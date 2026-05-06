@@ -43,17 +43,25 @@ Metrics/ClassLength:
 
 RSpec/ExampleLength:
   Max: 15
+  Exclude:
+    - "spec/integration/**/*"
 
 RSpec/MultipleExpectations:
   Max: 5
+  Exclude:
+    - "spec/integration/**/*"
 
 RSpec/NestedGroups:
   Max: 4
 
-# Rails cops are mostly relevant inside generated engines, not in the gem itself.
-Rails:
-  Enabled: false
+RSpec/DescribeClass:
+  Exclude:
+    - "spec/integration/**/*"
 
 # RSpec/SpecFilePathFormat trips on generator specs that test multiple classes.
 RSpec/SpecFilePathFormat:
+  Enabled: false
+
+# Rails cops are mostly relevant inside generated engines, not in the gem itself.
+Rails:
   Enabled: false
