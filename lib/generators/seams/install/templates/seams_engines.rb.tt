@@ -1,0 +1,11 @@
+# frozen_string_literal: true
+
+# Add every engine under engines/ to the host application's autoload
+# paths. New engines added with `seams:engine` are picked up
+# automatically without requiring an edit here.
+Rails.application.config.paths.add "engines", glob: "*"
+Dir[Rails.root.join("engines/*")].each do |engine_path|
+  next unless File.directory?(engine_path)
+
+  $LOAD_PATH.unshift File.join(engine_path, "lib")
+end

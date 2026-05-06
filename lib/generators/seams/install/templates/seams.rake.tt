@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+namespace :seams do
+  desc "List installed engines, the events they emit, and their dependencies"
+  task list: :environment do
+    require "seams/cli/list"
+    Seams::CLI::List.new.call
+  end
+
+  desc "Run RSpec for a single engine: rake seams:test[billing]"
+  task :test, [:engine] => :environment do |_t, args|
+    name = args[:engine] or abort("Usage: rake seams:test[billing]")
+    sh "bundle exec rspec engines/#{name}/spec"
+  end
+
+  desc "Run RuboCop for a single engine: rake seams:quality[billing]"
+  task :quality, [:engine] => :environment do |_t, args|
+    name = args[:engine] or abort("Usage: rake seams:quality[billing]")
+    sh "bundle exec rubocop engines/#{name}"
+  end
+end
