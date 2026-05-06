@@ -21,7 +21,8 @@ module Seams
 
     def reset_configuration!
       @configuration = Configuration.new
-      Events::Publisher.reset! if defined?(Events::Publisher)
+      Events::Publisher.reset!     if defined?(Events::Publisher)
+      Observability.reset!         if defined?(Observability)
     end
   end
 end
@@ -32,3 +33,6 @@ require "seams/events/adapter"
 require "seams/events/adapters/active_support"
 require "seams/event_registry"
 require "seams/events/publisher"
+require "seams/observability"
+require "seams/observability/adapter"
+require "seams/observability/adapters/rails_logger"
