@@ -1,0 +1,7 @@
+# frozen_string_literal: true
+
+require "<%= name %>/version"
+require "<%= name %>/engine"
+
+module <%= module_name %>
+end

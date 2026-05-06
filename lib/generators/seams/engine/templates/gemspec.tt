@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+require_relative "lib/<%= name %>/version"
+
+Gem::Specification.new do |spec|
+  spec.name        = "<%= name %>"
+  spec.version     = <%= module_name %>::VERSION
+  spec.authors     = ["TODO"]
+  spec.email       = ["TODO"]
+  spec.summary     = "TODO: short summary of the <%= name %> engine"
+  spec.description = "TODO: longer description"
+  spec.license     = "MIT"
+
+  spec.files = Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
+
+  spec.add_dependency "rails", ">= 7.1"
+  spec.add_dependency "seams"
+end

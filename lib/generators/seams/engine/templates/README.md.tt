@@ -1,0 +1,40 @@
+# <%= module_name %>
+
+> TODO: one-line summary of this engine.
+
+## Events emitted
+
+| Event name | Payload | Emitted when |
+| --- | --- | --- |
+| _none yet_ | | |
+
+Register every event in `lib/<%= name %>/engine.rb` so it shows up in
+`bin/rails seams:list`.
+
+## Events consumed
+
+| Event name | Subscriber | What it does |
+| --- | --- | --- |
+| _none yet_ | | |
+
+## Exposed concerns
+
+Modules in this list are intentionally part of the engine's public
+contract. Other engines may `include` them; `Seams/NoCrossEngineModelAccess`
+will not flag them.
+
+| Concern | Purpose |
+| --- | --- |
+| _none yet_ | |
+
+## Adapters
+
+| Interface | Default | Override via |
+| --- | --- | --- |
+| _none yet_ | | |
+
+## Running the specs
+
+```bash
+bin/rails seams:test[<%= name %>]
+```

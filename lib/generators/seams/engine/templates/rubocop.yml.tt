@@ -1,0 +1,31 @@
+inherit_from:
+  - ../../.rubocop.yml
+
+plugins:
+  - seams/cops
+
+# Engine-scoped boundary enforcement. List every other engine in your
+# host application here so this engine cannot reach into them
+# accidentally. Add concerns the other engines expose (e.g.
+# `Billing::Billable`) to ExposedConcerns to allow `include` calls.
+Seams/NoCrossEngineModelAccess:
+  Enabled: true
+  OwnEngine: <%= module_name %>
+  OtherEngines: []
+  ExposedConcerns: []
+
+Seams/NoCrossEngineDependency:
+  Enabled: true
+  OwnEngine: <%= name %>
+  OtherEngines: []
+
+Seams/KnownQueueNames:
+  Enabled: true
+  KnownQueues:
+    - default
+    - <%= name %>
+
+Seams/MigrationComments:
+  Enabled: true
+  Include:
+    - "db/migrate/**/*.rb"

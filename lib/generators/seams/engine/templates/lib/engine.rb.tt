@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+module <%= module_name %>
+  class Engine < ::Rails::Engine
+    isolate_namespace <%= module_name %>
+
+    config.generators do |g|
+      g.test_framework :rspec
+    end
+
+    initializer "<%= name %>.register_events" do
+      # Declare events that this engine emits. Other engines look these
+      # up via Seams::EventRegistry to know what to subscribe to.
+      #
+      # Example:
+      #   Seams::EventRegistry.register("<%= name %>.something_happened.<%= name %>", emitted_by: "<%= module_name %>")
+    end
+  end
+end
