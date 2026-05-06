@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "seams/version"
-require "seams/configuration"
 
 # Seams — A CLI framework that generates modular Rails engines.
 #
@@ -22,6 +21,14 @@ module Seams
 
     def reset_configuration!
       @configuration = Configuration.new
+      Events::Publisher.reset! if defined?(Events::Publisher)
     end
   end
 end
+
+require "seams/configuration"
+require "seams/events"
+require "seams/events/adapter"
+require "seams/events/adapters/active_support"
+require "seams/event_registry"
+require "seams/events/publisher"
