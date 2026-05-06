@@ -1,0 +1,59 @@
+plugins:
+  - rubocop-rails
+  - rubocop-rspec
+  - rubocop-performance
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "bin/**/*"
+    - "tmp/**/*"
+    - "vendor/**/*"
+    - "spec/fixtures/**/*"
+    - "lib/generators/**/templates/**/*"
+
+Style/Documentation:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Layout/LineLength:
+  Max: 120
+  Exclude:
+    - "spec/**/*"
+    - "*.gemspec"
+
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
+    - "*.gemspec"
+    - "Rakefile"
+
+Metrics/MethodLength:
+  Max: 25
+
+Metrics/ClassLength:
+  Max: 200
+
+RSpec/ExampleLength:
+  Max: 15
+
+RSpec/MultipleExpectations:
+  Max: 5
+
+RSpec/NestedGroups:
+  Max: 4
+
+# Rails cops are mostly relevant inside generated engines, not in the gem itself.
+Rails:
+  Enabled: false
+
+# RSpec/SpecFilePathFormat trips on generator specs that test multiple classes.
+RSpec/SpecFilePathFormat:
+  Enabled: false
