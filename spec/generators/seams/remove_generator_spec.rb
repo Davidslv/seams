@@ -26,9 +26,13 @@ RSpec.describe Seams::Generators::RemoveGenerator do
       expect(File.exist?(engine_path)).to be(false)
     end
 
-    it "raises if the engine doesn't exist" do
-      expect { run_generator(["nonexistent", "--force"]) }
-        .to raise_error(Seams::GeneratorError, /not found/)
+    it "is idempotent: re-running on a missing engine warns instead of raising" do
+      run_generator(["billing", "--force"])
+      expect { run_generator(["billing", "--force"]) }.not_to raise_error
+    end
+
+    it "warns instead of erroring when the engine never existed" do
+      expect { run_generator(["nonexistent", "--force"]) }.not_to raise_error
     end
 
     it "leaves the engines/ root intact even after removing the last engine" do

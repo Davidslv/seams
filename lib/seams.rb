@@ -9,25 +9,10 @@ module Seams
   class Error < StandardError; end
   class ConfigurationError < Error; end
   class GeneratorError < Error; end
-
-  class << self
-    def configuration
-      @configuration ||= Configuration.new
-    end
-
-    def configure
-      yield configuration
-    end
-
-    def reset_configuration!
-      @configuration = Configuration.new
-      Events::Publisher.reset!     if defined?(Events::Publisher)
-      Observability.reset!         if defined?(Observability)
-    end
-  end
 end
 
 require "seams/configuration"
+require "seams/runtime"
 require "seams/events"
 require "seams/events/adapter"
 require "seams/events/adapters/active_support"

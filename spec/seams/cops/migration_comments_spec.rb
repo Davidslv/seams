@@ -37,4 +37,18 @@ RSpec.describe RuboCop::Cop::Seams::MigrationComments, :config do
       end
     RUBY
   end
+
+  it "treats a frozen_string_literal magic comment + blank line as still leading" do
+    expect_no_offenses(<<~RUBY)
+      # frozen_string_literal: true
+
+      # What: adds the subscriptions table.
+      # Why:  required by the Billing engine to record paid plans.
+      class CreateSubscriptions < ActiveRecord::Migration[7.1]
+        def change
+          create_table :subscriptions
+        end
+      end
+    RUBY
+  end
 end

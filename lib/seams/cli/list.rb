@@ -10,6 +10,8 @@ module Seams
     class List
       DEFAULT_ENGINES_ROOT = "engines"
 
+      MODULE_DECLARATION = /\bmodule\s+([A-Z][A-Za-z0-9_]*)\b/
+
       def initialize(engines_root: DEFAULT_ENGINES_ROOT, output: $stdout)
         @engines_root = engines_root
         @output       = output
@@ -24,9 +26,7 @@ module Seams
           return
         end
 
-        engines.each do |engine|
-          print_engine(engine)
-        end
+        engines.each { |engine| print_engine(engine) }
       end
 
       private
@@ -46,9 +46,24 @@ module Seams
       end
 
       def events_for(name)
-        module_name = name.split("_").map(&:capitalize).join
-        events = Seams::EventRegistry.all.select { |_, owner| owner.to_s == module_name }.keys
+        module_name = module_name_for(name)
+        events      = Seams::EventRegistry.all.select { |_, owner| owner.to_s == module_name }.keys
         events.empty? ? ["(no events)"] : events
+      end
+
+      # Tries to find the engine's actual Ruby module name by reading
+      # its lib/<name>.rb. Falls back to a CamelCase conversion of the
+      # directory name (so `oauth2` becomes `Oauth2` rather than
+      # crashing) when the file is missing or doesn't declare a module.
+      def module_name_for(name)
+        root_file = File.join(@engines_root, name, "lib", "#{name}.rb")
+
+        if File.exist?(root_file)
+          match = File.read(root_file).match(MODULE_DECLARATION)
+          return match[1] if match
+        end
+
+        name.split("_").map(&:capitalize).join
       end
     end
   end

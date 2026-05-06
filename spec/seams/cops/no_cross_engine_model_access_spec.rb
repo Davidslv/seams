@@ -71,4 +71,60 @@ RSpec.describe RuboCop::Cop::Seams::NoCrossEngineModelAccess, :config do
       end
     RUBY
   end
+
+  context "with Rails framework constants under a sibling engine" do
+    it "does not flag Billing::Engine" do
+      expect_no_offenses(<<~RUBY)
+        Rails.application.routes.draw { mount Billing::Engine, at: "/billing" }
+      RUBY
+    end
+
+    it "does not flag Billing::VERSION" do
+      expect_no_offenses(<<~RUBY)
+        puts Billing::VERSION
+      RUBY
+    end
+
+    it "does not flag Billing::ApplicationRecord" do
+      expect_no_offenses(<<~RUBY)
+        class Subscription < Billing::ApplicationRecord; end
+      RUBY
+    end
+  end
+
+  context "with leaf names ending in framework suffixes" do
+    it "does not flag Billing::WebhooksController" do
+      expect_no_offenses(<<~RUBY)
+        Rails.application.routes.draw do
+          get "/x", to: Billing::WebhooksController
+        end
+      RUBY
+    end
+
+    it "does not flag Billing::ChargeJob" do
+      expect_no_offenses(<<~RUBY)
+        Billing::ChargeJob.perform_later
+      RUBY
+    end
+
+    it "does not flag Billing::ReceiptMailer" do
+      expect_no_offenses(<<~RUBY)
+        Billing::ReceiptMailer.send_now
+      RUBY
+    end
+  end
+
+  context "when OwnEngine is missing from config" do
+    let(:cop_config) do
+      {
+        "Enabled" => true,
+        "OtherEngines" => %w[Billing]
+      }
+    end
+
+    it "raises an error explaining the misconfiguration" do
+      expect { cop.send(:assert_own_engine_configured!) }
+        .to raise_error(RuboCop::Error, /OwnEngine/)
+    end
+  end
 end

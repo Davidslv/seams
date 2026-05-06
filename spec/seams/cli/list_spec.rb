@@ -57,4 +57,19 @@ RSpec.describe Seams::CLI::List do
       expect(io.string).to include("no engines")
     end
   end
+
+  describe "module-name resolution" do
+    before do
+      FileUtils.mkdir_p(File.join(engines_root, "oauth2", "lib"))
+      File.write(File.join(engines_root, "oauth2", "lib", "oauth2.rb"),
+                 "module OAuth2\nend\n")
+      Seams::EventRegistry.reset!
+      Seams::EventRegistry.register("token.granted.oauth2", emitted_by: "OAuth2")
+    end
+
+    it "reads the engine's lib/<name>.rb to find the actual module name" do
+      list.call
+      expect(io.string).to include("token.granted.oauth2")
+    end
+  end
 end

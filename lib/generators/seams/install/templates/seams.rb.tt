@@ -5,5 +5,5 @@
 Seams.configure do |config|
   config.event_bus_adapter      = "Seams::Events::Adapters::ActiveSupport"
   config.observability_adapter  = "Seams::Observability::Adapters::RailsLogger"
-  config.host_app_name          = Rails.application.class.module_parent_name
+  config.host_app_name          = (Rails.application.class.module_parent_name rescue nil)
 end

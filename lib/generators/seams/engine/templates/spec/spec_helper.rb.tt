@@ -2,11 +2,7 @@
 
 ENV["RAILS_ENV"] ||= "test"
 
-require "combustion"
-Combustion.path = "spec/internal"
-Combustion.initialize! :active_record, :action_controller
-
-require "rspec/rails"
+require "<%= name %>"
 
 RSpec.configure do |config|
   config.expect_with :rspec do |expectations|
@@ -17,6 +13,7 @@ RSpec.configure do |config|
     mocks.verify_partial_doubles = true
   end
 
-  config.use_transactional_fixtures = true
   config.disable_monkey_patching!
+  config.order = :random
+  Kernel.srand config.seed
 end

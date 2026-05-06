@@ -11,6 +11,13 @@ module Seams
     # underlying adapter directly — it enforces the naming convention,
     # checks the EventRegistry, and gives subscribers a simple
     # block-takes-payload interface regardless of which adapter is in use.
+    #
+    # Subscribers run **synchronously** in the publisher's thread (the
+    # default ActiveSupport::Notifications adapter has no other mode).
+    # They should therefore enqueue background jobs for any side effect
+    # that talks to the network or could fail — never perform the side
+    # effect inline. Seams does not enforce this; treat it as a
+    # convention that the boundary review catches.
     module Publisher
       class << self
         def publish(event_name, payload = {})
@@ -29,9 +36,11 @@ module Seams
 
         def subscribe(event_name, &)
           Events.assert_valid_name!(event_name)
-          adapter.subscribe(event_name.to_s) do |*args|
-            payload = args.last
-            yield(payload)
+          name = event_name.to_s
+          subscriptions << name
+
+          adapter.subscribe(name) do |*args|
+            yield(args.last)
           end
         end
 
@@ -39,12 +48,28 @@ module Seams
           adapter.unsubscribe(subscriber)
         end
 
+        # Returns the list of event names that engines have subscribed
+        # to during this process's lifetime. Useful for reporting and
+        # for the post-boot validation hook below.
+        def subscriptions
+          @subscriptions ||= []
+        end
+
+        # Walks every subscription and returns the names that no engine
+        # has registered as an emitted event. Hosts can call this from
+        # an after_initialize block (or in a CI smoke test) to catch
+        # typos like subscribing to "user.signed_up.atuh".
+        def orphan_subscriptions
+          subscriptions.reject { |name| EventRegistry.registered?(name) }.uniq
+        end
+
         def adapter
           @adapter ||= build_adapter
         end
 
         def reset!
-          @adapter = nil
+          @adapter       = nil
+          @subscriptions = nil
         end
 
         private

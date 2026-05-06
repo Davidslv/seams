@@ -97,4 +97,19 @@ RSpec.describe "Phase 1 integration", type: :integration do
     expect(parsed.dig("Seams/NoCrossEngineModelAccess", "OwnEngine")).to eq("Billing")
     expect(parsed.dig("Seams/NoCrossEngineDependency", "OwnEngine")).to eq("billing")
   end
+
+  it "auto-populates each engine's OtherEngines list when adding a sibling" do
+    run(Seams::Generators::InstallGenerator, [])
+    run(Seams::Generators::EngineGenerator, ["auth"])
+    run(Seams::Generators::EngineGenerator, ["billing"])
+
+    require "yaml"
+    auth     = YAML.safe_load_file(File.join(host_root, "engines/auth/.rubocop.yml"))
+    billing  = YAML.safe_load_file(File.join(host_root, "engines/billing/.rubocop.yml"))
+
+    expect(auth.dig("Seams/NoCrossEngineModelAccess", "OtherEngines")).to eq(["Billing"])
+    expect(auth.dig("Seams/NoCrossEngineDependency",  "OtherEngines")).to eq(["billing"])
+    expect(billing.dig("Seams/NoCrossEngineModelAccess", "OtherEngines")).to eq(["Auth"])
+    expect(billing.dig("Seams/NoCrossEngineDependency",  "OtherEngines")).to eq(["auth"])
+  end
 end

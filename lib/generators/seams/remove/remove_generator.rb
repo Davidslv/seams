@@ -17,8 +17,8 @@ module Seams
         engine_path = File.join(destination_root, "engines", name)
 
         unless File.directory?(engine_path)
-          raise Seams::GeneratorError,
-                "Engine #{name.inspect} not found at engines/#{name}"
+          say "  skip    engines/#{name}/ (not found)", :yellow
+          return
         end
 
         return unless options[:force] || confirm_removal?

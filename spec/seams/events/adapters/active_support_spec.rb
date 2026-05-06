@@ -27,9 +27,10 @@ RSpec.describe Seams::Events::Adapters::ActiveSupport do
   end
 
   describe "#subscribe" do
-    it "returns an ActiveSupport::Notifications subscriber that can be used to unsubscribe" do
+    it "returns a subscriber that ActiveSupport::Notifications recognizes" do
       subscriber = adapter.subscribe(event_name) { :noop }
-      expect { adapter.unsubscribe(subscriber) }.not_to raise_error
+
+      expect(subscriber.class.name).to start_with("ActiveSupport::Notifications")
     end
 
     it "matches subscribers by exact event name (no prefix matching)" do

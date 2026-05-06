@@ -73,7 +73,21 @@ RSpec.describe Seams::Generators::EngineGenerator do
 
     it "creates a spec_helper for the engine" do
       assert_file "engines/billing/spec/spec_helper.rb" do |content|
-        expect(content).to include("Combustion.initialize!")
+        expect(content).to include("require \"billing\"")
+        expect(content).to include("RSpec.configure")
+      end
+    end
+
+    it "creates a sample spec proving the engine boots" do
+      assert_file "engines/billing/spec/billing_spec.rb" do |content|
+        expect(content).to include("RSpec.describe Billing")
+        expect(content).to include("Billing::VERSION")
+      end
+    end
+
+    it "creates a LICENSE file" do
+      assert_file "engines/billing/LICENSE" do |content|
+        expect(content).to include("MIT License")
       end
     end
 
@@ -82,6 +96,23 @@ RSpec.describe Seams::Generators::EngineGenerator do
         expect(content).to include("# Billing")
         expect(content).to include("## Events emitted")
         expect(content).to include("## Events consumed")
+      end
+    end
+  end
+
+  describe "sibling engine cop config auto-update" do
+    it "rewrites OtherEngines in every existing engine's .rubocop.yml when adding a new one" do
+      run_generator(["auth"])
+      run_generator(["billing"])
+
+      assert_file "engines/auth/.rubocop.yml" do |content|
+        expect(content).to match(%r{Seams/NoCrossEngineModelAccess:.*?OtherEngines:\s*\n\s*-\s*Billing}m)
+        expect(content).to match(%r{Seams/NoCrossEngineDependency:.*?OtherEngines:\s*\n\s*-\s*billing}m)
+      end
+
+      assert_file "engines/billing/.rubocop.yml" do |content|
+        expect(content).to match(%r{Seams/NoCrossEngineModelAccess:.*?OtherEngines:\s*\n\s*-\s*Auth}m)
+        expect(content).to match(%r{Seams/NoCrossEngineDependency:.*?OtherEngines:\s*\n\s*-\s*auth}m)
       end
     end
   end

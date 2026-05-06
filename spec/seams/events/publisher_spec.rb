@@ -9,6 +9,8 @@ RSpec.describe Seams::Events::Publisher do
 
   before do
     allow(described_class).to receive(:adapter).and_return(adapter)
+    described_class.reset!
+    allow(described_class).to receive(:adapter).and_return(adapter)
     Seams::EventRegistry.reset!
     Seams::EventRegistry.register("subscription.created.billing", emitted_by: "Billing")
   end
@@ -43,6 +45,31 @@ RSpec.describe Seams::Events::Publisher do
       described_class.publish("subscription.created.billing", id: 7)
 
       expect(payload_seen).to eq(id: 7)
+    end
+
+    it "tracks every subscription so they can be inspected later" do
+      described_class.subscribe("subscription.created.billing") { :noop }
+      expect(described_class.subscriptions).to include("subscription.created.billing")
+    end
+
+    it "rejects subscriptions to invalid event names" do
+      expect do
+        described_class.subscribe("not-a-valid-event") { :noop }
+      end.to raise_error(Seams::Events::InvalidEventNameError)
+    end
+  end
+
+  describe ".orphan_subscriptions" do
+    it "returns subscriptions that no engine has registered as an emitted event" do
+      described_class.subscribe("subscription.created.billing") { :noop }   # registered
+      described_class.subscribe("user.signed_up.atuh")          { :noop }   # typo
+
+      expect(described_class.orphan_subscriptions).to eq(["user.signed_up.atuh"])
+    end
+
+    it "returns an empty array when every subscription has a registered emitter" do
+      described_class.subscribe("subscription.created.billing") { :noop }
+      expect(described_class.orphan_subscriptions).to be_empty
     end
   end
 end

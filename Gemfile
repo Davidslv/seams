@@ -20,7 +20,5 @@ group :development, :test do
 end
 
 group :test do
-  gem "ammeter", "~> 1.1"
-  gem "combustion", "~> 1.5"
   gem "sqlite3", "~> 2.0"
 end

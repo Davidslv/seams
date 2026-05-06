@@ -5,31 +5,54 @@ require "rubocop"
 module RuboCop
   module Cop
     module Seams
-      # Flags references to another engine's models from inside an
+      # Flags references to another engine's data classes from inside an
       # engine. Engines should communicate via events or via
       # explicitly-exposed concerns — never by reaching into another
       # engine's data layer.
       #
-      # Configured per-engine via the `OwnEngine` and `OtherEngines`
-      # options inside the engine's own .rubocop.yml. A registered
-      # concern (e.g. `Billing::Billable`) is exempt — only constants
-      # under the suspected ::Models namespace, or ones that look like
-      # ActiveRecord classes by convention, are flagged.
+      # Configured per-engine via the `OwnEngine`, `OtherEngines`, and
+      # `ExposedConcerns` options inside the engine's own .rubocop.yml.
+      #
+      # The cop deliberately ignores Rails framework constants that
+      # every engine exposes (`Engine`, `VERSION`, `ApplicationController`,
+      # `ApplicationRecord`, `ApplicationJob`, `ApplicationMailer`) and
+      # any class whose name ends in one of the configured suffixes
+      # (`Controller`, `Job`, `Mailer`, `Helper`, `Component`, `Engine`).
+      # Concerns (`Billing::Billable`, `Billing::Concerns::Billable`)
+      # are exempt when listed in `ExposedConcerns`.
       class NoCrossEngineModelAccess < Base
         MSG = "Engine `%<own>s` must not access `%<const>s` directly. " \
               "Use an event or a %<other>s-exposed concern instead."
 
+        DEFAULT_IGNORED_LEAF_NAMES = %w[
+          Engine
+          VERSION
+          ApplicationController
+          ApplicationRecord
+          ApplicationJob
+          ApplicationMailer
+          ApplicationHelper
+          ApplicationCable
+          Routes
+        ].freeze
+
+        DEFAULT_IGNORED_LEAF_SUFFIXES = %w[
+          Controller
+          Job
+          Mailer
+          Helper
+          Component
+          Channel
+          Engine
+        ].freeze
+
         def on_const(node)
-          return unless other_engines.any?
-          return if node.parent&.const_type? # only flag the outermost const ref
+          return unless flaggable?(node)
 
           full_name = node.const_name.to_s
-          parts     = full_name.split("::")
-          return if parts.size < 2 # bare top-level constants are not "model access"
+          top_level = full_name.split("::").first
 
-          top_level = parts.first
-          return unless other_engines.include?(top_level)
-          return if exposed_concern?(full_name)
+          assert_own_engine_configured!
 
           add_offense(
             node,
@@ -39,30 +62,60 @@ module RuboCop
 
         private
 
+        def flaggable?(node)
+          parts = const_parts_under_other_engine(node)
+          return false unless parts
+
+          full_name = parts.join("::")
+          return false if exposed_concern?(full_name)
+          return false if framework_constant?(parts)
+          return false if ignored_suffix?(parts.last)
+
+          true
+        end
+
+        # Returns the segments of the constant if `node` is the
+        # outermost reference to a multi-segment constant whose first
+        # segment is a sibling engine. Returns nil otherwise.
+        def const_parts_under_other_engine(node)
+          return nil if other_engines.empty?
+          return nil if node.parent&.const_type?
+
+          parts = node.const_name.to_s.split("::")
+          return nil if parts.size < 2
+          return nil unless other_engines.include?(parts.first)
+
+          parts
+        end
+
         def own_engine
-          cop_config["OwnEngine"].to_s
+          name = cop_config["OwnEngine"]
+          name&.to_s
+        end
+
+        def assert_own_engine_configured!
+          return if own_engine && !own_engine.empty?
+
+          raise RuboCop::Error,
+                "Seams/NoCrossEngineModelAccess requires `OwnEngine` to be set in " \
+                ".rubocop.yml so it knows which engine the file under inspection belongs to."
         end
 
         def other_engines
           Array(cop_config["OtherEngines"]).map(&:to_s)
         end
 
-        # A concern is a Ruby module that an engine intentionally exposes
-        # for other engines to `include`. By convention, concerns live at
-        # the top level of the engine namespace and are documented in the
-        # engine's README.
         def exposed_concern?(full_name)
-          parts = full_name.split("::")
-          return false unless parts.size == 2
-
-          # Heuristic: a single-segment "leaf" under the engine's
-          # namespace (e.g. Billing::Billable) is treated as a concern.
-          # Models live under deeper paths (Billing::Subscription is
-          # still flagged because it does not match a configured
-          # concern). A future iteration may make this configurable via
-          # an `ExposedConcerns` allowlist.
           allowlist = Array(cop_config["ExposedConcerns"]).map(&:to_s)
           allowlist.include?(full_name)
+        end
+
+        def framework_constant?(parts)
+          DEFAULT_IGNORED_LEAF_NAMES.include?(parts.last)
+        end
+
+        def ignored_suffix?(leaf_name)
+          DEFAULT_IGNORED_LEAF_SUFFIXES.any? { |suffix| leaf_name.end_with?(suffix) }
         end
       end
     end

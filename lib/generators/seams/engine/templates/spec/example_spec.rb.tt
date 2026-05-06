@@ -1,0 +1,7 @@
+# frozen_string_literal: true
+
+RSpec.describe <%= module_name %> do
+  it "defines a VERSION constant" do
+    expect(<%= module_name %>::VERSION).to match(/\A\d+\.\d+\.\d+\z/)
+  end
+end

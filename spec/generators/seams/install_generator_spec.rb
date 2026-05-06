@@ -62,7 +62,7 @@ RSpec.describe Seams::Generators::InstallGenerator do
 
     it "creates config/initializers/seams_engines.rb that adds engines/* to autoload" do
       assert_file "config/initializers/seams_engines.rb" do |content|
-        expect(content).to include("Rails.application.config")
+        expect(content).to include("Rails.autoloaders.main.push_dir")
         expect(content).to include("engines/")
       end
     end
