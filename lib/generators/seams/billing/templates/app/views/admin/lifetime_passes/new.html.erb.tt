@@ -1,0 +1,32 @@
+<h1>Grant a lifetime pass</h1>
+
+<%%= form_with url: billing.admin_lifetime_passes_path, scope: nil, local: true do %>
+  <p>
+    <label>Customer ref (Stripe customer id):
+      <input type="text" name="customer_ref" required>
+    </label>
+  </p>
+  <p>
+    <label>Plan:
+      <select name="plan_ref" required>
+        <option value=""></option>
+        <%% @plan_options.each do |plan| %>
+          <option value="<%%= plan.gateway_ref %>">
+            <%%= plan.name %> · <%%= plan.gateway_ref %>
+            <%% if (rem = plan.lifetime_inventory_remaining) %>
+              · <%%= rem %> remaining
+            <%% end %>
+          </option>
+        <%% end %>
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>Notes:
+      <textarea name="notes" rows="3"></textarea>
+    </label>
+  </p>
+  <button type="submit">Grant lifetime pass</button>
+<%% end %>
+
+<p><%%= link_to "Back", billing.admin_lifetime_passes_path %></p>

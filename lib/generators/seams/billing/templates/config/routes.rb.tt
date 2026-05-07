@@ -3,10 +3,19 @@
 Billing::Engine.routes.draw do
   resources :plans, only: %i[index]
 
-  post "/checkout",         to: "checkout#create",  as: :checkout
-  get  "/checkout/success", to: "checkout#success", as: :checkout_success
+  post "/checkout",          to: "checkout#create",   as: :checkout
+  get  "/checkout/success",  to: "checkout#success",  as: :checkout_success
+  # Lifetime Deal purchase — Stripe Checkout `mode: "payment"`.
+  # See issue #2 section 3A.LTD.
+  post "/lifetime_checkout", to: "checkout#lifetime", as: :lifetime_checkout
 
   post "/portal", to: "portal#create", as: :portal
+
+  # Admin-side LTD management. Mount behind your admin gate; see
+  # Billing::Admin::LifetimePassesController for the contract.
+  namespace :admin do
+    resources :lifetime_passes, only: %i[index new create destroy]
+  end
 
   post "/webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
 end

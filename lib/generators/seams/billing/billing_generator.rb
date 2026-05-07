@@ -105,6 +105,18 @@ module Seams
                  engine_path("app/views/billing/plans/index.html.erb")
       end
 
+      # LTD admin controller + views (issue #2 section 3A.LTD). Kept
+      # in its own generator method so create_controllers_and_views
+      # stays under the AbcSize lint threshold.
+      def create_lifetime_admin_controller_and_views
+        template "app/controllers/admin/lifetime_passes_controller.rb.tt",
+                 engine_path("app/controllers/billing/admin/lifetime_passes_controller.rb")
+        template "app/views/admin/lifetime_passes/index.html.erb.tt",
+                 engine_path("app/views/billing/admin/lifetime_passes/index.html.erb")
+        template "app/views/admin/lifetime_passes/new.html.erb.tt",
+                 engine_path("app/views/billing/admin/lifetime_passes/new.html.erb")
+      end
+
       def create_migrations
         template "db/migrate/create_billing_subscriptions.rb.tt",
                  engine_path("db/migrate/#{timestamp(0)}_create_billing_subscriptions.rb")

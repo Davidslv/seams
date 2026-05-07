@@ -1,0 +1,34 @@
+<h1>Lifetime passes</h1>
+
+<p><%%= link_to "Grant a new pass", billing.new_admin_lifetime_pass_path %></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Customer</th>
+      <th>Plan</th>
+      <th>Type</th>
+      <th>Granted at</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <%% @passes.each do |pass| %>
+      <tr>
+        <td><%%= pass.customer_ref %></td>
+        <td><%%= pass.plan_ref %></td>
+        <td><%%= pass.paid? ? "Paid" : "Granted" %></td>
+        <td><%%= pass.granted_at.utc.iso8601 %></td>
+        <td><%%= pass.revoked? ? "Revoked at #{pass.revoked_at.utc.iso8601}" : "Active" %></td>
+        <td>
+          <%% unless pass.revoked? %>
+            <%%= button_to "Revoke", billing.admin_lifetime_pass_path(pass),
+                          method: :delete,
+                          form: { onsubmit: "return confirm('Revoke this lifetime pass?')" } %>
+          <%% end %>
+        </td>
+      </tr>
+    <%% end %>
+  </tbody>
+</table>

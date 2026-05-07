@@ -27,6 +27,27 @@ module Billing
       render :success
     end
 
+    # POST /billing/lifetime_checkout?plan=price_xxx
+    # LTD purchase flow — same shape as #create but uses Stripe's
+    # `mode: "payment"`. The webhook handler distinguishes the two via
+    # session.metadata.access_type.
+    def lifetime
+      plan = Billing::Plan.active.find_by!(gateway_ref: params[:plan])
+
+      result = Billing::Lifetime::CreateLifetimeSessionService.call(
+        customer_ref: customer_ref_or_create!,
+        plan_ref:     plan.gateway_ref,
+        success_url:  billing.checkout_success_url,
+        cancel_url:   billing.plans_url
+      )
+
+      if result.ok?
+        redirect_to result.url, allow_other_host: true, status: :see_other
+      else
+        redirect_to billing.plans_path, alert: result.error
+      end
+    end
+
     private
 
     def customer_ref_or_create!

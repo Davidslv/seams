@@ -16,6 +16,8 @@ module Billing
     included do
       has_many :billing_subscriptions, class_name: "Billing::Subscription",
                                        foreign_key: :customer_ref, primary_key: :stripe_customer_id
+      has_many :billing_lifetime_passes, class_name: "Billing::LifetimePass",
+                                         foreign_key: :customer_ref, primary_key: :stripe_customer_id
     end
 
     def start_subscription!(plan_ref:)
@@ -26,6 +28,31 @@ module Billing
 
     def cancel_subscription!(subscription_ref:)
       Billing::CancelSubscriptionJob.perform_later(subscription_ref: subscription_ref)
+    end
+
+    # Lifetime Deal helpers (issue #2 section 3A.LTD).
+    # `lifetime?` is true if the user holds an active LifetimePass for
+    # ANY plan; `has_lifetime_for?(plan_ref:)` narrows to a specific one.
+    def lifetime?
+      lifetime_passes.active.exists?
+    end
+
+    def has_lifetime_for?(plan_ref:)
+      lifetime_passes.active.exists?(plan_ref: plan_ref)
+    end
+
+    def lifetime_passes
+      return Billing::LifetimePass.none unless respond_to?(:stripe_customer_id) && stripe_customer_id.present?
+
+      billing_lifetime_passes
+    end
+
+    # The "is this user a paying / entitled customer right now?" check.
+    # True for active or trialing recurring subscriptions OR for any
+    # active lifetime pass. Use this in host code instead of querying
+    # subscriptions directly so LTD users are accounted for.
+    def has_active_billing?
+      billing_subscriptions.active_or_trialing.exists? || lifetime?
     end
 
     private
