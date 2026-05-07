@@ -50,7 +50,18 @@ module Notifications
 
       def host_user_id_for(customer_ref)
         return nil if customer_ref.nil? || customer_ref.to_s.empty?
-        return nil unless defined?(::User) && ::User.column_names.include?("stripe_customer_id")
+
+        unless defined?(::User) && ::User.column_names.include?("stripe_customer_id")
+          # Visible signal — a silent miss here looks identical to "no
+          # user matched", which makes "billing notifications never
+          # fire for ANY user" hard to debug. Log loudly once per call.
+          Seams::Observability.adapter.warn(
+            "notifications.billing_subscriber.skip",
+            engine: "notifications",
+            reason: "host User class is not defined or has no stripe_customer_id column"
+          )
+          return nil
+        end
 
         ::User.where(stripe_customer_id: customer_ref).pick(:id)
       end

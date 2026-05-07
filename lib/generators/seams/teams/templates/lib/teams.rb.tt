@@ -7,8 +7,9 @@ require "teams/concerns/teamable"
 require "teams/concerns/authorization"
 
 module Teams
-  class Error             < StandardError; end
-  class AuthorizationError < Error; end
+  class Error               < StandardError; end
+  class AuthorizationError  < Error; end
+  class ConfigurationError  < Error; end
 
   class << self
     def configuration

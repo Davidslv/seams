@@ -5,7 +5,8 @@ module Teams
     include Teams::Authorization
 
     before_action :set_team
-    before_action :require_team_admin!, only: %i[create destroy]
+    before_action :require_team_member!, only: %i[index]
+    before_action :require_team_admin!,  only: %i[create destroy]
 
     def index
       @memberships = @team.memberships

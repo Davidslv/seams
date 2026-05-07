@@ -5,10 +5,21 @@ module Billing
   # The gateway adapter does the signature verification — we just
   # dispatch the resulting normalised event to event-bus subscribers.
   #
+  # Trust boundary: the request body is treated as untrusted until the
+  # gateway adapter's `verify_webhook` returns. CSRF is intentionally
+  # skipped (webhooks come from Stripe, not a browser session) — DO NOT
+  # add authentication here; the signature IS the authentication.
+  #
   # Idempotent: every accepted event is recorded by gateway+event_id;
   # retries hit the unique index and short-circuit before any
   # subscriber fires. Stripe explicitly requires this — retries can
   # span days (https://docs.stripe.com/webhooks#handle-duplicate-events).
+  #
+  # Rate-limit / replay window: Stripe's signature has a default
+  # 5-minute tolerance window; the WebhookEvent unique index covers
+  # arbitrary-length retries. No per-IP rate limit beyond what Rails'
+  # default rate-limiter provides — add one in front (CDN, ALB) if your
+  # webhook volume justifies it.
   class WebhooksController < ApplicationController
     skip_before_action :verify_authenticity_token
 
