@@ -1,0 +1,156 @@
+# frozen_string_literal: true
+
+require "rails/generators"
+require "rails/generators/test_case"
+require "generators/seams/teams/teams_generator"
+
+RSpec.describe Seams::Generators::TeamsGenerator do
+  let(:destination_root) { File.expand_path("../../../tmp/teams_generator", __dir__) }
+
+  def prepare_destination
+    FileUtils.rm_rf(destination_root)
+    FileUtils.mkdir_p(destination_root)
+    FileUtils.mkdir_p(File.join(destination_root, "engines"))
+  end
+
+  def run_generator
+    described_class.start([], destination_root: destination_root)
+  end
+
+  def assert_file(path)
+    full = File.join(destination_root, path)
+    expect(File.exist?(full)).to be(true), "expected #{path} to be created"
+    yield(File.read(full)) if block_given?
+  end
+
+  before do
+    prepare_destination
+    run_generator
+  end
+
+  describe "engine entry point" do
+    it "registers the five canonical team events" do
+      assert_file "engines/teams/lib/teams/engine.rb" do |content|
+        expect(content).to include('"team.created.teams"')
+        expect(content).to include('"team.member_added.teams"')
+        expect(content).to include('"team.member_removed.teams"')
+        expect(content).to include('"invitation.sent.teams"')
+        expect(content).to include('"invitation.accepted.teams"')
+      end
+    end
+  end
+
+  describe "configuration" do
+    it "creates Teams::Configuration with invitation_ttl + max_members_per_team" do
+      assert_file "engines/teams/lib/teams/configuration.rb" do |content|
+        expect(content).to include("attr_accessor :invitation_ttl, :max_members_per_team")
+      end
+    end
+  end
+
+  describe "models" do
+    it "creates Teams::Team with slug + memberships association" do
+      assert_file "engines/teams/app/models/teams/team.rb" do |content|
+        expect(content).to include("has_many :memberships")
+        expect(content).to include("has_many :invitations")
+        expect(content).to include("def assign_slug")
+      end
+    end
+
+    it "creates Teams::Membership with role inclusion" do
+      assert_file "engines/teams/app/models/teams/membership.rb" do |content|
+        expect(content).to include("ROLES")
+        expect(content).to include("def admin?")
+      end
+    end
+
+    it "creates Teams::Invitation with token + expiry assignment" do
+      assert_file "engines/teams/app/models/teams/invitation.rb" do |content|
+        expect(content).to include("SecureRandom.urlsafe_base64(32)")
+        expect(content).to include("def expired?")
+        expect(content).to include("Teams.configuration.invitation_ttl")
+      end
+    end
+  end
+
+  describe "controllers" do
+    it "creates TeamsController publishing team.created.teams" do
+      assert_file "engines/teams/app/controllers/teams/teams_controller.rb" do |content|
+        expect(content).to include('"team.created.teams"')
+      end
+    end
+
+    it "creates MembershipsController publishing team.member_added/removed.teams" do
+      assert_file "engines/teams/app/controllers/teams/memberships_controller.rb" do |content|
+        expect(content).to include('"team.member_added.teams"')
+        expect(content).to include('"team.member_removed.teams"')
+      end
+    end
+
+    it "creates InvitationsController with sent/accepted publishes + accept action" do
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
+        expect(content).to include('"invitation.sent.teams"')
+        expect(content).to include('"invitation.accepted.teams"')
+        expect(content).to include("def accept")
+      end
+    end
+  end
+
+  describe "concern" do
+    it "creates Teams::Teamable with member_of?, admin_of?, owner_of?" do
+      assert_file "engines/teams/lib/teams/concerns/teamable.rb" do |content|
+        expect(content).to include('require "active_support/concern"')
+        expect(content).to include("def member_of?")
+        expect(content).to include("def admin_of?")
+        expect(content).to include("def owner_of?")
+      end
+    end
+
+    it "registers Teams::Teamable in ExposedConcerns" do
+      assert_file "engines/teams/.rubocop.yml" do |content|
+        expect(content).to include("Teams::Teamable")
+      end
+    end
+  end
+
+  describe "migrations" do
+    it "creates teams + team_memberships + team_invitations migrations" do
+      %w[create_teams create_team_memberships create_team_invitations].each do |slug|
+        pattern = File.join(destination_root, "engines/teams/db/migrate", "*_#{slug}.rb")
+        file    = Dir[pattern].first
+        expect(file).not_to be_nil, "expected migration matching *_#{slug}.rb"
+
+        content = File.read(file)
+        expect(content).to include("# What:"), "expected #{file} to have a What: comment"
+      end
+    end
+  end
+
+  describe "routes" do
+    it "draws nested teams + memberships + invitations" do
+      assert_file "engines/teams/config/routes.rb" do |content|
+        expect(content).to include("resources :teams")
+        expect(content).to include("resources :memberships")
+        expect(content).to include("resources :invitations")
+        expect(content).to include("post :accept")
+      end
+    end
+  end
+
+  describe "documentation + specs" do
+    it "rewrites README with the canonical events table + role rubric" do
+      assert_file "engines/teams/README.md" do |content|
+        expect(content).to include("team.created.teams")
+        expect(content).to include("Teams::Teamable")
+        expect(content).to include("owner")
+        expect(content).to include("admin")
+      end
+    end
+
+    it "creates per-model spec stubs" do
+      assert_file "engines/teams/spec/models/teams/team_spec.rb"
+      assert_file "engines/teams/spec/models/teams/membership_spec.rb"
+      assert_file "engines/teams/spec/models/teams/invitation_spec.rb"
+    end
+  end
+end

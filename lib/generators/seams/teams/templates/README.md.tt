@@ -1,0 +1,50 @@
+# Teams
+
+> Multi-tenant teams + memberships + invitations for a Seams-powered host.
+
+## Events emitted
+
+| Event name                       | Payload                                          | Emitted when |
+| ---                              | ---                                              | --- |
+| `team.created.teams`             | `{ team_id:, owner_id: }`                        | TeamsController#create succeeds |
+| `team.member_added.teams`        | `{ team_id:, user_id:, role: }`                  | MembershipsController#create succeeds |
+| `team.member_removed.teams`      | `{ team_id:, user_id: }`                         | MembershipsController#destroy runs |
+| `invitation.sent.teams`          | `{ team_id:, email:, role: }`                    | InvitationsController#create succeeds |
+| `invitation.accepted.teams`      | `{ team_id:, email:, user_id: }`                 | InvitationsController#accept succeeds |
+
+## Events consumed
+
+This engine does not subscribe to any other engine's events by default.
+
+## Exposed concerns
+
+| Concern              | Purpose                                                             |
+| ---                  | ---                                                                 |
+| `Teams::Teamable`    | Mix into the host's user model for `teams`, `team_memberships`, `member_of?`, `admin_of?`, `owner_of?` helpers. |
+
+## Roles
+
+| Role     | Capabilities |
+| ---      | --- |
+| `owner`  | Everything an admin can, plus deleting the team. |
+| `admin`  | Manage memberships and invitations. |
+| `member` | Read-only by default. |
+
+The engine ships role enforcement at the model level (`Membership#admin?`).
+Authorization in controllers is the host's responsibility — Seams gives
+you the data and the events; opinion-free on which authz library you use.
+
+## Mounting
+
+```ruby
+# config/routes.rb (host application)
+Rails.application.routes.draw do
+  mount Teams::Engine, at: "/teams"
+end
+```
+
+## Running the specs
+
+```bash
+bin/rails seams:test[teams]
+```

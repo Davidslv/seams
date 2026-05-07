@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+module Teams
+  # Engine-scoped configuration. Override in
+  # config/initializers/teams.rb of the host application.
+  class Configuration
+    attr_accessor :invitation_ttl, :max_members_per_team
+
+    def initialize
+      @invitation_ttl       = 7 * 24 * 60 * 60  # 7 days, in seconds
+      @max_members_per_team = nil               # nil = unlimited
+    end
+  end
+end

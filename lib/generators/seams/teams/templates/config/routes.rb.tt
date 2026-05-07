@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+Teams::Engine.routes.draw do
+  resources :teams, only: %i[index show new create edit update destroy] do
+    resources :memberships, only: %i[index create destroy]
+    resources :invitations, only: %i[index create destroy] do
+      post :accept, on: :member
+    end
+  end
+end

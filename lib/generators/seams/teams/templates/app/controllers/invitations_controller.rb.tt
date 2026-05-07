@@ -1,0 +1,58 @@
+# frozen_string_literal: true
+
+module Teams
+  class InvitationsController < ApplicationController
+    before_action :set_team, except: %i[accept]
+
+    def index
+      @invitations = @team.invitations.pending
+    end
+
+    def create
+      invitation = @team.invitations.create!(invitation_params)
+      Seams::Events::Publisher.publish(
+        "invitation.sent.teams",
+        team_id: @team.id, email: invitation.email, role: invitation.role
+      )
+      redirect_to team_invitations_path(@team), notice: "Invitation sent"
+    rescue ActiveRecord::RecordInvalid => e
+      redirect_to team_invitations_path(@team), alert: e.message
+    end
+
+    def destroy
+      invitation = @team.invitations.find(params[:id])
+      invitation.destroy
+      redirect_to team_invitations_path(@team), notice: "Invitation revoked"
+    end
+
+    def accept
+      invitation = Teams::Invitation.find_by!(token: params[:token])
+      raise Teams::AuthorizationError, "Invitation expired" if invitation.expired?
+
+      Teams::Invitation.transaction do
+        invitation.team.memberships.create!(user_id: current_user_id, role: invitation.role)
+        invitation.update!(accepted_at: Time.current)
+      end
+
+      Seams::Events::Publisher.publish(
+        "invitation.accepted.teams",
+        team_id: invitation.team_id, email: invitation.email, user_id: current_user_id
+      )
+      redirect_to team_path(invitation.team), notice: "Joined #{invitation.team.name}"
+    end
+
+    private
+
+    def set_team
+      @team = Teams::Team.find(params[:team_id])
+    end
+
+    def invitation_params
+      params.require(:invitation).permit(:email, :role)
+    end
+
+    def current_user_id
+      respond_to?(:current_user) && current_user&.id
+    end
+  end
+end
