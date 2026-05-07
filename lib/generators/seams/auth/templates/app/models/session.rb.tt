@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+module Auth
+  class Session < ApplicationRecord
+    self.table_name = "auth_sessions"
+
+    belongs_to :user, class_name: "Auth::User"
+
+    SESSION_TTL = 30.days
+
+    before_create :assign_token
+    before_create :assign_expiry
+
+    scope :active, -> { where("expires_at > ?", Time.current) }
+
+    def expired?
+      expires_at <= Time.current
+    end
+
+    private
+
+    def assign_token
+      self.token ||= SecureRandom.hex(32)
+    end
+
+    def assign_expiry
+      self.expires_at ||= Time.current + SESSION_TTL
+    end
+  end
+end

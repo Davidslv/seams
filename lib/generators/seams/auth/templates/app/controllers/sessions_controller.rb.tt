@@ -1,0 +1,37 @@
+# frozen_string_literal: true
+
+module Auth
+  class SessionsController < ApplicationController
+    def new
+      # render the sign-in form
+    end
+
+    def create
+      user = Auth::User.authenticate(email: params[:email], password: params[:password])
+
+      if user
+        session = user.sessions.create!
+        cookies.encrypted[:auth_session] = { value: session.token, httponly: true, expires: session.expires_at }
+        Seams::Events::Publisher.publish("user.signed_in.auth", user_id: user.id, session_id: session.id)
+        redirect_to main_app.root_path, notice: "Signed in"
+      else
+        flash.now[:alert] = "Invalid email or password"
+        render :new, status: :unprocessable_entity
+      end
+    end
+
+    def destroy
+      token = cookies.encrypted[:auth_session]
+      if token
+        session = Auth::Session.find_by(token: token)
+        if session
+          Seams::Events::Publisher.publish("user.signed_out.auth",
+                                          user_id: session.user_id, session_id: session.id)
+          session.destroy
+        end
+      end
+      cookies.delete(:auth_session)
+      redirect_to main_app.root_path, notice: "Signed out"
+    end
+  end
+end

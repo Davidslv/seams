@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+# What: creates the auth_users table for the Auth engine.
+# Why:  every host application that mounts Auth::Engine needs a place
+#       to store password digests and per-user state.
+# Risk: empty table on creation — no data migration needed.
+class CreateAuthUsers < ActiveRecord::Migration[7.1]
+  def change
+    create_table :auth_users do |t|
+      t.string  :email,            null: false
+      t.string  :password_digest,  null: false
+      t.bigint  :host_user_id
+      t.timestamps
+    end
+
+    add_index :auth_users, :email, unique: true
+    add_index :auth_users, :host_user_id, where: "host_user_id IS NOT NULL"
+  end
+end

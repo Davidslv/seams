@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+module Auth
+  class Engine < ::Rails::Engine
+    isolate_namespace Auth
+
+    config.generators do |g|
+      g.test_framework :rspec
+    end
+
+    initializer "auth.register_events" do
+      Seams::EventRegistry.register("user.signed_up.auth",   emitted_by: "Auth")
+      Seams::EventRegistry.register("user.signed_in.auth",   emitted_by: "Auth")
+      Seams::EventRegistry.register("user.signed_out.auth",  emitted_by: "Auth")
+      Seams::EventRegistry.register("session.expired.auth",  emitted_by: "Auth")
+    end
+  end
+end

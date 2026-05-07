@@ -1,0 +1,44 @@
+# Auth
+
+> Email + password authentication for a Seams-powered host application.
+
+## Events emitted
+
+| Event name | Payload | Emitted when |
+| --- | --- | --- |
+| `user.signed_up.auth`   | `{ user_id:, email: }`        | RegistrationsController#create succeeds |
+| `user.signed_in.auth`   | `{ user_id:, session_id: }`   | SessionsController#create succeeds |
+| `user.signed_out.auth`  | `{ user_id:, session_id: }`   | SessionsController#destroy runs |
+| `session.expired.auth`  | `{ user_id:, session_id: }`   | (future) sweeper job revokes a stale session |
+
+## Events consumed
+
+This engine does not subscribe to any other engine's events.
+
+## Exposed concerns
+
+| Concern | Purpose |
+| --- | --- |
+| `Auth::Authenticatable` | Mix into the host's user-facing model to get session-aware helpers (`signed_in?`, `sign_out_everywhere!`) without coupling to `Auth::User`. |
+
+## Adapters
+
+This engine uses no swappable adapters in its first cut. Password
+hashing is provided by `bcrypt` via Rails' `has_secure_password`. To
+swap in a different hasher, override `Auth::User`'s
+`password_digest=` setter in your host application.
+
+## Mounting
+
+```ruby
+# config/routes.rb (host application)
+Rails.application.routes.draw do
+  mount Auth::Engine, at: "/auth"
+end
+```
+
+## Running the specs
+
+```bash
+bin/rails seams:test[auth]
+```

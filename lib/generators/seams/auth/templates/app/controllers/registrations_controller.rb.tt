@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+module Auth
+  class RegistrationsController < ApplicationController
+    def new
+      @user = Auth::User.new
+    end
+
+    def create
+      @user = Auth::User.new(user_params)
+
+      if @user.save
+        session = @user.sessions.create!
+        cookies.encrypted[:auth_session] = { value: session.token, httponly: true, expires: session.expires_at }
+        Seams::Events::Publisher.publish("user.signed_up.auth", user_id: @user.id, email: @user.email)
+        redirect_to main_app.root_path, notice: "Welcome"
+      else
+        render :new, status: :unprocessable_entity
+      end
+    end
+
+    private
+
+    def user_params
+      params.require(:user).permit(:email, :password, :password_confirmation)
+    end
+  end
+end
