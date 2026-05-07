@@ -1,7 +1,7 @@
 <%%# Notification bell partial. Render in the host layout: %>
 <%%#   <%%= render "notifications/bell", recipient: current_user %> %>
 <%%
-  count = recipient&.notifications&.unread&.count || 0
+  count = recipient&.notifications&.where(type: "Notifications::Strategies::InApp")&.unread&.count || 0
 %>
 
 <a href="<%%= notifications.notifications_path %>"

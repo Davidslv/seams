@@ -1,23 +1,99 @@
 # frozen_string_literal: true
 
 module Notifications
+  # Represents a scheduled notification belonging to an +owner+.
+  #
+  # Concrete delivery types are STI subclasses under
+  # +Notifications::Strategies+ — +InApp+, +Email+, +Sms+ — each
+  # implementing its own +#dispatch!+. They share this base's schema,
+  # scheduling, and audit logic.
+  #
+  # Scheduling is delegated to ice_cube. The schedule is persisted as
+  # a jsonb hash via +schedule_data+ and exposed through
+  # +schedule+/+schedule=+. +next_delivery_at+ is an indexed cache so
+  # the recurring sweeper hits one query.
   class Notification < ApplicationRecord
     self.table_name = "notifications"
 
-    CHANNELS = %w[in_app email sms].freeze
+    belongs_to :owner, polymorphic: true
+    has_many   :deliveries, class_name: "Notifications::Delivery",
+                            dependent: :destroy, inverse_of: :notification
 
-    belongs_to :recipient, polymorphic: true
-    belongs_to :source,    polymorphic: true, optional: true
+    # Concrete STI subclasses permitted for creation. Anything else
+    # fails validation rather than booting an unknown subclass.
+    PERMITTED_TYPES = [
+      "Notifications::Strategies::InApp",
+      "Notifications::Strategies::Email",
+      "Notifications::Strategies::Sms"
+    ].freeze
 
-    validates :notification_type, :title, :channel, presence: true
-    validates :channel, inclusion: { in: CHANNELS }
+    FREQUENCIES = %w[once daily weekly monthly].freeze
 
-    scope :unread,  -> { where(read_at: nil) }
-    scope :read,    -> { where.not(read_at: nil) }
-    scope :recent,  -> { order(created_at: :desc) }
-    scope :for,     ->(recipient) {
-      where(recipient_type: recipient.class.name, recipient_id: recipient.id)
-    }
+    validates :type,     inclusion: { in: PERMITTED_TYPES }
+    validates :template, presence: true
+
+    scope :due,        -> { where(next_delivery_at: ..Time.current) }
+    scope :pending,    -> { where.not(next_delivery_at: nil) }
+    scope :completed,  -> { where(next_delivery_at: nil) }
+    scope :unread,     -> { where(read_at: nil) }
+    scope :recent,     -> { order(created_at: :desc) }
+
+    # Accept short type names ("Email", "Sms", "InApp") in API params
+    # and normalise to fully-qualified class names. Falls back to the
+    # base class so the inclusion validation returns 422 instead of
+    # raising a 500.
+    def self.find_sti_class(type_name)
+      super(expand_type(type_name))
+    rescue ::ActiveRecord::SubclassNotFound
+      self
+    end
+
+    def self.expand_type(type_name)
+      PERMITTED_TYPES.find { |t| t.demodulize == type_name } || type_name
+    end
+
+    def type=(value)
+      super(self.class.expand_type(value.to_s))
+    end
+
+    # Deserialises +schedule_data+ into an IceCube::Schedule instance.
+    def schedule
+      return nil if schedule_data.blank?
+
+      IceCube::Schedule.from_hash(schedule_data)
+    end
+
+    # Assigns an IceCube::Schedule, persisting it as jsonb and setting
+    # +next_delivery_at+ to the schedule's first occurrence.
+    def schedule=(sched)
+      self.schedule_data    = sched&.to_hash
+      self.next_delivery_at = sched&.first
+    end
+
+    # Form-friendly schedule constructor. Accepts:
+    #   { starts_at:, frequency: once|daily|weekly|monthly,
+    #     interval: 1, count: 5, until: "2026-12-31" }
+    # so host code never has to import ice_cube.
+    def schedule_config=(config)
+      return if config.blank?
+
+      sched = IceCube::Schedule.new(Time.zone.parse(config[:starts_at].to_s))
+      rule  = build_recurrence_rule(config)
+      sched.add_recurrence_rule(rule) if rule
+      self.schedule = sched
+    end
+
+    # Renders the ERB template named by +template+. Looks first in the
+    # host's app/views/notifications/templates/<name>.erb, then falls
+    # back to the engine's bundled templates. Hosts override by
+    # dropping a file.
+    def rendered_content
+      ERB.new(File.read(find_template_path)).result_with_hash(notification: self)
+    end
+
+    def due?
+      next_delivery_at.present? && next_delivery_at <= Time.current
+    end
 
     def read?
       read_at.present?
@@ -25,6 +101,76 @@ module Notifications
 
     def mark_as_read!
       update!(read_at: Time.current) unless read?
+    end
+
+    def send_async
+      Notifications::SendNotificationJob.perform_later(id)
+    end
+
+    # Synchronous delivery. Wraps dispatch! + Delivery + advance! in a
+    # transaction and publishes the lifecycle events around them.
+    # No-ops if not yet due (defensive against duplicate enqueue).
+    def send!
+      return unless due?
+
+      self.class.transaction do
+        Seams::Events::Publisher.publish(
+          "notification.queued.notifications", id: id, type: type, owner_id: owner_id
+        )
+        dispatch!
+        deliveries.create!(sent_at: Time.current)
+        advance!
+        Seams::Events::Publisher.publish(
+          "notification.delivered.notifications", id: id, type: type, owner_id: owner_id
+        )
+      end
+    rescue StandardError => e
+      Seams::Events::Publisher.publish(
+        "notification.failed.notifications", id: id, type: type, error: "#{e.class}: #{e.message}"
+      )
+      raise
+    end
+
+    # Advances +next_delivery_at+ to the next ice_cube occurrence
+    # after now. nil when no further occurrences exist (one-shots
+    # become "completed").
+    def advance!
+      update!(next_delivery_at: schedule&.next_occurrence)
+    end
+
+    FREQUENCY_BUILDERS = {
+      "daily"   => ->(interval) { IceCube::Rule.daily(interval) },
+      "weekly"  => ->(interval) { IceCube::Rule.weekly(interval) },
+      "monthly" => ->(interval) { IceCube::Rule.monthly(interval) }
+    }.freeze
+    private_constant :FREQUENCY_BUILDERS
+
+    private
+
+    def build_recurrence_rule(config)
+      builder = FREQUENCY_BUILDERS[config[:frequency].to_s]
+      return unless builder
+
+      interval = [config[:interval].to_i, 1].max
+      apply_rule_constraints(builder.call(interval), config)
+    end
+
+    def apply_rule_constraints(rule, config)
+      rule = rule.count(config[:count].to_i)                  if config[:count].present?
+      rule = rule.until(Time.zone.parse(config[:until].to_s)) if config[:until].present?
+      rule
+    end
+
+    # Each strategy implements its own dispatch.
+    def dispatch!
+      raise NotImplementedError, "#{self.class} must implement #dispatch!"
+    end
+
+    def find_template_path
+      host = Rails.root.join("app/views/notifications/templates/#{template}.erb")
+      return host if host.exist?
+
+      Notifications::Engine.root.join("app/views/notifications/templates/#{template}.erb")
     end
   end
 end

@@ -5,7 +5,11 @@ module Notifications
     before_action :set_notification, only: %i[show mark_as_read]
 
     def index
-      @notifications = current_recipient.notifications.recent.limit(50)
+      @notifications = current_recipient
+                       &.notifications
+                       &.where(type: "Notifications::Strategies::InApp")
+                       &.recent
+                       &.limit(50) || []
     end
 
     def show
@@ -21,14 +25,18 @@ module Notifications
     end
 
     def mark_all_as_read
-      current_recipient.notifications.unread.update_all(read_at: Time.current)
+      current_recipient
+        &.notifications
+        &.where(type: "Notifications::Strategies::InApp")
+        &.unread
+        &.update_all(read_at: Time.current)
       redirect_to notifications_path, notice: "All caught up"
     end
 
     private
 
     def set_notification
-      @notification = current_recipient.notifications.find(params[:id])
+      @notification = current_recipient&.notifications&.find(params[:id])
     end
 
     def current_recipient

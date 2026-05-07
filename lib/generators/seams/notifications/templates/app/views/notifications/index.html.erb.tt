@@ -7,9 +7,8 @@
 <ul>
   <%% @notifications.each do |n| %>
     <li class="<%%= 'unread' unless n.read? %>">
-      <%%= n.title %>
-      <%% if n.body.present? %><p><%%= n.body %></p><%% end %>
-      <%% if n.action_url.present? %><%%= link_to "Open", n.action_url %><%% end %>
+      <strong><%%= n.template.to_s.titleize %></strong>
+      <p><%%= n.rendered_content %></p>
       <%%= time_tag n.created_at %>
     </li>
   <%% end %>

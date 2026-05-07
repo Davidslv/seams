@@ -1,0 +1,11 @@
+<%%# Default ERB template. The notification model exposes itself via %>
+<%%# the local variable +notification+. Override by dropping a file %>
+<%%# at app/views/notifications/templates/<name>.erb in your host. %>
+Hello,
+
+You have a notification.
+
+—
+This is the default Seams notification template. Override it by
+creating app/views/notifications/templates/<your-template>.erb in
+your host app.

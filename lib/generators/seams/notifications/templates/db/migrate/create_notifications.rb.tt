@@ -1,32 +1,26 @@
 # frozen_string_literal: true
 
-# What: creates the notifications table for the in-app inbox.
-# Why:  every user-visible notification (welcome, billing event,
-#       team invitation, etc.) needs a persistent record so the bell
-#       icon can render unread counts and the user can revisit history.
-# Risk: append-mostly with read_at updates. Indexed by
-#       (recipient, read_at, created_at) for the bell query.
+# What: creates the notifications table for the STI Notification model.
+# Why:  every channel (in-app, email, SMS) shares the same scheduling +
+#       audit semantics. STI keeps that DRY: one table, one indexed
+#       next_delivery_at, three subclasses with their own dispatch!.
+# Risk: append + per-row updates (read_at flips, next_delivery_at
+#       advances). Indexed by (next_delivery_at) for the due sweeper
+#       and (owner) for the bell view.
 class CreateNotifications < ActiveRecord::Migration[7.1]
   def change
     create_table :notifications do |t|
-      t.bigint  :recipient_id,   null: false
-      t.string  :recipient_type, null: false
-      t.string  :notification_type, null: false  # e.g. "welcome", "invoice_paid"
-      t.string  :channel,        null: false, default: "in_app"
-      t.string  :title,          null: false
-      t.text    :body
-      t.string  :action_url
-      t.bigint  :source_id
-      t.string  :source_type
-      t.jsonb   :metadata,       null: false, default: {}
-      t.datetime :read_at
-      t.datetime :delivered_at
+      t.string  :type,             null: false   # STI discriminator
+      t.references :owner,         polymorphic: true, null: false, index: true
+      t.string  :recipient                       # destination address (override of owner default)
+      t.string  :template,         null: false
+      t.jsonb   :schedule_data                   # IceCube::Schedule#to_hash
+      t.datetime :next_delivery_at
+      t.datetime :read_at                        # InApp only
       t.timestamps
     end
 
-    add_index :notifications, %i[recipient_type recipient_id read_at created_at],
-              name: "index_notifications_on_recipient_and_read"
-    add_index :notifications, %i[source_type source_id]
-    add_index :notifications, :notification_type
+    add_index :notifications, :next_delivery_at
+    add_index :notifications, %i[type next_delivery_at]
   end
 end

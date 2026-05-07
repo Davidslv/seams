@@ -1,15 +1,15 @@
 # frozen_string_literal: true
 
 module Notifications
-  # Consumes Auth events and:
-  #   1. Persists an in-app Notification row (so the bell shows it).
-  #   2. Enqueues an outbound email via DeliverEmailJob if the user
-  #      hasn't opted out via NotificationPreference.
+  # Consumes Auth events. On +user.signed_up.auth+:
+  #   1. Creates an InApp notification (so the bell shows it).
+  #   2. Creates an Email notification if the user hasn't opted out
+  #      via NotificationPreference.
   #
-  # Subscribers always enqueue jobs / DB writes; they never run side
-  # effects synchronously inside the publisher's transaction.
+  # Notifications are scheduled for immediate delivery and enqueued
+  # via send_async — they don't block the publisher's transaction.
   #
-  # `.attach!` is idempotent — Rails reload won't double-subscribe.
+  # +.attach!+ is idempotent — Rails reload won't double-subscribe.
   class AuthSubscriber
     @attached = false
 
@@ -30,26 +30,38 @@ module Notifications
       private
 
       def handle_signed_up(payload)
-        return unless payload[:user_id] && payload[:email]
+        return unless payload[:user_id]
 
-        Notifications::Notification.create!(
-          recipient_type:    "User",
-          recipient_id:      payload[:user_id],
-          notification_type: "welcome",
-          channel:           "in_app",
-          title:             "Welcome",
-          body:              "Thanks for signing up.",
-          delivered_at:      Time.current
-        )
+        owner = resolve_owner(payload[:user_id])
+        return unless owner
 
-        return unless Notifications::NotificationPreference.enabled?(
-          user_id: payload[:user_id], channel: "email", notification_type: "welcome"
-        )
+        create_in_app(owner)
+        create_email(owner) if email_enabled?(payload[:user_id])
+      end
 
-        DeliverEmailJob.perform_later(
-          to:      payload[:email],
-          subject: "Welcome",
-          body:    "Thanks for signing up. Reply to this email if you need anything."
+      def resolve_owner(user_id)
+        return nil unless defined?(::User)
+
+        ::User.find_by(id: user_id)
+      end
+
+      def create_in_app(owner)
+        notif = Notifications::Strategies::InApp.new(owner: owner, template: "welcome")
+        notif.schedule = IceCube::Schedule.new(Time.current)
+        notif.save!
+        notif.send_async
+      end
+
+      def create_email(owner)
+        notif = Notifications::Strategies::Email.new(owner: owner, template: "welcome")
+        notif.schedule = IceCube::Schedule.new(Time.current)
+        notif.save!
+        notif.send_async
+      end
+
+      def email_enabled?(user_id)
+        Notifications::NotificationPreference.enabled?(
+          user_id: user_id, channel: "email", notification_type: "welcome"
         )
       end
     end

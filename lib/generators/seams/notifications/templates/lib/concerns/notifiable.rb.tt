@@ -3,28 +3,63 @@
 require "active_support/concern"
 
 module Notifications
-  # Mix into the host application's user-facing model to gain a
-  # consistent way to fire transactional messages without coupling to
-  # the engine's internals.
+  # Mix into the host's user-facing model. Adds a +notifications+
+  # association and a +#notify+ helper that creates the right
+  # +Strategies::*+ subclass for the requested channel.
   #
   #   class User < ApplicationRecord
   #     include Notifications::Notifiable
   #   end
   #
-  #   user.notify_email(subject: "Hi", body: "Welcome")
+  #   user.notify(strategy: :email,  template: "welcome")
+  #   user.notify(strategy: :sms,    template: "alert", schedule_config: { starts_at: 1.day.from_now, frequency: "once" })
+  #   user.notify(strategy: :in_app, template: "system")
   module Notifiable
     extend ActiveSupport::Concern
 
-    def notify_email(subject:, body:)
-      Notifications::DeliverEmailJob.perform_later(
-        to: respond_to?(:email) ? email : nil, subject: subject, body: body
-      )
+    STRATEGY_CLASSES = {
+      email:  "Notifications::Strategies::Email",
+      sms:    "Notifications::Strategies::Sms",
+      in_app: "Notifications::Strategies::InApp"
+    }.freeze
+
+    included do
+      has_many :notifications, class_name: "Notifications::Notification",
+                               as: :owner, dependent: :destroy
     end
 
-    def notify_sms(body:)
-      Notifications::DeliverSmsJob.perform_later(
-        to: respond_to?(:phone) ? phone : nil, body: body
+    def notify(strategy:, template:, schedule_config: nil, recipient: nil)
+      notif = notifications.build(
+        type:      STRATEGY_CLASSES.fetch(strategy.to_sym),
+        recipient: recipient,
+        template:  template
       )
+      assign_schedule!(notif, schedule_config)
+      notif.save!
+      notif.send_async if notif.due?
+      notif
+    end
+
+    def email_notification_recipient
+      respond_to?(:email) ? email : nil
+    end
+
+    def sms_notification_recipient
+      respond_to?(:phone) ? phone : nil
+    end
+
+    def unread_in_app_notifications
+      notifications.where(type: "Notifications::Strategies::InApp").unread
+    end
+
+    private
+
+    def assign_schedule!(notif, schedule_config)
+      if schedule_config
+        notif.schedule_config = schedule_config
+      else
+        notif.schedule = IceCube::Schedule.new(Time.current)
+      end
     end
   end
 end

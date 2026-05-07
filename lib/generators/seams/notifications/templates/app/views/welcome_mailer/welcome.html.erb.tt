@@ -1,3 +1,0 @@
-<h1>Welcome<%%= ", #{@name}" if @name %></h1>
-
-<p>Thanks for signing up. Reply to this email if you need anything.</p>

@@ -9,8 +9,14 @@ require "seams/generators/host_injector"
 module Seams
   module Generators
     # Generates a canonical Notifications engine on top of the generic
-    # engine scaffold. The engine subscribes to user.signed_up.auth and
-    # routes outbound messages through swappable email + SMS adapters.
+    # engine scaffold.
+    #
+    # Notifications uses STI: a single +Notifications::Notification+
+    # base with three concrete subclasses under +Strategies+ — InApp,
+    # Email, Sms — each implementing its own +#dispatch!+. The
+    # schedule lives in a jsonb column populated by ice_cube;
+    # +next_delivery_at+ is the indexed cache the recurring sweeper
+    # reads from.
     #
     # Run with: bin/rails generate seams:notifications
     class NotificationsGenerator < Rails::Generators::Base
@@ -44,20 +50,6 @@ module Seams
                  engine_path("lib/notifications/concerns/notifiable.rb")
       end
 
-      def create_jobs
-        template "app/jobs/application_job.rb.tt",
-                 engine_path("app/jobs/notifications/application_job.rb")
-        template "app/jobs/deliver_email_job.rb.tt",
-                 engine_path("app/jobs/notifications/deliver_email_job.rb")
-        template "app/jobs/deliver_sms_job.rb.tt",
-                 engine_path("app/jobs/notifications/deliver_sms_job.rb")
-      end
-
-      def create_subscriber
-        template "app/subscribers/auth_subscriber.rb.tt",
-                 engine_path("app/subscribers/notifications/auth_subscriber.rb")
-      end
-
       def create_models
         template "app/models/application_record.rb.tt",
                  engine_path("app/models/notifications/application_record.rb")
@@ -65,6 +57,28 @@ module Seams
                  engine_path("app/models/notifications/notification.rb")
         template "app/models/notification_preference.rb.tt",
                  engine_path("app/models/notifications/notification_preference.rb")
+        template "app/models/delivery.rb.tt",
+                 engine_path("app/models/notifications/delivery.rb")
+        template "app/models/strategies/in_app.rb.tt",
+                 engine_path("app/models/notifications/strategies/in_app.rb")
+        template "app/models/strategies/email.rb.tt",
+                 engine_path("app/models/notifications/strategies/email.rb")
+        template "app/models/strategies/sms.rb.tt",
+                 engine_path("app/models/notifications/strategies/sms.rb")
+      end
+
+      def create_jobs
+        template "app/jobs/application_job.rb.tt",
+                 engine_path("app/jobs/notifications/application_job.rb")
+        template "app/jobs/send_due_notifications_job.rb.tt",
+                 engine_path("app/jobs/notifications/send_due_notifications_job.rb")
+        template "app/jobs/send_notification_job.rb.tt",
+                 engine_path("app/jobs/notifications/send_notification_job.rb")
+      end
+
+      def create_subscriber
+        template "app/subscribers/auth_subscriber.rb.tt",
+                 engine_path("app/subscribers/notifications/auth_subscriber.rb")
       end
 
       def create_controllers
@@ -91,12 +105,15 @@ module Seams
       def create_mailer
         template "app/mailers/application_mailer.rb.tt",
                  engine_path("app/mailers/notifications/application_mailer.rb")
-        template "app/mailers/transactional_mailer.rb.tt",
-                 engine_path("app/mailers/notifications/transactional_mailer.rb")
-        template "app/mailers/welcome_mailer.rb.tt",
-                 engine_path("app/mailers/notifications/welcome_mailer.rb")
-        template "app/views/welcome_mailer/welcome.html.erb.tt",
-                 engine_path("app/views/notifications/welcome_mailer/welcome.html.erb")
+        template "app/mailers/notification_mailer.rb.tt",
+                 engine_path("app/mailers/notifications/notification_mailer.rb")
+      end
+
+      def create_default_templates
+        template "app/views/templates/default.erb.tt",
+                 engine_path("app/views/notifications/templates/default.erb")
+        template "app/views/templates/welcome.erb.tt",
+                 engine_path("app/views/notifications/templates/welcome.erb")
       end
 
       def create_migrations
@@ -106,13 +123,6 @@ module Seams
                  engine_path("db/migrate/#{timestamp(1)}_create_notification_preferences.rb")
         template "db/migrate/create_notification_deliveries.rb.tt",
                  engine_path("db/migrate/#{timestamp(2)}_create_notification_deliveries.rb")
-      end
-
-      def create_specs
-        template "spec/jobs/deliver_email_job_spec.rb.tt",
-                 engine_path("spec/jobs/notifications/deliver_email_job_spec.rb")
-        template "spec/adapters/action_mailer_spec.rb.tt",
-                 engine_path("spec/adapters/notifications/action_mailer_spec.rb")
       end
 
       def overwrite_readme
@@ -130,6 +140,7 @@ module Seams
       end
 
       def wire_into_host
+        host_inject_gem("ice_cube", ">= 0.16")
         host_inject_mount(engine_class: "Notifications::Engine", at: "/notifications")
         host_inject_include_in_user("Notifications::Notifiable")
       end
@@ -139,11 +150,15 @@ module Seams
         say "  Notifications engine generated at engines/notifications/", :green
         say ""
         say "  Next steps:", :yellow
-        say "    1. `bin/rails db:migrate` to create the deliveries table"
-        say "    2. Configure adapters in config/initializers/notifications.rb"
-        say "    3. Run the engine specs: bin/rails seams:test[notifications]"
+        say "    1. bundle install   (picks up ice_cube)"
+        say "    2. bin/rails db:migrate"
+        say "    3. Schedule the sweeper. With Solid Queue, add to config/recurring.yml:"
+        say "         notifications_dispatcher:"
+        say "           class: Notifications::SendDueNotificationsJob"
+        say "           schedule: every minute"
+        say "    4. Configure adapters in config/initializers/notifications.rb"
         say ""
-        say "  Subscribed to: user.signed_up.auth (sends welcome email)"
+        say "  Subscribed to: user.signed_up.auth (creates an InApp + Email Notification)"
         say ""
       end
 

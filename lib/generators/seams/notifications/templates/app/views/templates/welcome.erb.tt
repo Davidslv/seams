@@ -1,0 +1,6 @@
+<%%# Default welcome template, used by AuthSubscriber when it consumes %>
+<%%# user.signed_up.auth. Override by dropping a file at %>
+<%%# app/views/notifications/templates/welcome.erb in your host. %>
+Welcome<%%= ", #{notification.owner.respond_to?(:name) ? notification.owner.name : ''}".rstrip %>!
+
+Thanks for signing up. Reply to this email if you need anything.

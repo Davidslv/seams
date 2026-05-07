@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+module Notifications
+  # Single mailer used by Notifications::Adapters::ActionMailer.
+  # Renders the notification's template via the ERB lookup chain
+  # (host app/views/notifications/templates/<name>.erb first, then
+  # engine default) and sends to the notification's recipient.
+  class NotificationMailer < ApplicationMailer
+    def notify(notification)
+      @notification = notification
+      mail(
+        to:           notification.recipient,
+        subject:      notification.template.to_s.titleize,
+        body:         notification.rendered_content,
+        content_type: "text/plain"
+      )
+    end
+  end
+end

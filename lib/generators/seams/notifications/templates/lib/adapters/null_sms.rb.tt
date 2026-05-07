@@ -4,14 +4,17 @@ require "notifications/adapters/abstract"
 
 module Notifications
   module Adapters
-    # No-op SMS adapter that logs the message and returns success
-    # without dispatching anything. Useful in development and tests
-    # where you want SMS calls to succeed without burning vendor quota.
+    # No-op SMS adapter. Logs the delivery via Seams::Observability
+    # and returns success without dispatching. Useful in development
+    # and tests so SMS calls succeed without burning vendor quota.
     class NullSms < Abstract
-      def deliver(to:, subject: nil, body:, **)
+      def deliver(notification:)
         Seams::Observability.adapter.info(
           "notifications.null_sms.deliver",
-          engine: "notifications", to: to, subject: subject, length: body.to_s.length
+          engine: "notifications",
+          to: notification.recipient,
+          template: notification.template,
+          length: notification.rendered_content.to_s.length
         )
         { ok: true, provider: "null_sms" }
       end
