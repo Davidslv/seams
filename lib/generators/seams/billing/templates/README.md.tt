@@ -41,7 +41,67 @@ customer at signup.
 
 | Concern              | Purpose                                                                        |
 | ---                  | ---                                                                            |
-| `Billing::Billable`  | Mix into the host's user model for `start_subscription!` / `cancel_subscription!` helpers. Requires a `stripe_customer_id` attribute on the host. |
+| `Billing::Billable`  | Mix into the host's user model for `start_subscription!` / `cancel_subscription!` / `lifetime?` / `has_lifetime_for?(plan_ref:)` / `has_active_billing?` helpers. Requires a `stripe_customer_id` attribute on the host. |
+
+## Lifetime Deals (LTD)
+
+The engine ships native LTD support — one-time payment for permanent
+access — alongside recurring subscriptions. Two flows:
+
+1. **Public purchase** — Stripe Checkout with `mode: "payment"`. The
+   pricing page renders any `Billing::Plan` with `interval: "lifetime"`
+   under a "Buy once, own forever" section. POST
+   `/billing/checkout/lifetime?plan=<gateway_ref>` →
+   `Billing::Lifetime::CreateLifetimeSessionService` →
+   redirect to Stripe → on `checkout.session.completed` (or
+   `checkout.session.async_payment_succeeded`) the webhook handler
+   creates the `Billing::LifetimePass` row and publishes
+   `lifetime.purchased.billing`.
+
+2. **Private grant** — admin issues an LTD without a Stripe charge via
+   `Billing::Admin::LifetimePassesController` (mounted at
+   `/billing/admin/lifetime_passes`). Use for early adopters,
+   influencer giveaways, ToS-violation refund-then-re-grant. Calls
+   `Billing::Lifetime::GrantPassService`, publishes
+   `lifetime.granted.billing`.
+
+### Trade-off (read this before turning LTDs on)
+
+LTDs lock you into supporting those users **indefinitely with no
+recurring revenue**. They're a strong early-adopter / launch lever —
+quick cash, fast feedback — but get expensive long-term as your
+support load grows while LTD users contribute zero MRR. Cap inventory
+on every LTD plan via `max_lifetime_units` (nil = unlimited):
+
+```ruby
+Billing::Plan.create!(
+  gateway_ref:        "price_lifetime_pro_2026",
+  name:               "Pro Lifetime",
+  interval:           "lifetime",
+  amount_cents:       249_00,
+  currency:           "usd",
+  max_lifetime_units: 100   # only the first 100 buyers
+)
+```
+
+The pricing page reads `Plan#lifetime_inventory_remaining` and
+disables the "Buy lifetime" button when `lifetime_sold_out?`.
+
+### Authorization model
+
+The engine ships no admin gate — `Billing::Admin::LifetimePassesController`
+mounts at `/billing/admin/...` and the host wires their own
+`require_admin!` `before_action` (ActiveAdmin / Avo / your own
+solution). Per the issue #2 4B scope decision, Seams doesn't ship its
+own admin engine.
+
+### Revoke
+
+`Billing::Lifetime::RevokePassService.call(pass:, revoked_by:, notes:)`
+soft-revokes via `revoked_at`. The pass row stays in the DB so the
+audit trail survives. Stripe refund (for paid LTDs) is the caller's
+responsibility — this service updates the local row only. Publishes
+`lifetime.revoked.billing`.
 
 ## Gateways
 

@@ -6,8 +6,9 @@ Billing::Engine.routes.draw do
   post "/checkout",          to: "checkout#create",   as: :checkout
   get  "/checkout/success",  to: "checkout#success",  as: :checkout_success
   # Lifetime Deal purchase — Stripe Checkout `mode: "payment"`.
-  # See issue #2 section 3A.LTD.
-  post "/lifetime_checkout", to: "checkout#lifetime", as: :lifetime_checkout
+  # Namespaced under /checkout/ alongside the recurring-checkout flow
+  # so the surface stays grouped. See issue #2 section 3A.LTD.
+  post "/checkout/lifetime", to: "checkout#lifetime", as: :lifetime_checkout
 
   post "/portal", to: "portal#create", as: :portal
 

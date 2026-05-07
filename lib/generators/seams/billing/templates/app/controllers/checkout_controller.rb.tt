@@ -27,7 +27,7 @@ module Billing
       render :success
     end
 
-    # POST /billing/lifetime_checkout?plan=price_xxx
+    # POST /billing/checkout/lifetime?plan=price_xxx
     # LTD purchase flow — same shape as #create but uses Stripe's
     # `mode: "payment"`. The webhook handler distinguishes the two via
     # session.metadata.access_type.

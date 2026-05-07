@@ -281,4 +281,114 @@ RSpec.describe Seams::Generators::BillingGenerator do
       assert_file "engines/billing/spec/gateways/billing/stripe_spec.rb"
     end
   end
+
+  describe "Lifetime Deals (LTD)" do
+    it "Plan adds 'lifetime' to INTERVALS + ships scopes + helpers" do
+      assert_file "engines/billing/app/models/billing/plan.rb" do |content|
+        expect(content).to include("%w[day week month year lifetime]")
+        expect(content).to include("scope :lifetime")
+        expect(content).to include("def lifetime?")
+        expect(content).to include("def lifetime_inventory_remaining")
+        expect(content).to include("def lifetime_sold_out?")
+      end
+    end
+
+    it "create_billing_plans migration adds max_lifetime_units column" do
+      assert_file(Dir.glob(File.join(destination_root, "engines/billing/db/migrate/*_create_billing_plans.rb")).first.then { |f| f.sub("#{destination_root}/", "") }) do |content|
+        expect(content).to include(":max_lifetime_units")
+      end
+    end
+
+    it "ships LifetimePass model + dedicated migration with unique (customer_ref, plan_ref)" do
+      assert_file "engines/billing/app/models/billing/lifetime_pass.rb" do |content|
+        expect(content).to include("class LifetimePass < ApplicationRecord")
+        expect(content).to include("self.table_name = \"billing_lifetime_passes\"")
+        expect(content).to include("validates :customer_ref, uniqueness: { scope: :plan_ref")
+      end
+      ltd_migration = Dir.glob(File.join(destination_root, "engines/billing/db/migrate/*_create_billing_lifetime_passes.rb")).first
+      expect(ltd_migration).not_to be_nil
+      expect(File.read(ltd_migration)).to include("name: \"index_billing_ltd_unique\"")
+    end
+
+    it "Stripe gateway gains create_lifetime_checkout_session with mode: payment" do
+      assert_file "engines/billing/lib/billing/gateways/stripe.rb" do |content|
+        expect(content).to include("def create_lifetime_checkout_session")
+        expect(content).to include('mode:        "payment"')
+        expect(content).to include('access_type: "lifetime"')
+      end
+    end
+
+    it "ships all four LTD service classes" do
+      %w[
+        grant_pass_service
+        revoke_pass_service
+        create_pass_from_checkout_service
+        create_lifetime_session_service
+      ].each do |svc|
+        assert_file "engines/billing/app/services/billing/lifetime/#{svc}.rb"
+      end
+    end
+
+    it "registers the three new lifetime canonical events" do
+      assert_file "engines/billing/lib/billing/engine.rb" do |content|
+        expect(content).to include("lifetime.granted.billing")
+        expect(content).to include("lifetime.purchased.billing")
+        expect(content).to include("lifetime.revoked.billing")
+      end
+    end
+
+    it "WebhooksController forks on checkout_lifetime? predicate" do
+      assert_file "engines/billing/app/controllers/billing/webhooks_controller.rb" do |content|
+        expect(content).to include("def checkout_lifetime?")
+        expect(content).to include("Billing::Lifetime::CreatePassFromCheckoutService")
+      end
+    end
+
+    it "Billable concern adds LTD helpers (lifetime?, has_lifetime_for?, has_active_billing?)" do
+      assert_file "engines/billing/lib/billing/concerns/billable.rb" do |content|
+        expect(content).to include("def lifetime?")
+        expect(content).to include("def has_lifetime_for?")
+        expect(content).to include("def has_active_billing?")
+      end
+    end
+
+    it "PlansController + index view split recurring vs lifetime" do
+      assert_file "engines/billing/app/controllers/billing/plans_controller.rb" do |content|
+        expect(content).to include("@recurring_plans")
+        expect(content).to include("@lifetime_plans")
+      end
+      assert_file "engines/billing/app/views/billing/plans/index.html.erb" do |content|
+        expect(content).to include("Lifetime — buy once")
+        expect(content).to include("lifetime_inventory_remaining")
+      end
+    end
+
+    it "CheckoutController gains #lifetime + route is /checkout/lifetime" do
+      assert_file "engines/billing/app/controllers/billing/checkout_controller.rb" do |content|
+        expect(content).to include("def lifetime")
+        expect(content).to include("Billing::Lifetime::CreateLifetimeSessionService")
+      end
+      assert_file "engines/billing/config/routes.rb" do |content|
+        expect(content).to match(%r{post\s+"/checkout/lifetime",\s+to:\s+"checkout#lifetime"})
+      end
+    end
+
+    it "ships admin grant controller + index/new views + admin route namespace" do
+      assert_file "engines/billing/app/controllers/billing/admin/lifetime_passes_controller.rb"
+      assert_file "engines/billing/app/views/billing/admin/lifetime_passes/index.html.erb"
+      assert_file "engines/billing/app/views/billing/admin/lifetime_passes/new.html.erb"
+      assert_file "engines/billing/config/routes.rb" do |content|
+        expect(content).to include("namespace :admin")
+        expect(content).to include("resources :lifetime_passes")
+      end
+    end
+
+    it "documents the LTD trade-off in README" do
+      assert_file "engines/billing/README.md" do |content|
+        expect(content).to include("Lifetime Deals (LTD)")
+        expect(content).to include("Trade-off")
+        expect(content).to include("max_lifetime_units")
+      end
+    end
+  end
 end
