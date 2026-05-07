@@ -95,4 +95,21 @@ RSpec.describe Seams::Generators::InstallGenerator do
       expect(File.executable?(full)).to be(true)
     end
   end
+
+  describe "#create_host_rubocop" do
+    it "creates .rubocop.yml so generated engines' inherit_from resolves" do
+      run_generator
+      assert_file ".rubocop.yml" do |content|
+        expect(content).to include("AllCops:")
+        expect(content).to include("Exclude:")
+      end
+    end
+
+    it "does not overwrite an existing host .rubocop.yml" do
+      File.write(File.join(destination_root, ".rubocop.yml"), "# host's own config\n")
+      run_generator
+      content = File.read(File.join(destination_root, ".rubocop.yml"))
+      expect(content).to eq("# host's own config\n")
+    end
+  end
 end

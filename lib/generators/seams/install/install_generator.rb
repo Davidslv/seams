@@ -32,6 +32,14 @@ module Seams
         template "seams_engines.rb.tt", "config/initializers/seams_engines.rb"
       end
 
+      def create_host_rubocop
+        # Generated engine .rubocop.yml files inherit from ../../.rubocop.yml
+        # so the host needs one. We don't overwrite an existing config.
+        return if File.exist?(File.join(destination_root, ".rubocop.yml"))
+
+        template "rubocop.yml.tt", ".rubocop.yml"
+      end
+
       def create_ci_workflow
         template "ci.yml.tt", ".github/workflows/ci.yml"
       end

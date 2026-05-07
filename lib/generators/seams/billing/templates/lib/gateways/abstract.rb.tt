@@ -25,7 +25,11 @@ module Billing
 
       # Verify a webhook payload + signature and return a normalised
       # event hash:
-      #   { type:, livemode:, object: <provider's raw object>, raw: <payload> }
+      #   { id:, type:, livemode:, object: <provider's raw object>, raw: <payload> }
+      #
+      # `id:` is the gateway's own event id (e.g. evt_* from Stripe).
+      # The Billing webhook controller uses it to dedupe retries via
+      # Billing::WebhookEvent.unique(gateway, gateway_event_id).
       # Implementations MUST raise Billing::WebhookError on any
       # signature mismatch.
       def verify_webhook(payload:, signature:, secret:)

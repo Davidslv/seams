@@ -5,6 +5,9 @@ require "notifications/configuration"
 require "notifications/engine"
 
 module Notifications
+  class Error          < StandardError; end
+  class AdapterError   < Error; end
+
   class << self
     def configuration
       @configuration ||= Configuration.new
@@ -16,10 +19,18 @@ module Notifications
 
     def email_adapter
       configuration.email_adapter.constantize.new
+    rescue NameError => e
+      raise Notifications::AdapterError,
+            "Notifications.configuration.email_adapter is set to " \
+            "#{configuration.email_adapter.inspect}, which could not be resolved: #{e.message}"
     end
 
     def sms_adapter
       configuration.sms_adapter.constantize.new
+    rescue NameError => e
+      raise Notifications::AdapterError,
+            "Notifications.configuration.sms_adapter is set to " \
+            "#{configuration.sms_adapter.inspect}, which could not be resolved: #{e.message}"
     end
   end
 end

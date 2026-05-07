@@ -80,9 +80,8 @@ end
 ```
 
 The Stripe gateway in the canonical Billing engine is the reference
-implementation —
-[engines/billing/lib/billing/gateways/stripe.rb](#) cites
-`docs.stripe.com` for every Stripe API call it makes.
+implementation — generated under `engines/billing/lib/billing/gateways/stripe.rb`
+in your host. It cites `docs.stripe.com` for every Stripe API call it makes.
 
 ## Wire it up
 

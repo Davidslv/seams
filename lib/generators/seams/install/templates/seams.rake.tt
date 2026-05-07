@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 namespace :seams do
+  ENGINE_NAME_PATTERN = /\A[a-z][a-z0-9_]*\z/
+
   desc "List installed engines, the events they emit, and their dependencies"
   task list: :environment do
     require "seams/cli/list"
@@ -10,12 +12,15 @@ namespace :seams do
   desc "Run RSpec for a single engine: rake seams:test[billing]"
   task :test, [:engine] => :environment do |_t, args|
     name = args[:engine] or abort("Usage: rake seams:test[billing]")
-    sh "bundle exec rspec engines/#{name}/spec"
+    abort("Invalid engine name: #{name.inspect}") unless ENGINE_NAME_PATTERN.match?(name)
+    # Array form: no shell interpolation, no injection.
+    sh "bundle", "exec", "rspec", "engines/#{name}/spec"
   end
 
   desc "Run RuboCop for a single engine: rake seams:quality[billing]"
   task :quality, [:engine] => :environment do |_t, args|
     name = args[:engine] or abort("Usage: rake seams:quality[billing]")
-    sh "bundle exec rubocop engines/#{name}"
+    abort("Invalid engine name: #{name.inspect}") unless ENGINE_NAME_PATTERN.match?(name)
+    sh "bundle", "exec", "rubocop", "engines/#{name}"
   end
 end
