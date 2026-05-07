@@ -26,7 +26,11 @@ module Seams
 
       source_root File.expand_path("templates", __dir__)
 
-      ENGINE_NAME = "notifications"
+      ENGINE_NAME      = "notifications"
+      DEFAULT_CHANNELS = %w[in_app email sms].freeze
+
+      class_option :channels, type: :string, default: "all",
+                              desc: "Comma-separated channels to enable: in_app,email,sms (or 'all')"
 
       def create_base_engine
         EngineGenerator.start([ENGINE_NAME], destination_root: destination_root)
@@ -37,14 +41,18 @@ module Seams
       end
 
       def create_configuration
-        template "lib/configuration.rb.tt", engine_path("lib/notifications/configuration.rb")
-        template "lib/notifications.rb.tt", engine_path("lib/notifications.rb"), force: true
+        template "lib/configuration.rb.tt",  engine_path("lib/notifications/configuration.rb")
+        template "lib/type_registry.rb.tt",  engine_path("lib/notifications/type_registry.rb")
+        template "lib/notifications.rb.tt",  engine_path("lib/notifications.rb"), force: true
       end
 
       def create_adapters
         template "lib/adapters/abstract.rb.tt",      engine_path("lib/notifications/adapters/abstract.rb")
         template "lib/adapters/action_mailer.rb.tt", engine_path("lib/notifications/adapters/action_mailer.rb")
-        template "lib/adapters/null_sms.rb.tt",      engine_path("lib/notifications/adapters/null_sms.rb")
+        # SMS adapter only ships when the sms channel is enabled.
+        return unless channels.include?("sms")
+
+        template "lib/adapters/null_sms.rb.tt", engine_path("lib/notifications/adapters/null_sms.rb")
       end
 
       def create_concern
@@ -61,12 +69,17 @@ module Seams
                  engine_path("app/models/notifications/notification_preference.rb")
         template "app/models/delivery.rb.tt",
                  engine_path("app/models/notifications/delivery.rb")
-        template "app/models/strategies/in_app.rb.tt",
-                 engine_path("app/models/notifications/strategies/in_app.rb")
-        template "app/models/strategies/email.rb.tt",
-                 engine_path("app/models/notifications/strategies/email.rb")
-        template "app/models/strategies/sms.rb.tt",
-                 engine_path("app/models/notifications/strategies/sms.rb")
+        create_strategy_models
+      end
+
+      def create_strategy_models
+        # STI strategy subclasses ship per --channels selection.
+        # STRATEGY_CLASSES in the Notifiable concern is conditionally
+        # rendered (in_app/email/sms) to match.
+        channels.each do |channel|
+          template "app/models/strategies/#{channel}.rb.tt",
+                   engine_path("app/models/notifications/strategies/#{channel}.rb")
+        end
       end
 
       def create_jobs
@@ -213,6 +226,22 @@ module Seams
       end
 
       private
+
+      # Resolved list of channels the host opted into via --channels.
+      # "all" (or empty / unrecognised) → all three. Memoised per
+      # generator run so conditional template branches stay consistent.
+      def channels
+        @channels ||= begin
+          raw = options[:channels].to_s.downcase.strip
+          if raw.empty? || raw == "all"
+            DEFAULT_CHANNELS.dup
+          else
+            requested = raw.split(",").map(&:strip).reject(&:empty?)
+            allowed   = requested & DEFAULT_CHANNELS
+            allowed.empty? ? DEFAULT_CHANNELS.dup : allowed
+          end
+        end
+      end
 
       def engine_path(relative)
         File.join(destination_root, "engines", ENGINE_NAME, relative)

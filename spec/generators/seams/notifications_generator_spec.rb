@@ -459,4 +459,88 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       expect(content).to include("group: :test")
     end
   end
+
+  describe "TypeRegistry (Phase 2B (2/3))" do
+    it "ships the TypeRegistry module" do
+      assert_file "engines/notifications/lib/notifications/type_registry.rb" do |content|
+        [
+          "module TypeRegistry",
+          "Type = Struct.new",
+          "def register",
+          "def fetch",
+          "UnknownType",
+          "Mutex.new"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "lib/notifications.rb seeds default cross-engine types" do
+      assert_file "engines/notifications/lib/notifications.rb" do |content|
+        [
+          'require "notifications/type_registry"',
+          "def seed_default_types!",
+          "welcome",
+          "billing.invoice_paid",
+          "billing.subscription_started",
+          "billing.lifetime_purchased"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "Notifiable concern adds notify_typed that resolves a TypeRegistry entry" do
+      assert_file "engines/notifications/lib/notifications/concerns/notifiable.rb" do |content|
+        [
+          "def notify_typed",
+          "Notifications::TypeRegistry.fetch",
+          "Notifications::NotificationPreference.enabled?"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
+
+  describe "--channels generator flag (Phase 2B (2/3))" do
+    let(:flag_destination) { File.expand_path("../../../tmp/notifications_channels", __dir__) }
+
+    def run_with_channels(channels)
+      FileUtils.rm_rf(flag_destination)
+      FileUtils.mkdir_p(flag_destination)
+      FileUtils.mkdir_p(File.join(flag_destination, "engines"))
+      described_class.start(["--channels=#{channels}"], destination_root: flag_destination)
+    end
+
+    it "default (no flag) ships all three strategies + null_sms adapter" do
+      assert_file "engines/notifications/app/models/notifications/strategies/in_app.rb"
+      assert_file "engines/notifications/app/models/notifications/strategies/email.rb"
+      assert_file "engines/notifications/app/models/notifications/strategies/sms.rb"
+      assert_file "engines/notifications/lib/notifications/adapters/null_sms.rb"
+    end
+
+    it "--channels=in_app,email omits the SMS strategy + null_sms adapter" do
+      run_with_channels("in_app,email")
+
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/notifications/app/models/notifications/strategies/in_app.rb"))).to be(true)
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/notifications/app/models/notifications/strategies/email.rb"))).to be(true)
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/notifications/app/models/notifications/strategies/sms.rb"))).to be(false)
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/notifications/lib/notifications/adapters/null_sms.rb"))).to be(false)
+    end
+
+    it "--channels=in_app,email rewrites STRATEGY_CLASSES without :sms" do
+      run_with_channels("in_app,email")
+
+      content = File.read(File.join(flag_destination,
+                                    "engines/notifications/lib/notifications/concerns/notifiable.rb"))
+      expect(content).to include("email:  \"Notifications::Strategies::Email\"")
+      expect(content).to include("in_app: \"Notifications::Strategies::InApp\"")
+      expect(content).not_to include("Notifications::Strategies::Sms")
+    end
+
+    it "--channels=garbage,unknown falls back to all three (no destructive interpretation)" do
+      run_with_channels("garbage,unknown")
+      assert_file "engines/notifications/app/models/notifications/strategies/sms.rb"
+    end
+  end
 end

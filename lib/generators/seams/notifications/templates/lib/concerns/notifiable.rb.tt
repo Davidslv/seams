@@ -18,9 +18,15 @@ module Notifications
     extend ActiveSupport::Concern
 
     STRATEGY_CLASSES = {
+<%- if channels.include?("email") -%>
       email:  "Notifications::Strategies::Email",
+<%- end -%>
+<%- if channels.include?("sms") -%>
       sms:    "Notifications::Strategies::Sms",
+<%- end -%>
+<%- if channels.include?("in_app") -%>
       in_app: "Notifications::Strategies::InApp"
+<%- end -%>
     }.freeze
 
     included do
@@ -38,6 +44,23 @@ module Notifications
       notif.save!
       notif.send_async if notif.due?
       notif
+    end
+
+    # Looks up a registered Notifications::TypeRegistry::Type by name
+    # and creates one Notification per channel the type supports
+    # (subject to the host's NotificationPreference rows). Returns the
+    # array of created notifications.
+    def notify_typed(type:, schedule_config: nil, recipient: nil)
+      record = Notifications::TypeRegistry.fetch(type)
+      record.channels.filter_map do |channel|
+        next unless STRATEGY_CLASSES.key?(channel.to_sym)
+        next unless Notifications::NotificationPreference.enabled?(
+          user_id:           id, channel: channel.to_s, notification_type: record.name
+        )
+
+        notify(strategy: channel, template: record.template,
+               schedule_config: schedule_config, recipient: recipient)
+      end
     end
 
     def email_notification_recipient
