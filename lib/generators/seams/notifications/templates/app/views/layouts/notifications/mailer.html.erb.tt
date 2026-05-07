@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%%= @notification&.template.to_s.titleize %></title>
+    <style>
+      body  { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #222; line-height: 1.5; max-width: 560px; margin: 24px auto; padding: 0 16px; }
+      p     { margin: 0 0 12px; }
+      .meta { color: #888; font-size: 12px; border-top: 1px solid #eee; padding-top: 12px; margin-top: 24px; }
+      a     { color: #1a73e8; }
+    </style>
+  </head>
+  <body>
+    <%%= yield %>
+
+    <p class="meta">
+      Sent via Seams Notifications.
+    </p>
+  </body>
+</html>

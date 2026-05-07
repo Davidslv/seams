@@ -1,0 +1,5 @@
+<%%# Default billing/lifetime_granted HTML — fires when an admin %>
+<%%# privately grants a Lifetime Deal (no Stripe charge). Override at %>
+<%%# app/views/notifications/templates/billing/lifetime_granted.html.erb. %>
+<p>A lifetime pass has been granted to your account. You have permanent
+access to this product — no further payment required.</p>

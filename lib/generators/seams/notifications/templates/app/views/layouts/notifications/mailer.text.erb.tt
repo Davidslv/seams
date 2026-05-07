@@ -1,0 +1,4 @@
+<%%= yield %>
+
+---
+Sent via Seams Notifications.

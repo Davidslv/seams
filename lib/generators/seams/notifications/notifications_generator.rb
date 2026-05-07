@@ -28,6 +28,15 @@ module Seams
 
       ENGINE_NAME      = "notifications"
       DEFAULT_CHANNELS = %w[in_app email sms].freeze
+      BILLING_TEMPLATES = %w[
+        subscription_started
+        subscription_updated
+        subscription_canceled
+        invoice_paid
+        invoice_failed
+        lifetime_granted
+        lifetime_purchased
+      ].freeze
 
       class_option :channels, type: :string, default: "all",
                               desc: "Comma-separated channels to enable: in_app,email,sms (or 'all')"
@@ -129,22 +138,27 @@ module Seams
       end
 
       def create_default_templates
-        template "app/views/templates/default.erb.tt",
-                 engine_path("app/views/notifications/templates/default.erb")
-        template "app/views/templates/welcome.erb.tt",
-                 engine_path("app/views/notifications/templates/welcome.erb")
-        %w[
-          subscription_started
-          subscription_updated
-          subscription_canceled
-          invoice_paid
-          invoice_failed
-          lifetime_granted
-          lifetime_purchased
-        ].each do |name|
-          template "app/views/templates/billing/#{name}.erb.tt",
-                   engine_path("app/views/notifications/templates/billing/#{name}.erb")
+        # Each notification template ships in two formats — .text.erb
+        # for SMS / plain-text email + .html.erb for HTML email and
+        # in-app rendering. Hosts override either or both by dropping
+        # files at app/views/notifications/templates/<name>.<format>.erb.
+        %i[text html].each do |format|
+          template "app/views/templates/default.#{format}.erb.tt",
+                   engine_path("app/views/notifications/templates/default.#{format}.erb")
+          template "app/views/templates/welcome.#{format}.erb.tt",
+                   engine_path("app/views/notifications/templates/welcome.#{format}.erb")
+          BILLING_TEMPLATES.each do |name|
+            template "app/views/templates/billing/#{name}.#{format}.erb.tt",
+                     engine_path("app/views/notifications/templates/billing/#{name}.#{format}.erb")
+          end
         end
+
+        # Mailer layout — wraps every notification email so hosts get
+        # consistent header/footer chrome without per-template repetition.
+        template "app/views/layouts/notifications/mailer.html.erb.tt",
+                 engine_path("app/views/layouts/notifications/mailer.html.erb")
+        template "app/views/layouts/notifications/mailer.text.erb.tt",
+                 engine_path("app/views/layouts/notifications/mailer.text.erb")
       end
 
       def create_migrations
@@ -183,6 +197,11 @@ module Seams
                  engine_path("spec/runtime/notifications_boot_spec.rb")
         template "spec/runtime/schedule_round_trip_spec.rb.tt",
                  engine_path("spec/runtime/notifications_schedule_round_trip_spec.rb")
+        # Phase 2B (3/3) — bell + ActionCable broadcast verification.
+        return unless channels.include?("in_app")
+
+        template "spec/runtime/bell_broadcast_spec.rb.tt",
+                 engine_path("spec/runtime/notifications_bell_broadcast_spec.rb")
       end
 
       def overwrite_readme

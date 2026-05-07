@@ -1,0 +1,5 @@
+<%%# Default billing/lifetime_purchased HTML — fires when a customer %>
+<%%# pays for a Lifetime Deal via Stripe Checkout. Override at %>
+<%%# app/views/notifications/templates/billing/lifetime_purchased.html.erb. %>
+<p>Thank you for your lifetime purchase. You have permanent access to this
+product — no recurring billing, ever.</p>

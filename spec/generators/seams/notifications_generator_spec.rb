@@ -4,6 +4,13 @@ require "rails/generators"
 require "rails/generators/test_case"
 require "generators/seams/notifications/notifications_generator"
 
+NOTIF_TEMPLATE_FORMATS = %w[text html].freeze
+NOTIF_BASE_TEMPLATES   = %w[default welcome].freeze
+NOTIF_BILLING_TEMPLATES = %w[
+  subscription_started subscription_updated subscription_canceled
+  invoice_paid invoice_failed lifetime_granted lifetime_purchased
+].freeze
+
 RSpec.describe Seams::Generators::NotificationsGenerator do
   let(:destination_root) { File.expand_path("../../../tmp/notifications_generator", __dir__) }
 
@@ -235,7 +242,7 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
         lifetime_granted
         lifetime_purchased
       ].each do |name|
-        assert_file "engines/notifications/app/views/notifications/templates/billing/#{name}.erb"
+        assert_file "engines/notifications/app/views/notifications/templates/billing/#{name}.text.erb"
       end
     end
 
@@ -295,9 +302,9 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
   end
 
   describe "default templates" do
-    it "creates default + welcome ERB templates resolved from app/views/notifications/templates/" do
-      assert_file "engines/notifications/app/views/notifications/templates/default.erb"
-      assert_file "engines/notifications/app/views/notifications/templates/welcome.erb"
+    it "creates default + welcome ERB templates (text variant) resolved from app/views/notifications/templates/" do
+      assert_file "engines/notifications/app/views/notifications/templates/default.text.erb"
+      assert_file "engines/notifications/app/views/notifications/templates/welcome.text.erb"
     end
   end
 
@@ -541,6 +548,67 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
     it "--channels=garbage,unknown falls back to all three (no destructive interpretation)" do
       run_with_channels("garbage,unknown")
       assert_file "engines/notifications/app/models/notifications/strategies/sms.rb"
+    end
+  end
+
+  describe "HTML + text template variants (Phase 2B (3/3))" do
+    it "ships .text.erb + .html.erb pairs for every default template" do
+      NOTIF_BASE_TEMPLATES.each do |name|
+        NOTIF_TEMPLATE_FORMATS.each do |fmt|
+          assert_file "engines/notifications/app/views/notifications/templates/#{name}.#{fmt}.erb"
+        end
+      end
+
+      NOTIF_BILLING_TEMPLATES.each do |name|
+        NOTIF_TEMPLATE_FORMATS.each do |fmt|
+          assert_file "engines/notifications/app/views/notifications/templates/billing/#{name}.#{fmt}.erb"
+        end
+      end
+    end
+
+    it "ships HTML + text mailer layouts" do
+      assert_file "engines/notifications/app/views/layouts/notifications/mailer.html.erb" do |content|
+        expect(content).to include("<%= yield %>")
+      end
+      assert_file "engines/notifications/app/views/layouts/notifications/mailer.text.erb" do |content|
+        expect(content).to include("<%= yield %>")
+      end
+    end
+
+    it "NotificationMailer renders multipart with the layout" do
+      assert_file "engines/notifications/app/mailers/notifications/notification_mailer.rb" do |content|
+        [
+          "format.text { render plain: text_body, layout: \"notifications/mailer\"",
+          "format.html { render html: html_body.html_safe, layout: \"notifications/mailer\"",
+          "template_exists?(format: :html)"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "Notification#rendered_content + #template_exists? accept a format keyword" do
+      assert_file "engines/notifications/app/models/notifications/notification.rb" do |content|
+        [
+          "def rendered_content(format: :text)",
+          "def template_exists?(format: :text)",
+          "def find_template_path(format: :text)",
+          "PERMITTED_FORMATS = %i[text html].freeze",
+          "raise(Notifications::Error"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
+
+  describe "bell + ActionCable broadcast spec (Phase 2B (3/3))" do
+    it "ships the bell broadcast runtime spec when in_app channel is enabled" do
+      assert_file "engines/notifications/spec/runtime/notifications_bell_broadcast_spec.rb" do |content|
+        [
+          "Notifications::NotificationChannel",
+          "broadcast_to",
+          "rendered_content(format: :html)",
+          "rendered_content(format: :text)",
+          "unread_in_app_notifications"
+        ].each { |needle| expect(content).to include(needle) }
+      end
     end
   end
 end

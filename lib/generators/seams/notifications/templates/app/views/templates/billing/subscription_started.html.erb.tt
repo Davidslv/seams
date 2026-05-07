@@ -1,0 +1,4 @@
+<%%# Default billing/subscription_started HTML, fires from %>
+<%%# subscription.created.billing. Override at %>
+<%%# app/views/notifications/templates/billing/subscription_started.html.erb. %>
+<p>Your subscription is active. Welcome aboard.</p>

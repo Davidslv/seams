@@ -91,12 +91,23 @@ module Notifications
       self.schedule = sched
     end
 
-    # Renders the ERB template named by +template+. Looks first in the
-    # host's app/views/notifications/templates/<name>.erb, then falls
+    # Renders the ERB template named by +template+ in the requested
+    # +format+ (`:text` (default) or `:html`). Looks first in the host's
+    # app/views/notifications/templates/<name>.<format>.erb, then falls
     # back to the engine's bundled templates. Hosts override by
-    # dropping a file.
-    def rendered_content
-      ERB.new(File.read(find_template_path)).result_with_hash(notification: self)
+    # dropping a file. Raises Notifications::Error if no template
+    # exists at the requested format — callers that want to probe
+    # without raising should use #template_exists?(format:).
+    def rendered_content(format: :text)
+      path = find_template_path(format: format) ||
+             raise(Notifications::Error,
+                   "Template #{template.inspect} (#{format}) not found under any allowed root")
+
+      ERB.new(File.read(path)).result_with_hash(notification: self)
+    end
+
+    def template_exists?(format: :text)
+      !find_template_path(format: format).nil?
     end
 
     def due?
@@ -178,7 +189,11 @@ module Notifications
       raise NotImplementedError, "#{self.class} must implement #dispatch!"
     end
 
-    def find_template_path
+    PERMITTED_FORMATS = %i[text html].freeze
+
+    def find_template_path(format: :text)
+      raise ArgumentError, "format must be :text or :html" unless PERMITTED_FORMATS.include?(format)
+
       # Realpath check — even though TEMPLATE_NAME_PATTERN already
       # rejects "..", a defence-in-depth `realpath` confirms the
       # resolved file lives under one of the two whitelisted roots.
@@ -186,14 +201,16 @@ module Notifications
       engine_root = Notifications::Engine.root.join("app/views/notifications/templates")
 
       [host_root, engine_root].each do |root|
-        candidate = root.join("#{template}.erb")
+        candidate = root.join("#{template}.#{format}.erb")
         next unless candidate.exist?
 
         resolved = candidate.realpath
         return resolved if resolved.to_s.start_with?(root.realpath.to_s)
       end
 
-      raise Notifications::Error, "Template #{template.inspect} not found under any allowed root"
+      # No template at this format. Caller decides whether to fall back
+      # (e.g. mailer trying :html then :text) or raise.
+      nil
     end
   end
 end

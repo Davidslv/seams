@@ -1,0 +1,10 @@
+<%%# Default HTML template. notification is the local. Override at %>
+<%%# app/views/notifications/templates/<name>.html.erb in the host. %>
+<p>Hello,</p>
+
+<p>You have a notification.</p>
+
+<p>—<br>
+This is the default Seams notification template. Override it by creating
+<code>app/views/notifications/templates/&lt;your-template&gt;.html.erb</code>
+in your host app.</p>
