@@ -231,4 +231,100 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       assert_file "engines/teams/spec/models/teams/invitation_spec.rb"
     end
   end
+
+  describe "Phase 4A — AccountScoped concern + factories" do
+    it "ships the AccountScoped concern with belongs_to :team + default_scope" do
+      assert_file "engines/teams/lib/teams/concerns/account_scoped.rb" do |content|
+        [
+          "module AccountScoped",
+          'belongs_to :team, class_name: "Teams::Team"',
+          "default_scope",
+          "Current.team",
+          "before_validation :assign_current_team"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "registers AccountScoped + Teamable + Authorization in ExposedConcerns" do
+      assert_file "engines/teams/.rubocop.yml" do |content|
+        [
+          "Teams::Teamable",
+          "Teams::AccountScoped",
+          "Teams::Authorization"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships FactoryBot factories for team, membership, invitation, host User" do
+      assert_file "engines/teams/spec/factories/teams.rb" do |content|
+        %w[
+          teams_user
+          team
+          team_membership
+          team_admin_membership
+          team_invitation
+        ].each { |name| expect(content).to include("factory :#{name}") }
+      end
+    end
+
+    it "wire_into_host adds factory_bot_rails to the test group" do
+      gen_path = File.expand_path(
+        "../../../lib/generators/seams/teams/teams_generator.rb",
+        __dir__
+      )
+      content = File.read(gen_path)
+      expect(content).to include('host_inject_gem("factory_bot_rails"')
+      expect(content).to include("group: :test")
+    end
+  end
+
+  describe "Phase 4A — --with generator flag" do
+    let(:flag_destination) { File.expand_path("../../../tmp/teams_with_flag", __dir__) }
+
+    def run_with(features)
+      FileUtils.rm_rf(flag_destination)
+      FileUtils.mkdir_p(flag_destination)
+      FileUtils.mkdir_p(File.join(flag_destination, "engines"))
+      described_class.start(["--with=#{features}"], destination_root: flag_destination)
+    end
+
+    it "default ships invitations + roles" do
+      assert_file "engines/teams/app/models/teams/invitation.rb"
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb"
+      assert_file "engines/teams/app/mailers/teams/invitation_mailer.rb"
+      assert_file "engines/teams/lib/teams/concerns/authorization.rb"
+    end
+
+    it "--with=invitations omits the Authorization concern" do
+      run_with("invitations")
+
+      invitation_path    = File.join(flag_destination, "engines/teams/app/models/teams/invitation.rb")
+      authorization_path = File.join(flag_destination, "engines/teams/lib/teams/concerns/authorization.rb")
+      expect(File.exist?(invitation_path)).to be(true)
+      expect(File.exist?(authorization_path)).to be(false)
+    end
+
+    it "--with=roles omits the Invitation model + mailer + subscriber" do
+      run_with("roles")
+
+      paths = {
+        authorization: "engines/teams/lib/teams/concerns/authorization.rb",
+        invitation: "engines/teams/app/models/teams/invitation.rb",
+        mailer: "engines/teams/app/mailers/teams/invitation_mailer.rb",
+        subscriber: "engines/teams/app/subscribers/teams/invitation_subscriber.rb"
+      }
+      expect(File.exist?(File.join(flag_destination, paths[:authorization]))).to be(true)
+      expect(File.exist?(File.join(flag_destination, paths[:invitation]))).to    be(false)
+      expect(File.exist?(File.join(flag_destination, paths[:mailer]))).to        be(false)
+      expect(File.exist?(File.join(flag_destination, paths[:subscriber]))).to    be(false)
+    end
+
+    it "--with=garbage falls back to all features (no surprising half-installed engine)" do
+      run_with("garbage")
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/teams/app/models/teams/invitation.rb"))).to be(true)
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/teams/lib/teams/concerns/authorization.rb"))).to be(true)
+    end
+  end
 end

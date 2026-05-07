@@ -21,6 +21,10 @@ module Seams
       source_root File.expand_path("templates", __dir__)
 
       ENGINE_NAME = "teams"
+      DEFAULT_FEATURES = %w[invitations roles].freeze
+
+      class_option :with, type: :string, default: "all",
+                          desc: "Comma-separated features to enable: invitations,roles (or 'all')"
 
       def create_base_engine
         EngineGenerator.start([ENGINE_NAME], destination_root: destination_root)
@@ -43,6 +47,8 @@ module Seams
                  engine_path("app/models/teams/team.rb")
         template "app/models/membership.rb.tt",
                  engine_path("app/models/teams/membership.rb")
+        return unless features.include?("invitations")
+
         template "app/models/invitation.rb.tt",
                  engine_path("app/models/teams/invitation.rb")
       end
@@ -52,6 +58,8 @@ module Seams
                  engine_path("app/controllers/teams/teams_controller.rb")
         template "app/controllers/memberships_controller.rb.tt",
                  engine_path("app/controllers/teams/memberships_controller.rb")
+        return unless features.include?("invitations")
+
         template "app/controllers/invitations_controller.rb.tt",
                  engine_path("app/controllers/teams/invitations_controller.rb")
       end
@@ -59,6 +67,13 @@ module Seams
       def create_concerns
         template "lib/concerns/teamable.rb.tt",
                  engine_path("lib/teams/concerns/teamable.rb")
+        # Phase 4A — account scoping helper that pairs with Core's
+        # TenantScoped. Mix into models that belong to a single team.
+        template "lib/concerns/account_scoped.rb.tt",
+                 engine_path("lib/teams/concerns/account_scoped.rb")
+        # `--with=roles` ships role-based controller filters.
+        return unless features.include?("roles")
+
         template "lib/concerns/authorization.rb.tt",
                  engine_path("lib/teams/concerns/authorization.rb")
       end
@@ -69,6 +84,8 @@ module Seams
       end
 
       def create_mailer_and_subscriber
+        return unless features.include?("invitations")
+
         template "app/mailers/invitation_mailer.rb.tt",
                  engine_path("app/mailers/teams/invitation_mailer.rb")
         template "app/views/invitation_mailer/invite.text.erb.tt",
@@ -82,6 +99,8 @@ module Seams
                  engine_path("db/migrate/#{timestamp(0)}_create_teams.rb")
         template "db/migrate/create_team_memberships.rb.tt",
                  engine_path("db/migrate/#{timestamp(1)}_create_team_memberships.rb")
+        return unless features.include?("invitations")
+
         template "db/migrate/create_team_invitations.rb.tt",
                  engine_path("db/migrate/#{timestamp(2)}_create_team_invitations.rb")
       end
@@ -91,6 +110,12 @@ module Seams
                  engine_path("spec/models/teams/team_spec.rb")
         template "spec/models/membership_spec.rb.tt",
                  engine_path("spec/models/teams/membership_spec.rb")
+        # Phase 4A — factories live alongside the model specs so any
+        # spec can `create(:team)` without rolling its own fixture.
+        template "spec/factories/teams.rb.tt",
+                 engine_path("spec/factories/teams.rb")
+        return unless features.include?("invitations")
+
         template "spec/models/invitation_spec.rb.tt",
                  engine_path("spec/models/teams/invitation_spec.rb")
       end
@@ -103,8 +128,10 @@ module Seams
         rubocop_path = engine_path(".rubocop.yml")
         return unless File.exist?(rubocop_path)
 
-        contents = File.read(rubocop_path)
-        replacement = "  ExposedConcerns:\n    - Teams::Teamable\n    - Teams::Authorization"
+        contents       = File.read(rubocop_path)
+        exposed_lines  = ["    - Teams::Teamable", "    - Teams::AccountScoped"]
+        exposed_lines << "    - Teams::Authorization" if features.include?("roles")
+        replacement    = "  ExposedConcerns:\n#{exposed_lines.join("\n")}"
         contents.sub!(/^  ExposedConcerns: \[\]$/, replacement)
         File.write(rubocop_path, contents)
       end
@@ -122,6 +149,9 @@ module Seams
       end
 
       def wire_into_host
+        # factory_bot_rails powers spec/factories/teams.rb. Lives in
+        # the host's test group only.
+        host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
         host_inject_mount(engine_class: "Teams::Engine", at: "/teams")
         host_inject_include_in_user("Teams::Teamable")
       end
@@ -137,6 +167,23 @@ module Seams
       end
 
       private
+
+      # Resolved feature list from --with. "all" (or empty / unrecognised)
+      # → invitations + roles. Garbage / unknown values fall back to all
+      # so the engine ships fully wired by default. Memoised so ERB
+      # branches stay consistent across the generator run.
+      def features
+        @features ||= begin
+          raw = options[:with].to_s.downcase.strip
+          if raw.empty? || raw == "all"
+            DEFAULT_FEATURES.dup
+          else
+            requested = raw.split(",").map(&:strip).reject(&:empty?)
+            allowed   = requested & DEFAULT_FEATURES
+            allowed.empty? ? DEFAULT_FEATURES.dup : allowed
+          end
+        end
+      end
 
       def engine_path(relative)
         File.join(destination_root, "engines", ENGINE_NAME, relative)
