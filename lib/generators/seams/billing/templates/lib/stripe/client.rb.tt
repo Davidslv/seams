@@ -2,6 +2,7 @@
 
 require "faraday"
 require "json"
+require "cgi"
 
 module Billing
   module Stripe
@@ -61,6 +62,33 @@ module Billing
         body = { customer: customer }
         body[:return_url] = return_url if return_url
         post("/v1/billing_portal/sessions", flatten_params(body))
+      end
+
+      # POST /v1/customers — verified against
+      # https://docs.stripe.com/api/customers/create
+      def create_customer(email:, **extra)
+        post("/v1/customers", flatten_params({ email: email }.merge(extra)))
+      end
+
+      # GET /v1/customers/search — verified against
+      # https://docs.stripe.com/api/customers/search. Returns at most
+      # `limit` matches; FindOrCreateService picks the first.
+      def search_customers(query:, limit: 1)
+        get("/v1/customers/search?query=#{CGI.escape(query)}&limit=#{limit}")
+      end
+
+      # POST /v1/subscriptions/{id} — verified against
+      # https://docs.stripe.com/api/subscriptions/update. Used by
+      # both ChangePlanService (items[]) and ReactivateService
+      # (cancel_at_period_end: false).
+      def update_subscription(subscription_id, **fields)
+        post("/v1/subscriptions/#{subscription_id}", flatten_params(fields))
+      end
+
+      # GET /v1/invoices/{id} — verified against
+      # https://docs.stripe.com/api/invoices/retrieve
+      def retrieve_invoice(invoice_id)
+        get("/v1/invoices/#{invoice_id}")
       end
 
       private

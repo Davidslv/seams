@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+module Billing
+  module Customers
+    # Resolves a Stripe customer for the host's user. Looks up by
+    # `email` first via /v1/customers/search; creates a new one if no
+    # match is found. Returns ServiceResult with `value: customer_ref`
+    # (the Stripe `cus_*` id).
+    #
+    #   result = Billing::Customers::FindOrCreateService.call(
+    #     email: "ada@example.com",
+    #     metadata: { host_user_id: 42 }
+    #   )
+    #   result.ok?         # => true
+    #   result.value       # => "cus_xyz"
+    #
+    # Idempotent — re-running with the same email returns the same
+    # customer_ref. Stripe's search index is eventually consistent
+    # (~1 minute lag); for back-to-back lookups during signup,
+    # callers should cache the customer_ref locally.
+    class FindOrCreateService < Billing::StripeService
+      def initialize(email:, metadata: {})
+        @email    = email
+        @metadata = metadata
+      end
+
+      def call_stripe(client)
+        existing = client.search_customers(query: %(email:"#{@email}"), limit: 1)
+        return existing[:data].first if existing[:data].any?
+
+        client.create_customer(email: @email, metadata: @metadata)
+      end
+
+      def on_success(stripe_response)
+        ServiceResult.ok(value: stripe_response[:id])
+      end
+    end
+  end
+end

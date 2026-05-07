@@ -550,4 +550,75 @@ RSpec.describe Seams::Generators::BillingGenerator do
       expect(content).to include('host_inject_gem("webmock"')
     end
   end
+
+  describe "Phase 3 (2/4) — service objects" do
+    it "ships Customers::FindOrCreateService that searches then creates" do
+      assert_file "engines/billing/app/services/billing/customers/find_or_create_service.rb" do |content|
+        [
+          "class FindOrCreateService < Billing::StripeService",
+          "client.search_customers",
+          "client.create_customer",
+          "ServiceResult.ok(value: stripe_response[:id])"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Subscriptions::CancelService with end-of-period default + immediate switch" do
+      assert_file "engines/billing/app/services/billing/subscriptions/cancel_service.rb" do |content|
+        [
+          "class CancelService < Billing::StripeService",
+          "@immediate",
+          "client.cancel_subscription",
+          "client.update_subscription",
+          "cancel_at_period_end: true"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Subscriptions::ChangePlanService that retrieves the existing item then updates" do
+      assert_file "engines/billing/app/services/billing/subscriptions/change_plan_service.rb" do |content|
+        [
+          "class ChangePlanService < Billing::StripeService",
+          "client.retrieve_subscription",
+          "client.update_subscription",
+          "proration_behavior",
+          "code: :invalid_state"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Subscriptions::ReactivateService that flips cancel_at_period_end" do
+      assert_file "engines/billing/app/services/billing/subscriptions/reactivate_service.rb" do |content|
+        [
+          "class ReactivateService < Billing::StripeService",
+          "cancel_at_period_end: false"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Invoices::SyncService that upserts the local Billing::Invoice row" do
+      assert_file "engines/billing/app/services/billing/invoices/sync_service.rb" do |content|
+        [
+          "class SyncService < Billing::StripeService",
+          "client.retrieve_invoice",
+          "Billing::Invoice.find_or_initialize_by",
+          "amount_paid",
+          "amount_due"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "Stripe::Client gains create_customer / search_customers / update_subscription / retrieve_invoice" do
+      assert_file "engines/billing/lib/billing/stripe/client.rb" do |content|
+        [
+          "def create_customer",
+          "def search_customers",
+          "def update_subscription",
+          "def retrieve_invoice",
+          "/v1/customers/search",
+          "/v1/invoices/"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
 end

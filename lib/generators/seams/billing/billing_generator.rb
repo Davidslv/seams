@@ -93,16 +93,46 @@ module Seams
       end
 
       def create_services
+        create_service_foundation
+        create_session_services
+        create_domain_services
+      end
+
+      def create_service_foundation
         # Phase 3 (1/4) — uniform service object foundation.
         template "app/services/service_result.rb.tt",
                  engine_path("app/services/billing/service_result.rb")
         template "app/services/stripe_service.rb.tt",
                  engine_path("app/services/billing/stripe_service.rb")
+      end
 
+      def create_session_services
         template "app/services/checkout_session_service.rb.tt",
                  engine_path("app/services/billing/checkout/create_session_service.rb")
         template "app/services/portal_session_service.rb.tt",
                  engine_path("app/services/billing/portal/create_session_service.rb")
+      end
+
+      def create_domain_services
+        create_customer_and_subscription_services
+        create_invoice_and_lifetime_services
+      end
+
+      def create_customer_and_subscription_services
+        # Phase 3 (2/4) — Customers + Subscriptions service objects.
+        template "app/services/customers/find_or_create_service.rb.tt",
+                 engine_path("app/services/billing/customers/find_or_create_service.rb")
+        template "app/services/subscriptions/cancel_service.rb.tt",
+                 engine_path("app/services/billing/subscriptions/cancel_service.rb")
+        template "app/services/subscriptions/change_plan_service.rb.tt",
+                 engine_path("app/services/billing/subscriptions/change_plan_service.rb")
+        template "app/services/subscriptions/reactivate_service.rb.tt",
+                 engine_path("app/services/billing/subscriptions/reactivate_service.rb")
+      end
+
+      def create_invoice_and_lifetime_services
+        template "app/services/invoices/sync_service.rb.tt",
+                 engine_path("app/services/billing/invoices/sync_service.rb")
         # Lifetime Deal services — see issue #2 section 3A.LTD.
         template "app/services/lifetime/grant_pass_service.rb.tt",
                  engine_path("app/services/billing/lifetime/grant_pass_service.rb")
