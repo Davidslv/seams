@@ -24,6 +24,7 @@ module Seams
     #     session.expired.auth.
     #
     # Run with: bin/rails generate seams:auth
+    # rubocop:disable Metrics/ClassLength
     class AuthGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
 
@@ -55,6 +56,9 @@ module Seams
         # OAuth identity link table — issue #2 section 2A.
         template "app/models/oauth_provider.rb.tt",
                  engine_path("app/models/auth/oauth_provider.rb")
+        # Bearer-token API access — issue #2 section 2A.
+        template "app/models/api_token.rb.tt",
+                 engine_path("app/models/auth/api_token.rb")
       end
 
       def create_controllers
@@ -77,6 +81,15 @@ module Seams
                  engine_path("app/services/auth/reset_password.rb")
         template "app/services/oauth_authenticator.rb.tt",
                  engine_path("app/services/auth/oauth_authenticator.rb")
+        template "app/services/generate_api_token.rb.tt",
+                 engine_path("app/services/auth/generate_api_token.rb")
+      end
+
+      def create_jobs
+        template "app/jobs/application_job.rb.tt",
+                 engine_path("app/jobs/auth/application_job.rb")
+        template "app/jobs/cleanup_expired_sessions_job.rb.tt",
+                 engine_path("app/jobs/auth/cleanup_expired_sessions_job.rb")
       end
 
       def create_oauth_adapters
@@ -113,6 +126,9 @@ module Seams
                  engine_path("lib/auth/concerns/authenticatable.rb")
         template "lib/concerns/authentication.rb.tt",
                  engine_path("lib/auth/concerns/authentication.rb")
+        # Bearer-token controller auth for API endpoints.
+        template "lib/concerns/api_authenticatable.rb.tt",
+                 engine_path("lib/auth/concerns/api_authenticatable.rb")
       end
 
       def create_migrations
@@ -124,6 +140,8 @@ module Seams
                  engine_path("db/migrate/#{timestamp(2)}_add_password_reset_to_auth_users.rb")
         template "db/migrate/create_auth_oauth_providers.rb.tt",
                  engine_path("db/migrate/#{timestamp(3)}_create_auth_oauth_providers.rb")
+        template "db/migrate/create_auth_api_tokens.rb.tt",
+                 engine_path("db/migrate/#{timestamp(4)}_create_auth_api_tokens.rb")
       end
 
       def create_specs
@@ -234,6 +252,17 @@ module Seams
           end
           add_index :auth_oauth_providers, %i[provider provider_uid], unique: true
           add_index :auth_oauth_providers, %i[user_id provider],      unique: true
+
+          create_table :auth_api_tokens do |t|
+            t.references :user,         null: false, foreign_key: { to_table: :auth_users }
+            t.string     :name,         null: false
+            t.string     :token_digest, null: false
+            t.string     :token_prefix, null: false
+            t.datetime   :expires_at
+            t.datetime   :last_used_at
+            t.timestamps
+          end
+          add_index :auth_api_tokens, :token_digest, unique: true
         SCHEMA
       end
 
@@ -248,5 +277,6 @@ module Seams
         RB
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

@@ -2,6 +2,12 @@
 
 module Auth
   class SessionsController < ApplicationController
+    # 10 attempts per minute per IP. Rails 8's built-in rate_limit
+    # uses Solid Cache by default; configure cache_store in your host
+    # if you need to override.
+    rate_limit to: 10, within: 1.minute, only: %i[create],
+               with: -> { redirect_to auth.new_session_path, alert: "Too many attempts. Try again in a minute." }
+
     def new
       # render the sign-in form
     end

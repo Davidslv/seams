@@ -348,4 +348,118 @@ RSpec.describe Seams::Generators::AuthGenerator do
       expect(content).to include('host_inject_gem("faraday"')
     end
   end
+
+  describe "API tokens (Bearer auth)" do
+    it "ships the ApiToken model with SHA-256 digest + find_by_plaintext + expired?" do
+      assert_file "engines/auth/app/models/auth/api_token.rb" do |content|
+        [
+          'self.table_name = "auth_api_tokens"',
+          'PREFIX           = "seam_"',
+          "Digest::SHA256.hexdigest",
+          "def self.find_by_plaintext",
+          "def expired?",
+          "def touch_last_used!",
+          "scope :active"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships the create_auth_api_tokens migration with unique digest index" do
+      pattern = File.join(destination_root,
+                          "engines/auth/db/migrate",
+                          "*_create_auth_api_tokens.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+
+      content = File.read(file)
+      expect(content).to include("create_table :auth_api_tokens")
+      expect(content).to include(":token_digest")
+      expect(content).to include("add_index :auth_api_tokens, :token_digest, unique: true")
+    end
+
+    it "ships GenerateApiToken service that returns plaintext once + publishes api_token.issued.auth" do
+      assert_file "engines/auth/app/services/auth/generate_api_token.rb" do |content|
+        [
+          "module GenerateApiToken",
+          "Result = Struct.new",
+          "ApiToken::PREFIX",
+          "SecureRandom.urlsafe_base64",
+          "api_token.issued.auth",
+          "auth_user_id",
+          "host_user_id"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships ApiAuthenticatable concern with Bearer header parsing + 401 on invalid token" do
+      assert_file "engines/auth/lib/auth/concerns/api_authenticatable.rb" do |content|
+        [
+          "module ApiAuthenticatable",
+          "def authenticate_api_token!",
+          "Bearer ",
+          "Auth::ApiToken.find_by_plaintext",
+          "token.touch_last_used!",
+          "render_unauthorized!"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "User model has_many :api_tokens" do
+      assert_file "engines/auth/app/models/auth/user.rb" do |content|
+        expect(content).to include("has_many :api_tokens")
+      end
+    end
+
+    it "registers api_token.issued.auth + api_token.revoked.auth in the engine event registry" do
+      assert_file "engines/auth/lib/auth/engine.rb" do |content|
+        expect(content).to include('"api_token.issued.auth"')
+        expect(content).to include('"api_token.revoked.auth"')
+      end
+    end
+  end
+
+  describe "Rate limiting (Rails 8 built-in)" do
+    it "SessionsController#create is rate-limited to 10/minute" do
+      assert_file "engines/auth/app/controllers/auth/sessions_controller.rb" do |content|
+        expect(content).to include("rate_limit")
+        expect(content).to include("to: 10")
+        expect(content).to include("within: 1.minute")
+      end
+    end
+
+    it "RegistrationsController#create is rate-limited to 5/hour" do
+      assert_file "engines/auth/app/controllers/auth/registrations_controller.rb" do |content|
+        expect(content).to include("rate_limit")
+        expect(content).to include("to: 5")
+        expect(content).to include("within: 1.hour")
+      end
+    end
+
+    it "PasswordResetsController is rate-limited to 5/hour for create + update" do
+      assert_file "engines/auth/app/controllers/auth/password_resets_controller.rb" do |content|
+        expect(content).to include("rate_limit")
+        expect(content).to include("to: 5")
+        expect(content).to include("within: 1.hour")
+      end
+    end
+  end
+
+  describe "Background jobs" do
+    it "ships ApplicationJob base class scoped to Auth" do
+      assert_file "engines/auth/app/jobs/auth/application_job.rb" do |content|
+        expect(content).to include("class ApplicationJob")
+      end
+    end
+
+    it "ships CleanupExpiredSessionsJob that publishes session.expired.auth per row" do
+      assert_file "engines/auth/app/jobs/auth/cleanup_expired_sessions_job.rb" do |content|
+        [
+          "class CleanupExpiredSessionsJob",
+          "Auth::Session.where(expires_at:",
+          "session.expired.auth",
+          "session.destroy"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
 end

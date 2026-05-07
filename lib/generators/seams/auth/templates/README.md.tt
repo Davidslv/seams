@@ -104,6 +104,68 @@ Verified against:
 - https://docs.github.com/en/rest/users/users
 - https://docs.github.com/en/rest/users/emails
 
+## API tokens (Bearer auth)
+
+`Auth::ApiToken` ships with the engine for programmatic access. Tokens
+are issued via `Auth::GenerateApiToken.call(user:, name:, expires_at:)`
+which returns a `Result` carrying both the persisted record and the
+**plaintext token** — the plaintext is shown ONCE and never recoverable
+from the DB (only a SHA-256 digest is stored).
+
+```ruby
+result = Auth::GenerateApiToken.call(user: current_user, name: "CI key")
+result.plaintext  # => "seam_tF9...xQ" — display once, then discard
+result.api_token  # => Auth::ApiToken row
+```
+
+Mix `Auth::ApiAuthenticatable` into API controllers and call
+`authenticate_api_token!` in a before_action:
+
+```ruby
+class Api::WidgetsController < ApplicationController
+  include Auth::ApiAuthenticatable
+  before_action :authenticate_api_token!
+end
+```
+
+Clients send `Authorization: Bearer seam_<token>`. On success the
+concern sets `current_user` + `current_api_token` and bumps the token's
+`last_used_at`. On failure it renders 401 JSON.
+
+Events emitted:
+
+| Event name | Payload |
+| --- | --- |
+| `api_token.issued.auth`  | `{ auth_user_id:, host_user_id:, api_token_id:, token_prefix: }` |
+| `api_token.revoked.auth` | `{ auth_user_id:, host_user_id:, api_token_id:, token_prefix: }` |
+
+## Rate limiting
+
+The engine uses Rails 8's built-in `rate_limit` (backed by Solid Cache):
+
+| Controller | Action | Limit |
+| --- | --- | --- |
+| `SessionsController`       | `create`         | 10 / minute |
+| `RegistrationsController`  | `create`         | 5 / hour    |
+| `PasswordResetsController` | `create`, `update` | 5 / hour  |
+
+Tune by overriding the `rate_limit` declaration in your host app
+controllers. Solid Cache is the default Rails 8 cache store; if your
+host uses a different store, the limit applies to whatever cache backs
+`Rails.cache`.
+
+## Cleanup expired sessions
+
+`Auth::CleanupExpiredSessionsJob` sweeps expired `Auth::Session` rows
+and emits `session.expired.auth` for each one. Wire it as a Solid Queue
+Recurring entry in `config/recurring.yml`:
+
+```yaml
+auth_cleanup_expired_sessions:
+  class: Auth::CleanupExpiredSessionsJob
+  schedule: "every 1 hour"
+```
+
 ## Mounting
 
 ```ruby
