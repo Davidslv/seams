@@ -67,6 +67,19 @@ jobs:
       fail-fast: false
       matrix:
         engine: ${{ fromJson(needs.discover.outputs.engines) }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgres://postgres:postgres@localhost:5432"
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
@@ -77,6 +90,19 @@ jobs:
   test_app:
     name: Test host app
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgres://postgres:postgres@localhost:5432"
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1

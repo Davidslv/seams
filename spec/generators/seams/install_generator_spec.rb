@@ -63,7 +63,7 @@ RSpec.describe Seams::Generators::InstallGenerator do
     it "creates config/seams_engines.rb that requires every engine" do
       assert_file "config/seams_engines.rb" do |content|
         expect(content).to include("$LOAD_PATH.unshift")
-        expect(content).to include('require engine_name')
+        expect(content).to include("require engine_name")
         expect(content).to include("engines/")
       end
     end

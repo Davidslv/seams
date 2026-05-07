@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+# These are full end-to-end integration tests, not class-under-test
+# specs — they describe a workflow, not an object. The example length
+# rule isn't useful here either; a single end-to-end run has many
+# steps by design.
+# rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength
+
 require "fileutils"
 require "tmpdir"
 
@@ -49,9 +55,8 @@ RSpec.describe "rails new integration", type: :integration_full do
 
   # Add seams + every gem the canonical generators inject. Pre-adding
   # them lets us bundle install ONCE up-front; the per-generator
-  # host_inject_gem calls are idempotent and just re-confirm.
-  # sqlite3 is omitted because Rails 8's `rails new --database=sqlite3`
-  # already adds it and Bundler refuses two version specifications.
+  # host_inject_gem calls are idempotent and just re-confirm. pg is
+  # added by `rails new --database=postgresql`.
   def add_gems_to_gemfile
     File.open(File.join(host_path, "Gemfile"), "a") do |f|
       f.puts
@@ -67,11 +72,47 @@ RSpec.describe "rails new integration", type: :integration_full do
   end
 
   def run_rails_new
+    # Pin the tmp dir to the same Ruby the seams gem itself targets,
+    # so rbenv shims don't fall back to the system Ruby (which won't
+    # have Rails installed under our required_ruby_version).
+    File.write(File.join(tmp_dir, ".ruby-version"), File.read(File.expand_path("../../.ruby-version", __dir__)))
+
     Bundler.with_unbundled_env do
       Dir.chdir(tmp_dir) do
         system("rails", "new", "host",
                "--skip-bundle", "--skip-git", "--skip-test",
-               "--skip-system-test", "--database=sqlite3") || raise("rails new failed")
+               "--skip-system-test", "--database=postgresql") || raise("rails new failed")
+      end
+    end
+    # Replace the default development/production database.yml with a
+    # Postgres config the local test environment can actually reach.
+    File.write(File.join(host_path, "config/database.yml"), <<~YML)
+      default: &default
+        adapter: postgresql
+        encoding: unicode
+        host: <%= ENV.fetch("PGHOST", "localhost") %>
+        port: <%= ENV.fetch("PGPORT", 5432) %>
+        username: <%= ENV.fetch("PGUSER", ENV["USER"]) %>
+        password: <%= ENV.fetch("PGPASSWORD", "") %>
+        pool: 5
+
+      development:
+        <<: *default
+        database: seams_integration_dev
+
+      test:
+        <<: *default
+        database: seams_integration_test
+    YML
+  end
+
+  def create_test_database
+    Bundler.with_unbundled_env do
+      Dir.chdir(host_path) do
+        system({ "RAILS_ENV" => "development" }, "bin/rails", "db:create",
+               out: File::NULL, err: File::NULL)
+        system({ "RAILS_ENV" => "test" }, "bin/rails", "db:create",
+               out: File::NULL, err: File::NULL)
       end
     end
   end
@@ -92,6 +133,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     run_rails_new
     add_gems_to_gemfile
     bundle_install
+    create_test_database
 
     %w[install core auth notifications billing teams].each { |g| generate(g) }
 
@@ -117,7 +159,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     tables = shell_capture(["bin/rails", "runner", "puts ActiveRecord::Base.connection.tables.sort.join(',')"])
     actual = tables.lines.last.to_s.strip.split(",")
     missing = expected - actual
-    expect(missing).to be_empty, "host db is missing engine tables: #{missing.join(', ')} (got: #{actual.inspect})"
+    expect(missing).to be_empty, "host db is missing engine tables: #{missing.join(", ")} (got: #{actual.inspect})"
   end
 
   # Phase 1.9 round-trip: the generic engine generator + the remove
@@ -127,6 +169,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     run_rails_new
     add_gems_to_gemfile
     bundle_install
+    create_test_database
     generate("install")
 
     shell(%w[bin/rails generate seams:engine reporting])
@@ -142,3 +185,5 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(boot_probe("puts defined?(Reporting::Engine).inspect")).to eq("nil")
   end
 end
+
+# rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength

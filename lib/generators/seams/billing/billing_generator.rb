@@ -138,8 +138,7 @@ module Seams
       end
 
       def wire_into_host
-        host_inject_gem("stripe",  "~> 12.0")
-        host_inject_gem("sqlite3", ">= 1.4", group: :test)
+        host_inject_gem("stripe", "~> 12.0")
         host_inject_mount(engine_class: "Billing::Engine", at: "/billing")
         host_inject_include_in_user("Billing::Billable")
       end

@@ -118,7 +118,6 @@ module Seams
 
       def wire_into_host
         host_inject_mount(engine_class: "Core::Engine", at: "/")
-        host_inject_gem("sqlite3", ">= 1.4", group: :test)
       end
 
       def report_summary

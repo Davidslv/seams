@@ -14,7 +14,7 @@ module Seams
     # Notifications uses STI: a single +Notifications::Notification+
     # base with three concrete subclasses under +Strategies+ — InApp,
     # Email, Sms — each implementing its own +#dispatch!+. The
-    # schedule lives in a json column populated by ice_cube;
+    # schedule lives in a jsonb column populated by ice_cube;
     # +next_delivery_at+ is the indexed cache the recurring sweeper
     # reads from.
     #

@@ -36,7 +36,7 @@ module Seams
         write(File.join(engine_path, "spec/dummy/config/boot.rb"),         boot_rb)
         write(File.join(engine_path, "spec/dummy/config/application.rb"),  application_rb(engine_module))
         write(File.join(engine_path, "spec/dummy/config/environment.rb"),  environment_rb)
-        write(File.join(engine_path, "spec/dummy/config/database.yml"),    database_yml)
+        write(File.join(engine_path, "spec/dummy/config/database.yml"),    database_yml(engine_path))
         write(File.join(engine_path, "spec/dummy/config/environments/test.rb"),       test_environment_rb)
         write(File.join(engine_path, "spec/dummy/config/initializers/secret_key.rb"), secret_key_rb)
         write(File.join(engine_path, "spec/dummy/config/routes.rb"),       routes_rb(engine_module, mount_at))
@@ -104,13 +104,22 @@ module Seams
         RB
       end
 
-      def database_yml
+      def database_yml(engine_path)
+        # Postgres-only — engine schemas use jsonb columns. Per-engine
+        # database name keeps parallel test runs from clobbering each
+        # other. CI sets PG* env vars; locally they default to the
+        # current user with no password (Homebrew Postgres default).
+        db_name = "#{File.basename(engine_path)}_dummy_test"
         <<~YML
           test:
-            adapter: sqlite3
-            database: ":memory:"
+            adapter: postgresql
+            database: #{db_name}
+            host:     <%= ENV.fetch("PGHOST",     "localhost") %>
+            port:     <%= ENV.fetch("PGPORT",     "5432") %>
+            username: <%= ENV.fetch("PGUSER",     ENV["USER"]) %>
+            password: <%= ENV.fetch("PGPASSWORD", "") %>
             pool: 5
-            timeout: 5000
+            encoding: unicode
         YML
       end
 
@@ -217,12 +226,36 @@ module Seams
 
           require_relative "spec_helper"
           ENV["RAILS_ENV"] ||= "test"
+
+          # Ensure the per-engine Postgres test database exists before
+          # the dummy app boots and tries to connect to it. We connect
+          # to the maintenance "postgres" database first, CREATE DATABASE
+          # if missing, then let the dummy app pick up its own config.
+          require "active_record"
+          require "yaml"
+          require "erb"
+          dummy_db_yml = File.expand_path("dummy/config/database.yml", __dir__)
+          db_config    = YAML.safe_load(ERB.new(File.read(dummy_db_yml)).result, aliases: true)["test"]
+          target_db    = db_config["database"]
+          admin_config = db_config.merge("database" => "postgres")
+          ActiveRecord::Base.establish_connection(admin_config)
+          unless ActiveRecord::Base.connection.execute(
+            "SELECT 1 FROM pg_database WHERE datname = '\#{target_db}'"
+          ).any?
+            ActiveRecord::Base.connection.execute(%(CREATE DATABASE "\#{target_db}"))
+          end
+          ActiveRecord::Base.remove_connection
+
           require File.expand_path("dummy/config/environment", __dir__)
           abort("Rails is in production mode!") if Rails.env.production?
 
           require "rspec/rails"
 
           ActiveRecord::Schema.verbose = false
+          # Drop and reload the schema for a clean slate every run.
+          ActiveRecord::Base.connection.tables.each do |t|
+            ActiveRecord::Base.connection.drop_table(t, force: :cascade)
+          end
           load File.expand_path("dummy/db/schema.rb", __dir__)
 
           RSpec.configure do |config|

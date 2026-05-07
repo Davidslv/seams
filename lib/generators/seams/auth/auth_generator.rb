@@ -142,8 +142,7 @@ module Seams
       end
 
       def wire_into_host
-        host_inject_gem("bcrypt",  "~> 3.1")
-        host_inject_gem("sqlite3", ">= 1.4", group: :test)
+        host_inject_gem("bcrypt", "~> 3.1")
         host_inject_mount(engine_class: "Auth::Engine", at: "/auth")
         host_inject_include_in_user("Auth::Authenticatable")
         host_inject_include_in_application_controller("Auth::Authentication")

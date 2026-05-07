@@ -17,8 +17,7 @@ subclasses, each implementing its own `#dispatch!`:
 
 Every Notification belongs to an `owner` (polymorphic), names a
 `template` (an ERB filename), and carries an ice_cube schedule
-serialised to a `schedule_data` json column (swap to `jsonb` on
-Postgres if you want GIN indexing). `next_delivery_at` is
+serialised to a `schedule_data` jsonb column. `next_delivery_at` is
 the indexed cache the recurring sweeper reads from.
 
 ## Scheduling

@@ -5,7 +5,7 @@
 # per-engine, not globally, so they don't fire on host code.
 
 AllCops:
-  TargetRubyVersion: 3.2
+  TargetRubyVersion: 4.0
   NewCops: enable
   SuggestExtensions: false
   Exclude:

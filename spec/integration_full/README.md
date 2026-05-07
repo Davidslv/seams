@@ -22,14 +22,17 @@ bundle exec rspec spec/integration_full/
 ## What `rails_new_spec.rb` does
 
 1. Shells out to `rails new tmp/host --skip-bundle --skip-git
-   --skip-test --skip-system-test --database=sqlite3`.
+   --skip-test --skip-system-test --database=postgresql`. Pins the
+   tmp dir to seams' `.ruby-version` so rbenv shims pick the right
+   Ruby. Overwrites the default `config/database.yml` with one that
+   reads `PGHOST` / `PGUSER` / `PGPASSWORD`.
 2. Appends `gem "seams", path: "<this gem>"` to the host's Gemfile.
 3. `bundle install` (vanilla Rails + seams).
-4. Runs every canonical generator in order:
+4. Creates the `seams_integration_dev` and `seams_integration_test`
+   Postgres databases.
+5. Runs every canonical generator in order:
    `seams:install`, `seams:core`, `seams:auth`, `seams:notifications`,
    `seams:billing`, `seams:teams`.
-5. `bundle install` again (picks up bcrypt, stripe, ice_cube,
-   sqlite3 — added by the canonical generators via host_inject_gem).
 6. For each engine, runs `bundle exec rspec engines/<name>/spec/runtime`
    inside the host. The runtime specs are the boot specs the
    canonical generators ship — they assert the engine constant

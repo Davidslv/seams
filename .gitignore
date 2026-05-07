@@ -10,8 +10,6 @@
 # rspec failure tracking
 .rspec_status
 
-# rbenv / asdf
-.ruby-version
 
 # Editor
 .vscode/

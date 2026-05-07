@@ -113,7 +113,6 @@ module Seams
       end
 
       def wire_into_host
-        host_inject_gem("sqlite3", ">= 1.4", group: :test)
         host_inject_mount(engine_class: "Teams::Engine", at: "/teams")
         host_inject_include_in_user("Teams::Teamable")
       end
