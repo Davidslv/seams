@@ -4,6 +4,7 @@ require "fileutils"
 require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
+require "seams/generators/host_injector"
 
 module Seams
   module Generators
@@ -13,6 +14,8 @@ module Seams
     #
     # Run with: bin/rails generate seams:notifications
     class NotificationsGenerator < Rails::Generators::Base
+      include Seams::Generators::HostInjector
+
       source_root File.expand_path("templates", __dir__)
 
       ENGINE_NAME = "notifications"
@@ -90,6 +93,11 @@ module Seams
         replacement = "  ExposedConcerns:\n    - Notifications::Notifiable"
         contents.sub!(/^  ExposedConcerns: \[\]$/, replacement)
         File.write(rubocop_path, contents)
+      end
+
+      def wire_into_host
+        host_inject_mount(engine_class: "Notifications::Engine", at: "/notifications")
+        host_inject_include_in_user("Notifications::Notifiable")
       end
 
       def report_summary

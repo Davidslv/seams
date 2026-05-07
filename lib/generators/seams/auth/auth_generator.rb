@@ -4,6 +4,7 @@ require "fileutils"
 require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
+require "seams/generators/host_injector"
 
 module Seams
   module Generators
@@ -23,6 +24,8 @@ module Seams
     #
     # Run with: bin/rails generate seams:auth
     class AuthGenerator < Rails::Generators::Base
+      include Seams::Generators::HostInjector
+
       source_root File.expand_path("templates", __dir__)
 
       ENGINE_NAME = "auth"
@@ -99,15 +102,21 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def wire_into_host
+        host_inject_gem("bcrypt", "~> 3.1")
+        host_inject_mount(engine_class: "Auth::Engine", at: "/auth")
+        host_inject_include_in_user("Auth::Authenticatable")
+        host_inject_include_in_application_controller("Auth::Authentication")
+      end
+
       def report_summary
         say ""
         say "  Auth engine generated at engines/auth/", :green
         say ""
         say "  Next steps:", :yellow
-        say "    1. Add `mount Auth::Engine, at: \"/auth\"` to config/routes.rb"
-        say "    2. `include Auth::Authentication` in your ApplicationController"
-        say "    3. `bin/rails db:migrate` to create the auth tables"
-        say "    4. Run the engine specs: bin/rails seams:test[auth]"
+        say "    1. bundle install   (picks up bcrypt + Auth::Engine)"
+        say "    2. bin/rails db:migrate"
+        say "    3. Run the engine specs: bin/rails seams:test[auth]"
         say ""
       end
 

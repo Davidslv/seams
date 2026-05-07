@@ -4,6 +4,7 @@ require "fileutils"
 require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
+require "seams/generators/host_injector"
 
 module Seams
   module Generators
@@ -15,6 +16,8 @@ module Seams
     #
     # Run with: bin/rails generate seams:billing
     class BillingGenerator < Rails::Generators::Base
+      include Seams::Generators::HostInjector
+
       source_root File.expand_path("templates", __dir__)
 
       ENGINE_NAME = "billing"
@@ -100,16 +103,21 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def wire_into_host
+        host_inject_gem("stripe", "~> 12.0")
+        host_inject_mount(engine_class: "Billing::Engine", at: "/billing")
+        host_inject_include_in_user("Billing::Billable")
+      end
+
       def report_summary
         say ""
         say "  Billing engine generated at engines/billing/", :green
         say ""
         say "  Next steps:", :yellow
-        say "    1. Add `gem \"stripe\"` to your host Gemfile and bundle install"
-        say "    2. Add `mount Billing::Engine, at: \"/billing\"` to config/routes.rb"
-        say "    3. Set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET in your env"
-        say "    4. Configure your Stripe webhook endpoint to point to /billing/webhooks/stripe"
-        say "    5. `bin/rails db:migrate`"
+        say "    1. bundle install   (picks up stripe + Billing::Engine)"
+        say "    2. Set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET in your env"
+        say "    3. Configure your Stripe webhook to POST to /billing/webhooks/stripe"
+        say "    4. bin/rails db:migrate"
         say ""
       end
 

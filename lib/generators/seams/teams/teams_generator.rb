@@ -4,6 +4,7 @@ require "fileutils"
 require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
+require "seams/generators/host_injector"
 
 module Seams
   module Generators
@@ -14,6 +15,8 @@ module Seams
     #
     # Run with: bin/rails generate seams:teams
     class TeamsGenerator < Rails::Generators::Base
+      include Seams::Generators::HostInjector
+
       source_root File.expand_path("templates", __dir__)
 
       ENGINE_NAME = "teams"
@@ -96,15 +99,18 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def wire_into_host
+        host_inject_mount(engine_class: "Teams::Engine", at: "/teams")
+        host_inject_include_in_user("Teams::Teamable")
+      end
+
       def report_summary
         say ""
         say "  Teams engine generated at engines/teams/", :green
         say ""
         say "  Next steps:", :yellow
-        say "    1. Add `mount Teams::Engine, at: \"/teams\"` to config/routes.rb"
-        say "    2. `include Teams::Teamable` in your User model"
-        say "    3. `bin/rails db:migrate`"
-        say "    4. Run the engine specs: bin/rails seams:test[teams]"
+        say "    1. bin/rails db:migrate"
+        say "    2. Run the engine specs: bin/rails seams:test[teams]"
         say ""
       end
 
