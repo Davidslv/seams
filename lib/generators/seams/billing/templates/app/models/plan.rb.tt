@@ -7,7 +7,16 @@ module Billing
   class Plan < ApplicationRecord
     self.table_name = "billing_plans"
 
-    INTERVALS = %w[day week month year].freeze
+    # `lifetime` is the LTD interval — a one-time payment with permanent
+    # access. Stripe Checkout uses `mode: "payment"` for these instead
+    # of `mode: "subscription"`. See LifetimePass + the LTD section in
+    # the README for the trade-off (no recurring revenue, indefinite
+    # support burden).
+    INTERVALS = %w[day week month year lifetime].freeze
+
+    has_many :lifetime_passes, class_name: "Billing::LifetimePass",
+                               foreign_key: :plan_ref, primary_key: :gateway_ref,
+                               dependent: :nullify
 
     validates :gateway_ref, presence: true, uniqueness: true
     validates :name, presence: true
@@ -15,7 +24,9 @@ module Billing
     validates :currency, presence: true
     validates :interval, inclusion: { in: INTERVALS }
 
-    scope :active, -> { where(active: true) }
+    scope :active,    -> { where(active: true) }
+    scope :recurring, -> { where.not(interval: "lifetime") }
+    scope :lifetime,  -> { where(interval: "lifetime") }
 
     def free?
       amount_cents.zero?
@@ -23,6 +34,22 @@ module Billing
 
     def has_trial?
       trial_period_days.to_i.positive?
+    end
+
+    def lifetime?
+      interval == "lifetime"
+    end
+
+    # nil = unlimited; otherwise the count of LTD slots still available
+    # (max_lifetime_units minus already-issued LifetimePass count).
+    def lifetime_inventory_remaining
+      return nil if max_lifetime_units.nil? || !lifetime?
+
+      [max_lifetime_units - lifetime_passes.count, 0].max
+    end
+
+    def lifetime_sold_out?
+      lifetime? && lifetime_inventory_remaining&.zero?
     end
   end
 end

@@ -17,6 +17,11 @@ class CreateBillingPlans < ActiveRecord::Migration[7.1]
       t.integer :trial_period_days
       t.boolean :active,             null: false, default: true
       t.jsonb   :features,           null: false, default: {}
+      # LTD inventory cap. nil = unlimited. Only meaningful when
+      # interval == "lifetime"; ignored otherwise. The pricing page +
+      # admin grant flow read Plan#lifetime_inventory_remaining to
+      # gate purchases / grants.
+      t.integer :max_lifetime_units
       t.timestamps
     end
 

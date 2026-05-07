@@ -48,6 +48,8 @@ module Seams
                  engine_path("app/models/billing/webhook_event.rb")
         template "app/models/plan.rb.tt",
                  engine_path("app/models/billing/plan.rb")
+        template "app/models/lifetime_pass.rb.tt",
+                 engine_path("app/models/billing/lifetime_pass.rb")
       end
 
       def create_gateways
@@ -102,6 +104,8 @@ module Seams
                  engine_path("db/migrate/#{timestamp(2)}_create_billing_webhook_events.rb")
         template "db/migrate/create_billing_plans.rb.tt",
                  engine_path("db/migrate/#{timestamp(3)}_create_billing_plans.rb")
+        template "db/migrate/create_billing_lifetime_passes.rb.tt",
+                 engine_path("db/migrate/#{timestamp(4)}_create_billing_lifetime_passes.rb")
       end
 
       def create_specs
@@ -207,8 +211,23 @@ module Seams
             t.integer :trial_period_days
             t.boolean :active,            null: false, default: true
             t.jsonb   :features,          null: false, default: {}
+            t.integer :max_lifetime_units
             t.timestamps
           end
+
+          create_table :billing_lifetime_passes do |t|
+            t.string   :customer_ref,        null: false
+            t.string   :plan_ref,            null: false
+            t.string   :gateway_ref
+            t.bigint   :granted_by_user_id
+            t.datetime :granted_at,          null: false
+            t.datetime :revoked_at
+            t.bigint   :revoked_by_user_id
+            t.text     :notes
+            t.timestamps
+          end
+          add_index :billing_lifetime_passes, %i[customer_ref plan_ref], unique: true,
+                                                                         name: "index_billing_ltd_unique"
 
           create_table :users do |t|
             t.string :email
