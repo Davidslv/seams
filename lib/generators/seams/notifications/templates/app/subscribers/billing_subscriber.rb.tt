@@ -1,19 +1,22 @@
 # frozen_string_literal: true
 
 module Notifications
-  # Consumes Billing events and creates an in-app Notification for the
-  # host User who owns the subscription/invoice. Mirrors AuthSubscriber.
+  # Consumes Billing events and enqueues a Notifications::CreateNotificationJob
+  # (which creates the InApp Notification out-of-band — never inline,
+  # see Seams::Events::Publisher docstring).
   #
   # Every subscribed event publishes the same canonical payload shape:
   #   { gateway:, livemode:, customer_ref:, ref:, object_id:, object: }
   #
   # `customer_ref` is the gateway-side customer id (e.g. cus_xxx). The
-  # host User is resolved via `stripe_customer_id` — that column is the
-  # contract `Billing::Billable` documents on the host's User model.
+  # host User is resolved via `stripe_customer_id` — the column
+  # `Billing::Billable` documents on the host's User model.
   #
-  # +.attach!+ is idempotent — Rails reload won't double-subscribe.
+  # +.attach!+ is idempotent across Rails autoreload via
+  # +Seams::Events::Publisher.attach_once+.
   class BillingSubscriber
-    @attached = false
+    SUBSCRIBER_KEY = :notifications_billing_subscriber
+    HOST_USER_CLASS_NAME = "User"
 
     EVENT_TEMPLATES = {
       "subscription.created.billing"  => "billing/subscription_started",
@@ -23,38 +26,33 @@ module Notifications
     }.freeze
 
     class << self
-      attr_accessor :attached
-      alias_method :attached?, :attached
-
       def attach!
-        return if attached?
-
         EVENT_TEMPLATES.each do |event, template|
-          Seams::Events::Publisher.subscribe(event) do |payload|
+          Seams::Events::Publisher.attach_once(SUBSCRIBER_KEY, event) do |payload|
             handle(payload: payload, template: template)
           end
         end
-
-        self.attached = true
       end
 
       private
 
       def handle(payload:, template:)
-        owner = resolve_owner(payload[:customer_ref])
-        return unless owner
+        host_user_id = host_user_id_for(payload[:customer_ref])
+        return unless host_user_id
 
-        notif = Notifications::Strategies::InApp.new(owner: owner, template: template)
-        notif.schedule = IceCube::Schedule.new(Time.current)
-        notif.save!
-        notif.send_async
+        Notifications::CreateNotificationJob.perform_later(
+          owner_class: HOST_USER_CLASS_NAME,
+          owner_id:    host_user_id,
+          template:    template,
+          strategy:    "in_app"
+        )
       end
 
-      def resolve_owner(customer_ref)
+      def host_user_id_for(customer_ref)
         return nil if customer_ref.nil? || customer_ref.to_s.empty?
         return nil unless defined?(::User) && ::User.column_names.include?("stripe_customer_id")
 
-        ::User.find_by(stripe_customer_id: customer_ref)
+        ::User.where(stripe_customer_id: customer_ref).pick(:id)
       end
     end
   end

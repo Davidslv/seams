@@ -70,11 +70,11 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       assert_file "engines/teams/app/views/teams/invitation_mailer/invite.text.erb"
     end
 
-    it "InvitationSubscriber consumes invitation.sent.teams and enqueues the mailer" do
+    it "InvitationSubscriber consumes invitation.sent.teams via attach_once and enqueues the mailer" do
       assert_file "engines/teams/app/subscribers/teams/invitation_subscriber.rb" do |content|
-        expect(content).to include('Seams::Events::Publisher.subscribe("invitation.sent.teams")')
+        expect(content).to include('attach_once(SUBSCRIBER_KEY, "invitation.sent.teams")')
         expect(content).to include("Teams::InvitationMailer.invite(invitation_id).deliver_later")
-        expect(content).to include("return if attached?")
+        expect(content).not_to include("@attached =")
       end
     end
 

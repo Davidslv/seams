@@ -55,11 +55,11 @@ RSpec.describe Seams::Generators::CoreGenerator do
   end
 
   describe "concerns" do
-    it "creates Core::Auditable with create/update/destroy hooks" do
+    it "creates Core::Auditable with after_commit hooks (not after_create / after_update / after_destroy)" do
       assert_file "engines/core/app/models/concerns/core/auditable.rb" do |content|
-        expect(content).to include("after_create   :record_audit_create")
-        expect(content).to include("after_update   :record_audit_update")
-        expect(content).to include("after_destroy  :record_audit_destroy")
+        expect(content).to include("after_commit :record_audit_create,  on: :create")
+        expect(content).to include("after_commit :record_audit_update,  on: :update")
+        expect(content).to include("after_commit :record_audit_destroy, on: :destroy")
       end
     end
 

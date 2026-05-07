@@ -61,8 +61,8 @@ RSpec.describe "Phase 2 integration", type: :integration do
 
     auth_subscriber = File.read(File.join(host_root,
                                           "engines/notifications/app/subscribers/notifications/auth_subscriber.rb"))
-    expect(auth_subscriber).to include('subscribe("user.signed_up.auth")')
-    expect(auth_subscriber).to include("Notifications::Strategies::Email.new")
+    expect(auth_subscriber).to include('attach_once(SUBSCRIBER_KEY, "user.signed_up.auth")')
+    expect(auth_subscriber).to include("Notifications::CreateNotificationJob.perform_later")
   end
 
   it "auth migration + notifications migration both have leading comment blocks" do

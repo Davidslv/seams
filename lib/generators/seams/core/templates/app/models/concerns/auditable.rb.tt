@@ -17,9 +17,13 @@ module Core
       has_many :audit_logs, class_name: "Core::AuditLog",
                             as: :auditable, dependent: :nullify
 
-      after_create   :record_audit_create
-      after_update   :record_audit_update
-      after_destroy  :record_audit_destroy
+      # after_commit (not after_create / after_update / after_destroy)
+      # so the publish doesn't fire inside the host model's open
+      # transaction. Subscribers run synchronously; an in-transaction
+      # publish lets a slow subscriber hold the table lock.
+      after_commit :record_audit_create,  on: :create
+      after_commit :record_audit_update,  on: :update
+      after_commit :record_audit_destroy, on: :destroy
     end
 
     private

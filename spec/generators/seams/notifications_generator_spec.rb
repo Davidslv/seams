@@ -177,17 +177,17 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
   end
 
   describe "subscriber" do
-    it "AuthSubscriber subscribes to user.signed_up.auth and creates strategy notifications" do
+    it "AuthSubscriber subscribes to user.signed_up.auth and enqueues CreateNotificationJob (no inline DB writes)" do
       assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
-        expect(content).to include('Seams::Events::Publisher.subscribe("user.signed_up.auth")')
-        expect(content).to include("Notifications::Strategies::InApp.new")
-        expect(content).to include("Notifications::Strategies::Email.new")
+        expect(content).to include('Seams::Events::Publisher.attach_once(SUBSCRIBER_KEY, "user.signed_up.auth")')
+        expect(content).to include("Notifications::CreateNotificationJob.perform_later")
       end
     end
 
-    it "guards .attach! so a Rails reload doesn't double-subscribe" do
+    it "uses Publisher.attach_once so Rails autoreload can't double-subscribe" do
       assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
-        expect(content).to include("return if attached?")
+        expect(content).to include("attach_once(SUBSCRIBER_KEY")
+        expect(content).not_to include("@attached =") # old class-body flag would reset on reload
       end
     end
 
@@ -205,9 +205,9 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
-    it "BillingSubscriber creates an InApp strategy and resolves the host User by stripe_customer_id" do
+    it "BillingSubscriber enqueues CreateNotificationJob and resolves the host User by stripe_customer_id" do
       assert_file "engines/notifications/app/subscribers/notifications/billing_subscriber.rb" do |content|
-        expect(content).to include("Notifications::Strategies::InApp.new")
+        expect(content).to include("Notifications::CreateNotificationJob.perform_later")
         expect(content).to include("stripe_customer_id")
       end
     end

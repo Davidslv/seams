@@ -8,20 +8,13 @@ module Teams
   #
   # +.attach!+ is idempotent — Rails reload won't double-subscribe.
   class InvitationSubscriber
-    @attached = false
+    SUBSCRIBER_KEY = :teams_invitation_subscriber
 
     class << self
-      attr_accessor :attached
-      alias_method :attached?, :attached
-
       def attach!
-        return if attached?
-
-        Seams::Events::Publisher.subscribe("invitation.sent.teams") do |payload|
+        Seams::Events::Publisher.attach_once(SUBSCRIBER_KEY, "invitation.sent.teams") do |payload|
           handle_invitation_sent(payload)
         end
-
-        self.attached = true
       end
 
       private

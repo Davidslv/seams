@@ -74,6 +74,8 @@ module Seams
                  engine_path("app/jobs/notifications/send_due_notifications_job.rb")
         template "app/jobs/send_notification_job.rb.tt",
                  engine_path("app/jobs/notifications/send_notification_job.rb")
+        template "app/jobs/create_notification_job.rb.tt",
+                 engine_path("app/jobs/notifications/create_notification_job.rb")
       end
 
       def create_subscriber

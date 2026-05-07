@@ -72,4 +72,27 @@ RSpec.describe Seams::Events::Publisher do
       expect(described_class.orphan_subscriptions).to be_empty
     end
   end
+
+  describe ".attach_once" do
+    it "subscribes the first time and returns a truthy handle" do
+      handle = described_class.attach_once(:test_key, "subscription.created.billing") { :noop }
+      expect(handle).not_to be_nil
+    end
+
+    it "is idempotent across repeated calls with the same (key, event_name)" do
+      received = []
+      described_class.attach_once(:test_key, "subscription.created.billing") { |p| received << p }
+      described_class.attach_once(:test_key, "subscription.created.billing") { |p| received << p }
+      described_class.attach_once(:test_key, "subscription.created.billing") { |p| received << p }
+
+      described_class.publish("subscription.created.billing", id: 1)
+
+      expect(received).to eq([{ id: 1 }]) # not three callbacks, despite three attach_once calls
+    end
+
+    it "tracks attach state on Publisher itself, not on the subscriber class — so Rails autoreload doesn't double-subscribe" do
+      described_class.attach_once(:test_key, "subscription.created.billing") { :noop }
+      expect(described_class.attached_keys).to include([:test_key, "subscription.created.billing"])
+    end
+  end
 end

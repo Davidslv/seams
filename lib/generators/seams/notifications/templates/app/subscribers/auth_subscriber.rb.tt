@@ -2,74 +2,49 @@
 
 module Notifications
   # Consumes Auth events. On +user.signed_up.auth+:
-  #   1. Creates an InApp notification (so the bell shows it).
-  #   2. Creates an Email notification if the user hasn't opted out
-  #      via NotificationPreference.
+  #   1. Resolves the host User by `payload[:host_user_id]`.
+  #   2. Enqueues Notifications::CreateNotificationJob — which creates
+  #      InApp + (preferences-permitting) Email rows out-of-band.
   #
-  # Notifications are scheduled for immediate delivery and enqueued
-  # via send_async — they don't block the publisher's transaction.
+  # Notifications are NEVER created inline inside the publisher's
+  # thread (see Seams::Events::Publisher docstring); the job is the
+  # boundary.
   #
-  # +.attach!+ is idempotent — Rails reload won't double-subscribe.
+  # +.attach!+ is idempotent across Rails autoreload via
+  # +Seams::Events::Publisher.attach_once+ — class-body @attached
+  # variables would reset on reload and double-subscribe.
   class AuthSubscriber
-    @attached = false
+    SUBSCRIBER_KEY = :notifications_auth_subscriber
+    HOST_USER_CLASS_NAME = "User"
 
     class << self
-      attr_accessor :attached
-      alias_method :attached?, :attached
-
       def attach!
-        return if attached?
-
-        Seams::Events::Publisher.subscribe("user.signed_up.auth") do |payload|
+        Seams::Events::Publisher.attach_once(SUBSCRIBER_KEY, "user.signed_up.auth") do |payload|
           handle_signed_up(payload)
         end
-
-        self.attached = true
       end
 
       private
 
       def handle_signed_up(payload)
-        host_user_id = payload[:host_user_id] || legacy_host_user_id_from(payload)
+        host_user_id = payload[:host_user_id]
         return unless host_user_id
 
-        owner = resolve_owner(host_user_id)
-        return unless owner
+        Notifications::CreateNotificationJob.perform_later(
+          owner_class: HOST_USER_CLASS_NAME,
+          owner_id:    host_user_id,
+          template:    "welcome",
+          strategy:    "in_app"
+        )
 
-        create_in_app(owner)
-        create_email(owner) if email_enabled?(host_user_id)
-      end
+        return unless email_enabled?(host_user_id)
 
-      def resolve_owner(host_user_id)
-        return nil unless defined?(::User)
-
-        ::User.find_by(id: host_user_id)
-      end
-
-      # Translate from old auth_user_id-only payloads (or callers that
-      # passed `user_id` and meant Auth::User#id). Returns nil if the
-      # auth user has no linked host user yet.
-      def legacy_host_user_id_from(payload)
-        return nil unless defined?(Auth::User)
-
-        auth_user_id = payload[:auth_user_id] || payload[:user_id]
-        return nil unless auth_user_id
-
-        Auth::User.find_by(id: auth_user_id)&.host_user_id
-      end
-
-      def create_in_app(owner)
-        notif = Notifications::Strategies::InApp.new(owner: owner, template: "welcome")
-        notif.schedule = IceCube::Schedule.new(Time.current)
-        notif.save!
-        notif.send_async
-      end
-
-      def create_email(owner)
-        notif = Notifications::Strategies::Email.new(owner: owner, template: "welcome")
-        notif.schedule = IceCube::Schedule.new(Time.current)
-        notif.save!
-        notif.send_async
+        Notifications::CreateNotificationJob.perform_later(
+          owner_class: HOST_USER_CLASS_NAME,
+          owner_id:    host_user_id,
+          template:    "welcome",
+          strategy:    "email"
+        )
       end
 
       def email_enabled?(user_id)

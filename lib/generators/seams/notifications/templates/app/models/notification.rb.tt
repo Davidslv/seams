@@ -115,23 +115,27 @@ module Notifications
       Notifications::SendNotificationJob.perform_later(id)
     end
 
-    # Synchronous delivery. Wraps dispatch! + Delivery + advance! in a
-    # transaction and publishes the lifecycle events around them.
+    # Synchronous delivery. Publishes lifecycle events OUTSIDE the
+    # transaction so subscribers don't run inside the AR transaction
+    # (a slow subscriber would hold table locks; a raise would roll
+    # back the delivery write).
     # No-ops if not yet due (defensive against duplicate enqueue).
     def send!
       return unless due?
 
+      Seams::Events::Publisher.publish(
+        "notification.queued.notifications", id: id, type: type, owner_id: owner_id
+      )
+
+      dispatch!
       self.class.transaction do
-        Seams::Events::Publisher.publish(
-          "notification.queued.notifications", id: id, type: type, owner_id: owner_id
-        )
-        dispatch!
         deliveries.create!(sent_at: Time.current)
         advance!
-        Seams::Events::Publisher.publish(
-          "notification.delivered.notifications", id: id, type: type, owner_id: owner_id
-        )
       end
+
+      Seams::Events::Publisher.publish(
+        "notification.delivered.notifications", id: id, type: type, owner_id: owner_id
+      )
     rescue StandardError => e
       Seams::Events::Publisher.publish(
         "notification.failed.notifications", id: id, type: type, error: "#{e.class}: #{e.message}"
