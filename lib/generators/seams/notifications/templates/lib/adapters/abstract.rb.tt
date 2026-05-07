@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+module Notifications
+  module Adapters
+    # Contract every notifications adapter must implement. Subclass
+    # this in your host application to wire up Mailgun, Twilio, etc.,
+    # then point the relevant Notifications.configuration knob at the
+    # subclass.
+    class Abstract
+      def deliver(_to:, _subject:, _body:, **_extras)
+        raise NotImplementedError, "#{self.class} must implement #deliver"
+      end
+    end
+  end
+end

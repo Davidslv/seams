@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+module Notifications
+  class WelcomeMailer < ApplicationMailer
+    def welcome(to:, name: nil)
+      @name = name
+      mail(to: to, subject: "Welcome")
+    end
+  end
+end

@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+
+RSpec.describe Notifications::DeliverEmailJob do
+  let(:adapter) { instance_double(Notifications::Adapters::ActionMailer, deliver: { ok: true, provider: "action_mailer" }) }
+
+  before do
+    allow(Notifications).to receive(:email_adapter).and_return(adapter)
+  end
+
+  it "delegates to the configured email adapter" do
+    described_class.new.perform(to: "x@y.com", subject: "Hi", body: "Hello")
+    expect(adapter).to have_received(:deliver).with(to: "x@y.com", subject: "Hi", body: "Hello")
+  end
+
+  it "publishes notification.queued.notifications and notification.delivered.notifications" do
+    queued    = []
+    delivered = []
+    Seams::Events::Publisher.subscribe("notification.queued.notifications")    { |p| queued << p }
+    Seams::Events::Publisher.subscribe("notification.delivered.notifications") { |p| delivered << p }
+
+    described_class.new.perform(to: "x@y.com", subject: "Hi", body: "Hello")
+
+    expect(queued.size).to    eq(1)
+    expect(delivered.size).to eq(1)
+  end
+
+  it "publishes notification.failed.notifications and re-raises when the adapter raises" do
+    allow(adapter).to receive(:deliver).and_raise(StandardError, "smtp down")
+    failed = []
+    Seams::Events::Publisher.subscribe("notification.failed.notifications") { |p| failed << p }
+
+    expect { described_class.new.perform(to: "x@y.com", subject: "Hi", body: "Hello") }
+      .to raise_error(StandardError, "smtp down")
+
+    expect(failed.first[:error]).to include("smtp down")
+  end
+end

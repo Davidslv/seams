@@ -1,0 +1,20 @@
+# frozen_string_literal: true
+
+require "notifications/adapters/abstract"
+
+module Notifications
+  module Adapters
+    # No-op SMS adapter that logs the message and returns success
+    # without dispatching anything. Useful in development and tests
+    # where you want SMS calls to succeed without burning vendor quota.
+    class NullSms < Abstract
+      def deliver(to:, subject: nil, body:, **)
+        Seams::Observability.adapter.info(
+          "notifications.null_sms.deliver",
+          engine: "notifications", to: to, subject: subject, length: body.to_s.length
+        )
+        { ok: true, provider: "null_sms" }
+      end
+    end
+  end
+end

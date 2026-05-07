@@ -1,0 +1,42 @@
+# Notifications
+
+> Outbound transactional messaging (email + SMS) for a Seams-powered host.
+
+## Events emitted
+
+| Event name | Payload | Emitted when |
+| --- | --- | --- |
+| `notification.queued.notifications`     | `{ to:, channel:, ... }`         | DeliverEmailJob / DeliverSmsJob enqueues a send |
+| `notification.delivered.notifications`  | `{ to:, channel:, provider: }`   | Adapter#deliver returned successfully |
+| `notification.failed.notifications`     | `{ to:, channel:, error: }`      | Adapter#deliver raised |
+
+## Events consumed
+
+| Event name | Subscriber | What it does |
+| --- | --- | --- |
+| `user.signed_up.auth` | `Notifications::AuthSubscriber` | Enqueues a welcome email |
+
+Subscribers always enqueue background jobs; they do not perform
+side-effects synchronously inside the publisher's call.
+
+## Exposed concerns
+
+| Concern | Purpose |
+| --- | --- |
+| `Notifications::Notifiable` | Mix into the host's user-facing model for `notify_email(...)` / `notify_sms(...)` helpers. |
+
+## Adapters
+
+| Interface | Default | Override via |
+| --- | --- | --- |
+| Email | `Notifications::Adapters::ActionMailer` | `Notifications.configure { \|c\| c.email_adapter = "Notifications::Adapters::Mailgun" }` |
+| SMS   | `Notifications::Adapters::NullSms`      | `Notifications.configure { \|c\| c.sms_adapter   = "Notifications::Adapters::Twilio" }` |
+
+To add a new adapter, subclass `Notifications::Adapters::Abstract` and
+implement `#deliver(to:, subject:, body:, **)`.
+
+## Running the specs
+
+```bash
+bin/rails seams:test[notifications]
+```

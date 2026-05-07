@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+module Notifications
+  # Mix into the host application's user-facing model to gain a
+  # consistent way to fire transactional messages without coupling to
+  # the engine's internals.
+  #
+  #   class User < ApplicationRecord
+  #     include Notifications::Notifiable
+  #   end
+  #
+  #   user.notify_email(subject: "Hi", body: "Welcome")
+  module Notifiable
+    extend ActiveSupport::Concern
+
+    def notify_email(subject:, body:)
+      Notifications::DeliverEmailJob.perform_later(
+        to: respond_to?(:email) ? email : nil, subject: subject, body: body
+      )
+    end
+
+    def notify_sms(body:)
+      Notifications::DeliverSmsJob.perform_later(
+        to: respond_to?(:phone) ? phone : nil, body: body
+      )
+    end
+  end
+end

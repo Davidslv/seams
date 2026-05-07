@@ -1,0 +1,26 @@
+# frozen_string_literal: true
+
+module Notifications
+  class DeliverSmsJob < ApplicationJob
+    queue_as :notifications
+
+    def perform(to:, body:, **extras)
+      Seams::Events::Publisher.publish(
+        "notification.queued.notifications", to: to, channel: :sms
+      )
+
+      result = Notifications.sms_adapter.deliver(to: to, body: body, **extras)
+
+      Seams::Events::Publisher.publish(
+        "notification.delivered.notifications", to: to, channel: :sms,
+                                                provider: result[:provider]
+      )
+    rescue StandardError => e
+      Seams::Events::Publisher.publish(
+        "notification.failed.notifications", to: to, channel: :sms,
+                                             error: "#{e.class}: #{e.message}"
+      )
+      raise
+    end
+  end
+end

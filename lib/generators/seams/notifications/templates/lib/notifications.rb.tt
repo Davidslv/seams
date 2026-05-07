@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+require "notifications/version"
+require "notifications/configuration"
+require "notifications/engine"
+
+module Notifications
+  class << self
+    def configuration
+      @configuration ||= Configuration.new
+    end
+
+    def configure
+      yield configuration
+    end
+
+    def email_adapter
+      Object.const_get(configuration.email_adapter).new
+    end
+
+    def sms_adapter
+      Object.const_get(configuration.sms_adapter).new
+    end
+  end
+end

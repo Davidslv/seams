@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+require "notifications/adapters/abstract"
+
+module Notifications
+  module Adapters
+    # Default email adapter — wraps ActionMailer with a simple
+    # subject/body interface. Suitable for development and small
+    # production volumes; swap to Mailgun / SendGrid for higher scale.
+    class ActionMailer < Abstract
+      def deliver(to:, subject:, body:, from: Notifications.configuration.default_from, **)
+        mail = ::Mail.new(to: to, from: from, subject: subject, body: body)
+        ::ActionMailer::Base.wrap_delivery_behavior(mail)
+        mail.deliver
+        { ok: true, provider: "action_mailer", message_id: mail.message_id }
+      end
+    end
+  end
+end

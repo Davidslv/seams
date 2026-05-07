@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+# What: creates the notification_deliveries audit table.
+# Why:  retention beyond the queue lets ops trace per-user delivery
+#       history when a customer says "I never got the email".
+# Risk: append-only writes from background jobs — no live SQL traffic
+#       affected. Empty on creation.
+class CreateNotificationDeliveries < ActiveRecord::Migration[7.1]
+  def change
+    create_table :notification_deliveries do |t|
+      t.string   :channel,    null: false  # "email" | "sms"
+      t.string   :to,         null: false
+      t.string   :subject
+      t.string   :provider
+      t.string   :status,     null: false, default: "queued"  # queued | delivered | failed
+      t.string   :error
+      t.datetime :delivered_at
+      t.timestamps
+    end
+
+    add_index :notification_deliveries, %i[channel created_at]
+    add_index :notification_deliveries, :to
+  end
+end

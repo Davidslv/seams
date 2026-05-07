@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+module Notifications
+  # Consumes Auth events and enqueues outbound notification jobs.
+  # Subscribers always enqueue jobs — they never run side effects
+  # synchronously inside the publisher's transaction.
+  class AuthSubscriber
+    def self.attach!
+      Seams::Events::Publisher.subscribe("user.signed_up.auth") do |payload|
+        DeliverEmailJob.perform_later(
+          to: payload[:email],
+          subject: "Welcome",
+          body: "Thanks for signing up. Reply to this email if you need anything."
+        )
+      end
+    end
+  end
+end
