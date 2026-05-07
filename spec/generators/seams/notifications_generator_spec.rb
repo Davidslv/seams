@@ -381,4 +381,82 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
   end
+
+  describe "Phase 2B — dummy app + factories + spec coverage" do
+    it "writes a per-engine dummy app with the notifications schema" do
+      %w[
+        engines/notifications/spec/dummy/config/application.rb
+        engines/notifications/spec/dummy/db/schema.rb
+        engines/notifications/spec/dummy/app/models/user.rb
+        engines/notifications/spec/dummy/app/controllers/application_controller.rb
+        engines/notifications/spec/rails_helper.rb
+      ].each do |path|
+        expect(File.exist?(File.join(destination_root, path))).to be(true), "missing #{path}"
+      end
+    end
+
+    it "wires runtime specs into the engine output (boot + schedule round-trip)" do
+      assert_file "engines/notifications/spec/runtime/notifications_boot_spec.rb"
+      assert_file "engines/notifications/spec/runtime/notifications_schedule_round_trip_spec.rb"
+    end
+
+    it "ships FactoryBot factories covering all 3 strategies + delivery + preference" do
+      assert_file "engines/notifications/spec/factories/notifications.rb" do |content|
+        [
+          "FactoryBot.define",
+          "factory :notification",
+          "factory :in_app_notification",
+          "factory :email_notification",
+          "factory :sms_notification",
+          "factory :notification_delivery",
+          "factory :notification_preference",
+          "factory :notifications_user"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Notification model spec covering STI, validations, and scopes" do
+      assert_file "engines/notifications/spec/models/notifications/notification_spec.rb" do |content|
+        [
+          "Notifications::Strategies::InApp",
+          "Notifications::Strategies::Email",
+          "scopes",
+          ".due",
+          ".unread",
+          "rejects template paths with traversal segments"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Delivery model spec covering association + dependent destroy" do
+      assert_file "engines/notifications/spec/models/notifications/delivery_spec.rb" do |content|
+        [
+          "RSpec.describe Notifications::Delivery",
+          "is destroyed when its parent notification is destroyed",
+          "ActiveRecord::NotNullViolation"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships NotificationPreference model spec covering .enabled? fallback chain" do
+      assert_file "engines/notifications/spec/models/notifications/notification_preference_spec.rb" do |content|
+        [
+          "RSpec.describe Notifications::NotificationPreference",
+          ".enabled?",
+          "default-on",
+          "falls back to the channel-wide row"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "wire_into_host adds factory_bot_rails to the test group" do
+      gen_path = File.expand_path(
+        "../../../lib/generators/seams/notifications/notifications_generator.rb",
+        __dir__
+      )
+      content = File.read(gen_path)
+      expect(content).to include('host_inject_gem("factory_bot_rails"')
+      expect(content).to include("group: :test")
+    end
+  end
 end

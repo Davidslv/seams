@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/dummy_app_writer"
 
 module Seams
   module Generators
@@ -19,6 +20,7 @@ module Seams
     # reads from.
     #
     # Run with: bin/rails generate seams:notifications
+    # rubocop:disable Metrics/ClassLength
     class NotificationsGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
 
@@ -141,6 +143,35 @@ module Seams
                  engine_path("db/migrate/#{timestamp(2)}_create_notification_deliveries.rb")
       end
 
+      def create_specs
+        # Phase 2B finish — coverage for the engine's three core models.
+        template "spec/factories/notifications.rb.tt",
+                 engine_path("spec/factories/notifications.rb")
+        template "spec/models/notification_spec.rb.tt",
+                 engine_path("spec/models/notifications/notification_spec.rb")
+        template "spec/models/delivery_spec.rb.tt",
+                 engine_path("spec/models/notifications/delivery_spec.rb")
+        template "spec/models/notification_preference_spec.rb.tt",
+                 engine_path("spec/models/notifications/notification_preference_spec.rb")
+      end
+
+      def create_dummy_app
+        Seams::Generators::DummyAppWriter.write!(
+          engine_path: File.join(destination_root, "engines", ENGINE_NAME),
+          engine_module: "Notifications",
+          mount_at: "/notifications",
+          schema: dummy_schema,
+          host_user: dummy_host_user
+        )
+        # Wire the runtime spec templates into the generator output —
+        # they were orphaned in templates/ pre-Wave-12 (the integration
+        # test silently skipped them).
+        template "spec/runtime/boot_spec.rb.tt",
+                 engine_path("spec/runtime/notifications_boot_spec.rb")
+        template "spec/runtime/schedule_round_trip_spec.rb.tt",
+                 engine_path("spec/runtime/notifications_schedule_round_trip_spec.rb")
+      end
+
       def overwrite_readme
         template "README.md.tt", engine_path("README.md"), force: true
       end
@@ -157,6 +188,9 @@ module Seams
 
       def wire_into_host
         host_inject_gem("ice_cube", ">= 0.16")
+        # factory_bot_rails powers the engine's spec/factories/*. Lives
+        # in the host's test group only.
+        host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
         host_inject_mount(engine_class: "Notifications::Engine", at: "/notifications")
         host_inject_include_in_user("Notifications::Notifiable")
       end
@@ -191,6 +225,55 @@ module Seams
         base = Time.now.utc.strftime("%Y%m%d%H%M%S").to_i
         (base + 100 + offset).to_s
       end
+
+      def dummy_schema
+        <<~SCHEMA
+          create_table :users do |t|
+            t.string :email, null: false
+            t.timestamps
+          end
+          add_index :users, :email, unique: true
+
+          create_table :notifications do |t|
+            t.string  :type,             null: false
+            t.references :owner,         polymorphic: true, null: false, index: true
+            t.string  :recipient
+            t.string  :template,         null: false
+            t.jsonb   :schedule_data
+            t.datetime :next_delivery_at
+            t.datetime :read_at
+            t.timestamps
+          end
+          add_index :notifications, :next_delivery_at
+
+          create_table :notification_preferences do |t|
+            t.bigint  :user_id,           null: false
+            t.string  :channel,           null: false
+            t.string  :notification_type
+            t.boolean :enabled,           null: false, default: true
+            t.timestamps
+          end
+          add_index :notification_preferences, %i[user_id channel notification_type], unique: true,
+                                                                                       name: "index_notification_prefs_unique"
+
+          create_table :notification_deliveries do |t|
+            t.references :notification, null: false, foreign_key: true, index: true
+            t.datetime   :sent_at,      null: false
+            t.timestamps
+          end
+        SCHEMA
+      end
+
+      def dummy_host_user
+        <<~RB
+          # frozen_string_literal: true
+
+          class User < ApplicationRecord
+            include Notifications::Notifiable
+          end
+        RB
+      end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
