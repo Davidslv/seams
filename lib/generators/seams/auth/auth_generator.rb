@@ -137,6 +137,8 @@ module Seams
         )
         template "spec/runtime/boot_spec.rb.tt",
                  engine_path("spec/runtime/auth_boot_spec.rb")
+        template "spec/runtime/event_payload_spec.rb.tt",
+                 engine_path("spec/runtime/auth_event_payload_spec.rb")
       end
 
       def wire_into_host

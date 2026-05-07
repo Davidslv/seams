@@ -30,19 +30,32 @@ module Notifications
       private
 
       def handle_signed_up(payload)
-        return unless payload[:user_id]
+        host_user_id = payload[:host_user_id] || legacy_host_user_id_from(payload)
+        return unless host_user_id
 
-        owner = resolve_owner(payload[:user_id])
+        owner = resolve_owner(host_user_id)
         return unless owner
 
         create_in_app(owner)
-        create_email(owner) if email_enabled?(payload[:user_id])
+        create_email(owner) if email_enabled?(host_user_id)
       end
 
-      def resolve_owner(user_id)
+      def resolve_owner(host_user_id)
         return nil unless defined?(::User)
 
-        ::User.find_by(id: user_id)
+        ::User.find_by(id: host_user_id)
+      end
+
+      # Translate from old auth_user_id-only payloads (or callers that
+      # passed `user_id` and meant Auth::User#id). Returns nil if the
+      # auth user has no linked host user yet.
+      def legacy_host_user_id_from(payload)
+        return nil unless defined?(Auth::User)
+
+        auth_user_id = payload[:auth_user_id] || payload[:user_id]
+        return nil unless auth_user_id
+
+        Auth::User.find_by(id: auth_user_id)&.host_user_id
       end
 
       def create_in_app(owner)

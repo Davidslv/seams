@@ -6,10 +6,15 @@
 
 | Event name | Payload | Emitted when |
 | --- | --- | --- |
-| `user.signed_up.auth`   | `{ user_id:, email: }`        | RegistrationsController#create succeeds |
-| `user.signed_in.auth`   | `{ user_id:, session_id: }`   | SessionsController#create succeeds |
-| `user.signed_out.auth`  | `{ user_id:, session_id: }`   | SessionsController#destroy runs |
-| `session.expired.auth`  | `{ user_id:, session_id: }`   | (future) sweeper job revokes a stale session |
+| `user.signed_up.auth`   | `{ auth_user_id:, host_user_id:, email: }`      | RegistrationsController#create succeeds |
+| `user.signed_in.auth`   | `{ auth_user_id:, host_user_id:, session_id: }` | SessionsController#create succeeds |
+| `user.signed_out.auth`  | `{ auth_user_id:, host_user_id:, session_id: }` | SessionsController#destroy runs |
+| `session.expired.auth`  | `{ auth_user_id:, host_user_id:, session_id: }` | (future) sweeper job revokes a stale session |
+
+> `auth_user_id` is the row id in the engine's `auth_users` table.
+> `host_user_id` is the host application's user id (may be nil if the
+> auth record isn't linked to a host User yet). Subscribers that
+> resolve host models should always use `host_user_id`.
 
 ## Events consumed
 

@@ -28,8 +28,15 @@ module Auth
         session = user.sessions.create!
       end
 
+      # `auth_user_id` is the id of the Auth::User row; `host_user_id`
+      # is the host application's user id (may be nil if the host
+      # hasn't linked the auth record to its own User yet). Subscribers
+      # that look up host models should always use `host_user_id`.
       Seams::Events::Publisher.publish(
-        "user.signed_up.auth", user_id: user.id, email: user.email
+        "user.signed_up.auth",
+        auth_user_id: user.id,
+        host_user_id: user.host_user_id,
+        email: user.email
       )
       Result.new(ok?: true, user: user, session: session)
     rescue ActiveRecord::RecordInvalid => e

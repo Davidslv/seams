@@ -27,8 +27,13 @@ module Auth
       if token
         session = Auth::Session.find_by(token: token)
         if session
-          Seams::Events::Publisher.publish("user.signed_out.auth",
-                                          user_id: session.user_id, session_id: session.id)
+          auth_user = session.user
+          Seams::Events::Publisher.publish(
+            "user.signed_out.auth",
+            auth_user_id: auth_user.id,
+            host_user_id: auth_user.host_user_id,
+            session_id:   session.id
+          )
           session.destroy
         end
       end

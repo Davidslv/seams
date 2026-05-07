@@ -21,7 +21,10 @@ module Auth
 
       session = user.sessions.create!
       Seams::Events::Publisher.publish(
-        "user.signed_in.auth", user_id: user.id, session_id: session.id
+        "user.signed_in.auth",
+        auth_user_id: user.id,
+        host_user_id: user.host_user_id,
+        session_id:   session.id
       )
       Result.new(ok?: true, user: user, session: session)
     end
