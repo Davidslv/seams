@@ -20,6 +20,10 @@ module Billing
 
     def gateway
       configuration.gateway.constantize.new
+    rescue NameError => e
+      raise Billing::Error,
+            "Billing.configuration.gateway is set to #{configuration.gateway.inspect}, " \
+            "which could not be resolved: #{e.message}"
     end
   end
 end

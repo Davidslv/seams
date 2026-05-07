@@ -58,6 +58,7 @@ module Billing
       def verify_webhook(payload:, signature:, secret:)
         event = ::Stripe::Webhook.construct_event(payload, signature, secret)
         {
+          id:       event.id,        # evt_* — used by the controller for dedupe
           type:     event.type,
           livemode: event.livemode,
           object:   event.data.object,

@@ -4,6 +4,11 @@ module Billing
   # Receives webhook callbacks from the configured payment gateway.
   # The gateway adapter does the signature verification — we just
   # dispatch the resulting normalised event to event-bus subscribers.
+  #
+  # Idempotent: every accepted event is recorded by gateway+event_id;
+  # retries hit the unique index and short-circuit before any
+  # subscriber fires. Stripe explicitly requires this — retries can
+  # span days (https://docs.stripe.com/webhooks#handle-duplicate-events).
   class WebhooksController < ApplicationController
     skip_before_action :verify_authenticity_token
 
@@ -18,7 +23,7 @@ module Billing
         secret:    Billing.configuration.webhook_secret
       )
 
-      dispatch(event)
+      record_and_dispatch("stripe", event)
       head :ok
     rescue Billing::WebhookError => e
       Seams::Observability.adapter.warn(
@@ -39,17 +44,41 @@ module Billing
       "invoice.payment_failed"         => "invoice.failed.billing"
     }.freeze
 
-    def dispatch(event)
+    def record_and_dispatch(gateway, event)
+      Billing::WebhookEvent.create!(
+        gateway:          gateway,
+        gateway_event_id: event[:id] || object_id_for(event[:object]),
+        event_type:       event[:type],
+        livemode:         event[:livemode]
+      )
+
+      dispatch(event, gateway: gateway)
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+      # Duplicate retry — Stripe will keep retrying; replying 200 stops
+      # the storm without re-publishing to subscribers.
+      Seams::Observability.adapter.info(
+        "billing.webhook.duplicate", engine: "billing",
+        gateway: gateway, event_type: event[:type]
+      )
+    end
+
+    def dispatch(event, gateway:)
       seams_name = EVENT_MAP[event[:type]]
       return unless seams_name
 
       Seams::Events::Publisher.publish(
         seams_name,
-        gateway:   "stripe",
+        gateway:   gateway,
         livemode:  event[:livemode],
-        object_id: event.dig(:object, "id"),
+        object_id: object_id_for(event[:object]),
         object:    event[:object].respond_to?(:to_hash) ? event[:object].to_hash : event[:object]
       )
+    end
+
+    def object_id_for(object)
+      return nil if object.nil?
+
+      object.respond_to?(:id) ? object.id : object["id"]
     end
   end
 end

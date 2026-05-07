@@ -40,6 +40,8 @@ module Seams
                  engine_path("app/models/billing/subscription.rb")
         template "app/models/invoice.rb.tt",
                  engine_path("app/models/billing/invoice.rb")
+        template "app/models/webhook_event.rb.tt",
+                 engine_path("app/models/billing/webhook_event.rb")
       end
 
       def create_gateways
@@ -73,6 +75,8 @@ module Seams
                  engine_path("db/migrate/#{timestamp(0)}_create_billing_subscriptions.rb")
         template "db/migrate/create_billing_invoices.rb.tt",
                  engine_path("db/migrate/#{timestamp(1)}_create_billing_invoices.rb")
+        template "db/migrate/create_billing_webhook_events.rb.tt",
+                 engine_path("db/migrate/#{timestamp(2)}_create_billing_webhook_events.rb")
       end
 
       def create_specs

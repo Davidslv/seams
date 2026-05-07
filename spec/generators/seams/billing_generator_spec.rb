@@ -112,6 +112,13 @@ RSpec.describe Seams::Generators::BillingGenerator do
         expect(content).to include("amount_cents")
       end
     end
+
+    it "creates Billing::WebhookEvent with unique gateway_event_id" do
+      assert_file "engines/billing/app/models/billing/webhook_event.rb" do |content|
+        expect(content).to include("class WebhookEvent")
+        expect(content).to include("uniqueness: { scope: :gateway }")
+      end
+    end
   end
 
   describe "jobs" do
@@ -144,6 +151,14 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
+    it "dedupes Stripe retries via Billing::WebhookEvent" do
+      assert_file "engines/billing/app/controllers/billing/webhooks_controller.rb" do |content|
+        expect(content).to include("Billing::WebhookEvent.create!")
+        expect(content).to include("ActiveRecord::RecordNotUnique")
+        expect(content).to include("billing.webhook.duplicate")
+      end
+    end
+
     it "draws the stripe webhook route" do
       assert_file "engines/billing/config/routes.rb" do |content|
         expect(content).to include('post "/webhooks/stripe"')
@@ -171,6 +186,18 @@ RSpec.describe Seams::Generators::BillingGenerator do
       content = File.read(file)
       expect(content).to include("create_table :billing_invoices")
       expect(content).to include("to_table: :billing_subscriptions")
+    end
+
+    it "creates billing_webhook_events migration with unique gateway_event_id index" do
+      pattern = File.join(destination_root,
+                          "engines/billing/db/migrate",
+                          "*_create_billing_webhook_events.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+
+      content = File.read(file)
+      expect(content).to include("create_table :billing_webhook_events")
+      expect(content).to include("unique: true")
     end
   end
 
