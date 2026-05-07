@@ -25,8 +25,18 @@ module Auth
                              uniqueness: { scope: :provider,
                                            message: "already linked this provider" }
 
+    # access_token / refresh_token are credentials — encrypted with the
+    # default (non-deterministic) mode for maximum strength. We never
+    # query by these.
     encrypts :access_token
     encrypts :refresh_token
+
+    # provider_uid is the user's stable id at the OAuth provider
+    # (Google `sub`, GitHub user id). It IS personal data under GDPR
+    # Article 4 ("online identifier"). Deterministic so the
+    # (provider, provider_uid) lookup that powers OAuth sign-in keeps
+    # resolving and the unique index keeps enforcing.
+    encrypts :provider_uid, deterministic: true
 
     def access_token_expired?
       expires_at && expires_at < Time.current

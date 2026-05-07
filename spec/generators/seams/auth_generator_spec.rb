@@ -462,4 +462,53 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
   end
+
+  describe "PII encryption (Wave 11 GDPR)" do
+    it "User#email is encrypted deterministically with downcase normalisation" do
+      assert_file "engines/auth/app/models/auth/user.rb" do |content|
+        expect(content).to include("encrypts :email, deterministic: true, downcase: true")
+      end
+    end
+
+    it "OAuthProvider#provider_uid is encrypted deterministically" do
+      assert_file "engines/auth/app/models/auth/oauth_provider.rb" do |content|
+        expect(content).to include("encrypts :provider_uid, deterministic: true")
+      end
+    end
+
+    it "OAuth tokens remain non-deterministically encrypted (credentials, not query targets)" do
+      assert_file "engines/auth/app/models/auth/oauth_provider.rb" do |content|
+        expect(content).to include("encrypts :access_token")
+        expect(content).to include("encrypts :refresh_token")
+        expect(content).not_to include("encrypts :access_token, deterministic")
+        expect(content).not_to include("encrypts :refresh_token, deterministic")
+      end
+    end
+
+    it "ships the seams:auth:rotate_pii_encryption rake task for upgrading hosts" do
+      assert_file "engines/auth/lib/tasks/auth_pii.rake" do |content|
+        [
+          "namespace :seams",
+          "namespace :auth",
+          "task rotate_pii_encryption",
+          "Auth::User.find_each",
+          "Auth::OAuthProvider.find_each",
+          "user.update!(email: user.email)",
+          "provider.update!(provider_uid: provider.provider_uid)"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "README documents the GDPR section: data inventory + db:encryption:init + rotation + erasure" do
+      assert_file "engines/auth/README.md" do |content|
+        [
+          "GDPR / data protection",
+          "db:encryption:init",
+          "seams:auth:rotate_pii_encryption",
+          "Right to erasure",
+          "support_unencrypted_data"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
 end

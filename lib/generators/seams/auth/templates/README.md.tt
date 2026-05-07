@@ -166,6 +166,80 @@ auth_cleanup_expired_sessions:
   schedule: "every 1 hour"
 ```
 
+## GDPR / data protection
+
+Personal data the engine stores and how it's protected at rest:
+
+| Column                                  | At rest        | Why                                                  |
+| ---                                     | ---            | ---                                                  |
+| `auth_users.email`                      | encrypted (deterministic) | PII (Article 4); deterministic so `find_by(email:)` and the uniqueness index keep working |
+| `auth_users.password_digest`            | bcrypt one-way hash | not PII — never reversible to a password         |
+| `auth_oauth_providers.access_token`     | encrypted (non-deterministic) | credential                                |
+| `auth_oauth_providers.refresh_token`    | encrypted (non-deterministic) | credential                                |
+| `auth_oauth_providers.provider_uid`     | encrypted (deterministic) | online identifier (Article 4); deterministic so `(provider, provider_uid)` lookup + unique index keep working |
+| `auth_api_tokens.token_digest`          | SHA-256 hash   | not reversible to the plaintext token                |
+| `auth_api_tokens.token_prefix`          | plaintext      | first 12 chars only — display label, not a secret    |
+
+### One-time host setup
+
+```bash
+bin/rails db:encryption:init
+```
+
+Store the printed keys in Rails credentials
+(`bin/rails credentials:edit`) under `active_record_encryption.*`. See
+https://guides.rubyonrails.org/active_record_encryption.html.
+
+### Upgrading from Auth Wave ≤10 (existing hosts only)
+
+Hosts that deployed Auth before Wave 11 have plaintext `email` +
+`provider_uid` already in the database. Re-encrypt them in place:
+
+1. In `config/application.rb`, add the transitional flag so plaintext
+   rows are still readable while rotation runs:
+
+   ```ruby
+   config.active_record.encryption.support_unencrypted_data = true
+   ```
+
+2. Deploy + run:
+
+   ```bash
+   bin/rails seams:auth:rotate_pii_encryption
+   ```
+
+3. Once the task reports zero remaining unencrypted rows, remove the
+   flag (or set it back to `false`) and redeploy.
+
+The task is idempotent — re-running it on already-encrypted rows is a
+no-op. Fresh hosts skip steps 1 and 3 entirely.
+
+### Right to erasure (Article 17)
+
+```ruby
+Auth::User.find_by(email: "user@example.com").destroy
+```
+
+cascades to `sessions`, `api_tokens`, and `oauth_providers` via
+`dependent: :destroy`. Hosts must additionally erase rows in their own
+`User` table (linked by `host_user_id`) — the engine does not own that
+schema.
+
+### Logging
+
+Don't log `email`. Log `auth_user_id` instead. Encryption protects the
+DB at rest but is moot if PII leaks into log files. Add the column to
+`config.filter_parameters` in your host:
+
+```ruby
+config.filter_parameters += %i[email password password_digest]
+```
+
+### Right to access / portability (Article 15 / 20)
+
+Not yet shipped — `Auth::ExportUserData` is on the roadmap. For now,
+hosts can export with a direct query against the user's rows.
+
 ## Mounting
 
 ```ruby

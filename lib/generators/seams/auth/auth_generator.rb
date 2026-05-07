@@ -92,6 +92,12 @@ module Seams
                  engine_path("app/jobs/auth/cleanup_expired_sessions_job.rb")
       end
 
+      def create_rake_tasks
+        # Wave 11: PII rotation task for hosts upgrading from Wave ≤10.
+        template "lib/tasks/auth_pii.rake.tt",
+                 engine_path("lib/tasks/auth_pii.rake")
+      end
+
       def create_oauth_adapters
         template "lib/oauth/abstract.rb.tt",
                  engine_path("lib/auth/oauth/abstract.rb")
