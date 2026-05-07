@@ -144,6 +144,24 @@ module Seams
                  engine_path("app/services/billing/lifetime/create_lifetime_session_service.rb")
       end
 
+      # Phase 3 (3/4) — webhook router + 13 handler classes.
+      def create_webhook_router_and_handlers
+        template "app/services/webhooks/handler.rb.tt",
+                 engine_path("app/services/billing/webhooks/handler.rb")
+        template "app/services/webhooks/event_router.rb.tt",
+                 engine_path("app/services/billing/webhooks/event_router.rb")
+
+        webhook_handler_templates.each do |basename|
+          template "app/services/webhooks/handlers/#{basename}.rb.tt",
+                   engine_path("app/services/billing/webhooks/handlers/#{basename}.rb")
+        end
+      end
+
+      def create_webhook_process_event_job
+        template "app/jobs/webhooks/process_event_job.rb.tt",
+                 engine_path("app/jobs/billing/webhooks/process_event_job.rb")
+      end
+
       def create_controllers_and_views
         template "app/controllers/webhooks_controller.rb.tt",
                  engine_path("app/controllers/billing/webhooks_controller.rb")
@@ -293,6 +311,26 @@ module Seams
 
       def gateway_env_prefix
         gateway.upcase
+      end
+
+      def webhook_handler_templates
+        %w[
+          subscription_handler_base
+          subscription_created_handler
+          subscription_updated_handler
+          subscription_deleted_handler
+          subscription_trial_will_end_handler
+          invoice_handler_base
+          invoice_created_handler
+          invoice_paid_handler
+          invoice_payment_failed_handler
+          invoice_finalized_handler
+          invoice_voided_handler
+          payment_succeeded_handler
+          payment_failed_handler
+          charge_refunded_handler
+          checkout_session_completed_handler
+        ]
       end
 
       def engine_path(relative)

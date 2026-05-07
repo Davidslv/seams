@@ -4,6 +4,46 @@ require "rails/generators"
 require "rails/generators/test_case"
 require "generators/seams/billing/billing_generator"
 
+BILLING_SUBSCRIPTION_LEAF_HANDLERS = {
+  "subscription_created_handler" => "subscription.created.billing",
+  "subscription_updated_handler" => "subscription.updated.billing",
+  "subscription_deleted_handler" => "subscription.canceled.billing",
+  "subscription_trial_will_end_handler" => "subscription.trial_will_end.billing"
+}.freeze
+
+BILLING_INVOICE_LEAF_HANDLERS = {
+  "invoice_created_handler" => ["invoice.created.billing", "draft"],
+  "invoice_paid_handler" => ["invoice.paid.billing", "paid"],
+  "invoice_payment_failed_handler" => ["invoice.failed.billing", "open"],
+  "invoice_finalized_handler" => ["invoice.finalized.billing", "open"],
+  "invoice_voided_handler" => ["invoice.voided.billing", "void"]
+}.freeze
+
+BILLING_STANDALONE_HANDLERS = {
+  "payment_succeeded_handler" => "payment.succeeded.billing",
+  "payment_failed_handler" => "payment.failed.billing",
+  "charge_refunded_handler" => "charge.refunded.billing",
+  "checkout_session_completed_handler" => "checkout.session_completed.billing"
+}.freeze
+
+BILLING_REGISTERED_EVENTS = %w[
+  subscription.created.billing subscription.updated.billing
+  subscription.canceled.billing subscription.trial_will_end.billing
+  invoice.created.billing invoice.paid.billing invoice.failed.billing
+  invoice.finalized.billing invoice.voided.billing
+  payment.succeeded.billing payment.failed.billing charge.refunded.billing
+  checkout.session_completed.billing
+  lifetime.granted.billing lifetime.purchased.billing lifetime.revoked.billing
+].freeze
+
+BILLING_EVENT_ROUTER_NEEDLES = %w[
+  customer.subscription.created customer.subscription.trial_will_end
+  invoice.created invoice.finalized invoice.voided
+  payment_intent.succeeded payment_intent.payment_failed
+  charge.refunded
+  checkout.session.completed checkout.session.async_payment_succeeded
+].freeze
+
 RSpec.describe Seams::Generators::BillingGenerator do
   let(:destination_root) { File.expand_path("../../../tmp/billing_generator", __dir__) }
 
@@ -230,7 +270,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
         expect(content).to include("def stripe")
         expect(content).to include("verify_webhook")
         expect(content).to include("Stripe-Signature")
-        expect(content).to include("EVENT_MAP")
+        expect(content).to include("Billing::Webhooks::EventRouter.handler_for")
       end
     end
 
@@ -365,10 +405,14 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
-    it "WebhooksController forks on checkout_lifetime? predicate" do
-      assert_file "engines/billing/app/controllers/billing/webhooks_controller.rb" do |content|
-        expect(content).to include("def checkout_lifetime?")
-        expect(content).to include("Billing::Lifetime::CreatePassFromCheckoutService")
+    it "CheckoutSessionCompletedHandler forks on mode + metadata.access_type for LTDs" do
+      assert_file "engines/billing/app/services/billing/webhooks/handlers/checkout_session_completed_handler.rb" do |content|
+        [
+          "class CheckoutSessionCompletedHandler",
+          "Billing::Lifetime::CreatePassFromCheckoutService",
+          "mode_value",
+          "access_type"
+        ].each { |needle| expect(content).to include(needle) }
       end
     end
 
@@ -512,7 +556,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
     it "default ships Stripe; the configuration's @gateway points at the Stripe class" do
       content = File.read(File.join(destination_root,
                                     "engines/billing/lib/billing/configuration.rb"))
-      expect(content).to include('@gateway          = "Billing::Gateways::Stripe"')
+      expect(content).to include('@gateway                = "Billing::Gateways::Stripe"')
       expect(content).to include("STRIPE_SECRET_KEY")
 
       expect(File.exist?(File.join(destination_root,
@@ -530,7 +574,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
 
       config = File.read(File.join(gateway_destination,
                                    "engines/billing/lib/billing/configuration.rb"))
-      expect(config).to include('@gateway          = "Billing::Gateways::Paddle"')
+      expect(config).to include('@gateway                = "Billing::Gateways::Paddle"')
       expect(config).to include("PADDLE_SECRET_KEY")
     end
 
@@ -539,7 +583,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
 
       config = File.read(File.join(gateway_destination,
                                    "engines/billing/lib/billing/configuration.rb"))
-      expect(config).to include('@gateway          = "Billing::Gateways::Stripe"')
+      expect(config).to include('@gateway                = "Billing::Gateways::Stripe"')
     end
 
     it "wire_into_host adds factory_bot_rails + webmock to the test group" do
@@ -618,6 +662,120 @@ RSpec.describe Seams::Generators::BillingGenerator do
           "/v1/customers/search",
           "/v1/invoices/"
         ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
+
+  describe "Phase 3 (3/4) — webhook router + handler classes" do
+    it "ships the Webhooks::Handler base class" do
+      assert_file "engines/billing/app/services/billing/webhooks/handler.rb" do |content|
+        [
+          "class Handler",
+          "SEAMS_EVENT = nil",
+          "def call",
+          "def publish",
+          "def object_hash",
+          "def customer_ref",
+          "Seams::Events::Publisher.publish"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "Webhooks::EventRouter exposes register + handler_for" do
+      assert_file "engines/billing/app/services/billing/webhooks/event_router.rb" do |content|
+        ["module EventRouter", "def register", "def handler_for"].each do |needle|
+          expect(content).to include(needle)
+        end
+      end
+    end
+
+    BILLING_EVENT_ROUTER_NEEDLES.each do |stripe_event|
+      it "Webhooks::EventRouter maps #{stripe_event}" do
+        assert_file "engines/billing/app/services/billing/webhooks/event_router.rb" do |content|
+          expect(content).to include(stripe_event)
+        end
+      end
+    end
+
+    it "ships SubscriptionHandlerBase with the upsert" do
+      assert_file "engines/billing/app/services/billing/webhooks/handlers/subscription_handler_base.rb" do |content|
+        expect(content).to include("class SubscriptionHandlerBase < Billing::Webhooks::Handler")
+        expect(content).to include("upsert_subscription")
+      end
+    end
+
+    BILLING_SUBSCRIPTION_LEAF_HANDLERS.each do |basename, seams_event|
+      it "ships subscription handler: #{basename}" do
+        assert_file "engines/billing/app/services/billing/webhooks/handlers/#{basename}.rb" do |content|
+          expect(content).to include("< SubscriptionHandlerBase")
+          expect(content).to include(%(SEAMS_EVENT = "#{seams_event}"))
+        end
+      end
+    end
+
+    it "ships InvoiceHandlerBase with the upsert" do
+      assert_file "engines/billing/app/services/billing/webhooks/handlers/invoice_handler_base.rb" do |content|
+        expect(content).to include("class InvoiceHandlerBase < Billing::Webhooks::Handler")
+        expect(content).to include("upsert_invoice")
+      end
+    end
+
+    BILLING_INVOICE_LEAF_HANDLERS.each do |basename, (seams_event, status)|
+      it "ships invoice handler: #{basename}" do
+        assert_file "engines/billing/app/services/billing/webhooks/handlers/#{basename}.rb" do |content|
+          expect(content).to include("< InvoiceHandlerBase")
+          expect(content).to include(%(SEAMS_EVENT    = "#{seams_event}"))
+          expect(content).to include(%(INVOICE_STATUS = "#{status}"))
+        end
+      end
+    end
+
+    BILLING_STANDALONE_HANDLERS.each do |basename, seams_event|
+      it "ships standalone handler: #{basename}" do
+        assert_file "engines/billing/app/services/billing/webhooks/handlers/#{basename}.rb" do |content|
+          expect(content).to include("< Billing::Webhooks::Handler")
+          expect(content).to include(%(SEAMS_EVENT = "#{seams_event}"))
+        end
+      end
+    end
+
+    it "ships Webhooks::ProcessEventJob for opt-in async dispatch" do
+      assert_file "engines/billing/app/jobs/billing/webhooks/process_event_job.rb" do |content|
+        [
+          "class ProcessEventJob < Billing::ApplicationJob",
+          "queue_as :billing",
+          "Billing::Webhooks::EventRouter.handler_for",
+          "handler.new(event: event, gateway: gateway).call"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "WebhooksController shrinks to a router glue layer" do
+      assert_file "engines/billing/app/controllers/billing/webhooks_controller.rb" do |content|
+        [
+          "Billing::Webhooks::EventRouter.handler_for",
+          "Billing::Webhooks::ProcessEventJob.perform_later",
+          "Billing.configuration.process_webhooks_async"
+        ].each { |needle| expect(content).to include(needle) }
+        # Old inline machinery should be gone.
+        %w[EVENT_MAP customer_ref_for ref_for upsert_local_record checkout_lifetime?].each do |needle|
+          expect(content).not_to include(needle)
+        end
+      end
+    end
+
+    BILLING_REGISTERED_EVENTS.each do |event_name|
+      it "engine.rb registers #{event_name}" do
+        assert_file "engines/billing/lib/billing/engine.rb" do |content|
+          expect(content).to include(event_name)
+        end
+      end
+    end
+
+    it "Configuration ships process_webhooks_async (default false)" do
+      assert_file "engines/billing/lib/billing/configuration.rb" do |content|
+        expect(content).to include(":process_webhooks_async")
+        expect(content).to include("@process_webhooks_async = false")
       end
     end
   end

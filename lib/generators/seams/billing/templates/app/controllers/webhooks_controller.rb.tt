@@ -3,23 +3,24 @@
 module Billing
   # Receives webhook callbacks from the configured payment gateway.
   # The gateway adapter does the signature verification — we just
-  # dispatch the resulting normalised event to event-bus subscribers.
+  # record the event for idempotency and route it to the handler
+  # that knows how to process that event type.
   #
-  # Trust boundary: the request body is treated as untrusted until the
-  # gateway adapter's `verify_webhook` returns. CSRF is intentionally
-  # skipped (webhooks come from Stripe, not a browser session) — DO NOT
-  # add authentication here; the signature IS the authentication.
+  # Trust boundary: the request body is treated as untrusted until
+  # the gateway adapter's `verify_webhook` returns. CSRF is
+  # intentionally skipped (webhooks come from Stripe, not a browser
+  # session) — DO NOT add authentication here; the signature IS the
+  # authentication.
   #
   # Idempotent: every accepted event is recorded by gateway+event_id;
-  # retries hit the unique index and short-circuit before any
-  # subscriber fires. Stripe explicitly requires this — retries can
-  # span days (https://docs.stripe.com/webhooks#handle-duplicate-events).
+  # retries hit the unique index and short-circuit before any handler
+  # fires. Stripe explicitly requires this — retries can span days
+  # (https://docs.stripe.com/webhooks#handle-duplicate-events).
   #
-  # Rate-limit / replay window: Stripe's signature has a default
-  # 5-minute tolerance window; the WebhookEvent unique index covers
-  # arbitrary-length retries. No per-IP rate limit beyond what Rails'
-  # default rate-limiter provides — add one in front (CDN, ALB) if your
-  # webhook volume justifies it.
+  # Sync vs async: by default the handler runs in the request thread.
+  # Set Billing.configuration.process_webhooks_async = true to enqueue
+  # Billing::Webhooks::ProcessEventJob instead — Stripe recommends
+  # responding in <100ms (https://docs.stripe.com/webhooks#acknowledge-events-immediately).
   class WebhooksController < ApplicationController
     skip_before_action :verify_authenticity_token
 
@@ -45,23 +46,13 @@ module Billing
 
     private
 
-    # Stripe event types we care about. Full catalogue:
-    # https://docs.stripe.com/api/events/types
-    EVENT_MAP = {
-      "customer.subscription.created"  => "subscription.created.billing",
-      "customer.subscription.updated"  => "subscription.updated.billing",
-      "customer.subscription.deleted"  => "subscription.canceled.billing",
-      "invoice.paid"                   => "invoice.paid.billing",
-      "invoice.payment_failed"         => "invoice.failed.billing"
-    }.freeze
-
+    # Insert WebhookEvent FIRST inside a transaction that ALSO runs
+    # the handler. If the handler raises, the WebhookEvent row rolls
+    # back — Stripe retries, we get another chance to publish.
+    # Otherwise a transient handler bug would permanently drop one
+    # event behind the unique-index guard. Async path skips the
+    # transaction (the job has its own retry semantics).
     def record_and_dispatch(gateway, event)
-      # Order matters: insert WebhookEvent FIRST inside a transaction
-      # that ALSO runs dispatch. If dispatch raises (a subscriber
-      # blew up, a model is in an unexpected state), the WebhookEvent
-      # row rolls back — Stripe retries, we get another chance to
-      # publish. Otherwise a transient subscriber bug would
-      # permanently drop one event behind the unique-index guard.
       Billing::WebhookEvent.transaction do
         Billing::WebhookEvent.create!(
           gateway:          gateway,
@@ -70,14 +61,7 @@ module Billing
           livemode:         event[:livemode]
         )
 
-        # `checkout.session.completed` fires for BOTH subscription-mode
-        # and payment-mode (LTD). Fork before the canonical-event mapper
-        # so LTDs don't try to map onto a subscription event.
-        if checkout_lifetime?(event)
-          handle_checkout_lifetime(event)
-        else
-          dispatch(event, gateway: gateway)
-        end
+        dispatch(gateway: gateway, event: event)
       end
     rescue ActiveRecord::RecordNotUnique
       # Duplicate retry — Stripe will keep retrying; replying 200 stops
@@ -88,135 +72,27 @@ module Billing
       )
     end
 
-    def dispatch(event, gateway:)
-      seams_name = EVENT_MAP[event[:type]]
-      return unless seams_name
+    def dispatch(gateway:, event:)
+      if Billing.configuration.process_webhooks_async
+        Billing::Webhooks::ProcessEventJob.perform_later(
+          gateway: gateway, event_data: event.deep_stringify_keys
+        )
+      else
+        run_handler(gateway: gateway, event: event)
+      end
+    end
 
-      object       = event[:object]
-      object_hash  = object.respond_to?(:to_hash) ? object.to_hash : object
-      object_id    = object_id_for(object)
-      customer_ref = customer_ref_for(seams_name, object_hash)
-      ref          = ref_for(seams_name, object_hash, object_id)
+    def run_handler(gateway:, event:)
+      handler_class = Billing::Webhooks::EventRouter.handler_for(event[:type])
+      return unless handler_class
 
-      # Upsert the local Billing::Subscription / Billing::Invoice row
-      # so downstream subscribers can resolve from the local DB rather
-      # than from the webhook payload alone.
-      upsert_local_record(seams_name, object_hash, customer_ref: customer_ref, ref: ref)
-
-      # Canonical payload shape — every emit of these events from any
-      # publisher (webhook or host-initiated job) MUST match. Subscribers
-      # rely on `customer_ref` to resolve the host User.
-      Seams::Events::Publisher.publish(
-        seams_name,
-        gateway:      gateway,
-        livemode:     event[:livemode],
-        customer_ref: customer_ref,
-        ref:          ref,
-        object_id:    object_id,
-        object:       object_hash
-      )
+      handler_class.new(event: event, gateway: gateway).call
     end
 
     def object_id_for(object)
       return nil if object.nil?
 
-      object.respond_to?(:id) ? object.id : object["id"]
-    end
-
-    # True when this is a Stripe Checkout LTD purchase. Two event types
-    # to watch (https://docs.stripe.com/payments/checkout/fulfill-orders):
-    #   - `checkout.session.completed`               (immediate)
-    #   - `checkout.session.async_payment_succeeded` (delayed: ACH etc.)
-    # AND `mode == "payment"` (not `"subscription"`)
-    # AND metadata.access_type == "lifetime" (set by
-    #     Billing::Gateways::Stripe#create_lifetime_checkout_session).
-    def checkout_lifetime?(event)
-      return false unless %w[
-        checkout.session.completed
-        checkout.session.async_payment_succeeded
-      ].include?(event[:type])
-
-      object = event[:object]
-      mode   = object.respond_to?(:mode) ? object.mode : (object.is_a?(Hash) && (object[:mode] || object["mode"]))
-      return false unless mode == "payment"
-
-      metadata = object.respond_to?(:metadata) ? object.metadata : (object.is_a?(Hash) && (object[:metadata] || object["metadata"]))
-      access_type =
-        if metadata.respond_to?(:access_type)
-          metadata.access_type
-        elsif metadata.is_a?(Hash)
-          metadata[:access_type] || metadata["access_type"]
-        end
-
-      access_type == "lifetime"
-    end
-
-    # Hands off to the LTD service which both creates the local
-    # LifetimePass row + publishes lifetime.purchased.billing.
-    def handle_checkout_lifetime(event)
-      Billing::Lifetime::CreatePassFromCheckoutService.call(
-        session:  event[:object],
-        livemode: event[:livemode]
-      )
-    end
-
-    # `customer_ref` is the gateway-side customer id (e.g. cus_xxx).
-    # All four canonical billing events publish it so notifications can
-    # resolve the host User by stripe_customer_id.
-    def customer_ref_for(seams_name, object_hash)
-      return nil unless object_hash.is_a?(Hash)
-
-      case seams_name
-      when /\Asubscription\./, /\Ainvoice\./
-        object_hash[:customer] || object_hash["customer"]
-      end
-    end
-
-    # `ref` is the engine-side identifier for whatever the event is
-    # about — gateway_ref of a Subscription for subscription.* events,
-    # gateway_ref of an Invoice for invoice.* events.
-    def ref_for(seams_name, _object_hash, object_id)
-      case seams_name
-      when /\Asubscription\./, /\Ainvoice\./
-        object_id
-      end
-    end
-
-    def upsert_local_record(seams_name, object_hash, customer_ref:, ref:)
-      return unless ref && customer_ref && object_hash.is_a?(Hash)
-
-      case seams_name
-      when "subscription.created.billing", "subscription.updated.billing", "subscription.canceled.billing"
-        Billing::Subscription
-          .find_or_initialize_by(gateway_ref: ref)
-          .tap { |s|
-            s.customer_ref = customer_ref
-            s.plan_ref     = (object_hash[:plan] || object_hash["plan"] || {}).then { |p|
-              p.is_a?(Hash) ? (p[:id] || p["id"]) : nil
-            }
-            s.status       = object_hash[:status] || object_hash["status"] || s.status || "incomplete"
-            s.save!
-          }
-      when "invoice.paid.billing", "invoice.failed.billing"
-        sub_ref = object_hash[:subscription] || object_hash["subscription"]
-        sub     = sub_ref && Billing::Subscription.find_by(gateway_ref: sub_ref)
-        Billing::Invoice
-          .find_or_initialize_by(gateway_ref: ref)
-          .tap { |inv|
-            inv.subscription = sub if sub
-            inv.amount_cents = object_hash[:amount_paid] || object_hash["amount_paid"] ||
-                               object_hash[:amount_due]  || object_hash["amount_due"]  || 0
-            inv.currency     = object_hash[:currency] || object_hash["currency"] || "usd"
-            inv.status       = (seams_name == "invoice.paid.billing") ? "paid" : "open"
-            inv.paid_at      = Time.current if seams_name == "invoice.paid.billing"
-            inv.save!
-          }
-      end
-    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
-      Seams::Observability.adapter.warn(
-        "billing.webhook.upsert_failed",
-        engine: "billing", event: seams_name, error: e.message
-      )
+      object.respond_to?(:id) ? object.id : (object.is_a?(Hash) && (object[:id] || object["id"]))
     end
   end
 end

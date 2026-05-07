@@ -10,13 +10,18 @@ module Billing
   #     c.webhook_secret = ENV.fetch("STRIPE_WEBHOOK_SECRET")
   #   end
   class Configuration
-    attr_accessor :gateway, :api_key, :webhook_secret, :default_currency
+    attr_accessor :gateway, :api_key, :webhook_secret, :default_currency,
+                  :process_webhooks_async
 
     def initialize
-      @gateway          = "<%= gateway_class_name %>"
-      @api_key          = ENV.fetch("<%= gateway_env_prefix %>_SECRET_KEY",     nil)
-      @webhook_secret   = ENV.fetch("<%= gateway_env_prefix %>_WEBHOOK_SECRET", nil)
-      @default_currency = "usd"
+      @gateway                = "<%= gateway_class_name %>"
+      @api_key                = ENV.fetch("<%= gateway_env_prefix %>_SECRET_KEY",     nil)
+      @webhook_secret         = ENV.fetch("<%= gateway_env_prefix %>_WEBHOOK_SECRET", nil)
+      @default_currency       = "usd"
+      # Default to synchronous so failed handlers roll back the
+      # WebhookEvent insert and Stripe gets to retry. Hosts on Solid
+      # Queue (or similar) can flip to async + accept the trade-off.
+      @process_webhooks_async = false
     end
 
     # Short identifier used as the `gateway:` field in canonical event
