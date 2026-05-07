@@ -1,0 +1,33 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+
+RSpec.describe Core::Auditable do
+  let(:model_class) do
+    Class.new(ActiveRecord::Base) do
+      self.table_name = "articles"
+      include Core::Auditable
+    end
+  end
+
+  it "creates an audit log on create" do
+    expect { model_class.create!(title: "Hi") }
+      .to change(Core::AuditLog, :count).by(1)
+  end
+
+  it "records the changed attributes on update" do
+    article = model_class.create!(title: "Hi")
+    expect { article.update!(title: "Bye") }
+      .to change(Core::AuditLog, :count).by(1)
+
+    last = Core::AuditLog.recent.first
+    expect(last.action).to eq("update")
+    expect(last.payload).to include("title" => "Bye")
+  end
+
+  it "creates an audit log on destroy" do
+    article = model_class.create!(title: "Hi")
+    expect { article.destroy }
+      .to change(Core::AuditLog, :count).by(1)
+  end
+end

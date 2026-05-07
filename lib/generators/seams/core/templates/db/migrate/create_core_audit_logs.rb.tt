@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+# What: creates the core_audit_logs table.
+# Why:  every engine that mixes Core::Auditable into a model needs
+#       somewhere to write audit entries. Single shared table keeps
+#       cross-engine queries trivial ("show me everything actor X did
+#       last week" doesn't have to UNION across N tables).
+# Risk: append-only writes from after_create/update/destroy hooks.
+#       Indexed by auditable + actor for the common queries.
+class CreateCoreAuditLogs < ActiveRecord::Migration[7.1]
+  def change
+    create_table :core_audit_logs do |t|
+      t.string  :action,          null: false
+      t.string  :auditable_type
+      t.bigint  :auditable_id
+      t.bigint  :actor_id
+      t.jsonb   :payload,         null: false, default: {}
+      t.timestamps
+    end
+
+    add_index :core_audit_logs, %i[auditable_type auditable_id]
+    add_index :core_audit_logs, :actor_id
+    add_index :core_audit_logs, %i[action created_at]
+  end
+end

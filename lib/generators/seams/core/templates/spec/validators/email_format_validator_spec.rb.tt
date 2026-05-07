@@ -1,0 +1,29 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+
+RSpec.describe Core::EmailFormatValidator do
+  let(:model_class) do
+    Class.new do
+      include ActiveModel::Validations
+      attr_accessor :email
+      validates :email, "core/email_format": true
+    end
+  end
+
+  it "accepts a normal email" do
+    expect(model_class.new.tap { |o| o.email = "x@y.com" }).to be_valid
+  end
+
+  it "rejects an email without @" do
+    expect(model_class.new.tap { |o| o.email = "no-at" }).not_to be_valid
+  end
+
+  it "rejects emails with consecutive dots" do
+    expect(model_class.new.tap { |o| o.email = "x..y@z.com" }).not_to be_valid
+  end
+
+  it "rejects emails without a TLD" do
+    expect(model_class.new.tap { |o| o.email = "x@y" }).not_to be_valid
+  end
+end

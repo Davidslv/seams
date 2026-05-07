@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+module Core
+  class Engine < ::Rails::Engine
+    isolate_namespace Core
+
+    config.generators do |g|
+      g.test_framework :rspec
+    end
+
+    initializer "core.register_events" do
+      Seams::EventRegistry.register("record.audited.core", emitted_by: "Core")
+    end
+  end
+end

@@ -57,6 +57,7 @@ module Seams
         say ""
         say "  Other useful commands:", :yellow
         say "    bin/seams list          - list engines + their events"
+        say "    bin/seams core          - generate the canonical Core engine (concerns, audit log)"
         say "    bin/seams auth          - generate the canonical Auth engine"
         say "    bin/seams notifications - generate the canonical Notifications engine"
         say "    bin/seams billing       - generate the canonical Billing engine"
