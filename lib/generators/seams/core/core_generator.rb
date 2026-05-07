@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/dummy_app_writer"
 
 module Seams
   module Generators
@@ -104,8 +105,20 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def create_dummy_app
+        Seams::Generators::DummyAppWriter.write!(
+          engine_path: File.join(destination_root, "engines", ENGINE_NAME),
+          engine_module: "Core",
+          schema: dummy_schema,
+          host_user: dummy_host_user
+        )
+        template "spec/runtime/boot_spec.rb.tt",
+                 engine_path("spec/runtime/core_boot_spec.rb")
+      end
+
       def wire_into_host
         host_inject_mount(engine_class: "Core::Engine", at: "/")
+        host_inject_gem("sqlite3", ">= 1.4", group: :test)
       end
 
       def report_summary
@@ -124,6 +137,47 @@ module Seams
 
       def engine_path(relative)
         File.join(destination_root, "engines", ENGINE_NAME, relative)
+      end
+
+      def dummy_schema
+        <<~SCHEMA
+          create_table :core_audit_logs do |t|
+            t.string  :action,         null: false
+            t.string  :auditable_type
+            t.bigint  :auditable_id
+            t.bigint  :actor_id
+            t.text    :payload,        null: false, default: "{}"
+            t.timestamps
+          end
+          add_index :core_audit_logs, %i[auditable_type auditable_id]
+
+          create_table :articles do |t|
+            t.string   :title
+            t.string   :slug
+            t.datetime :deleted_at
+            t.bigint   :team_id
+            t.timestamps
+          end
+          add_index :articles, :slug, unique: true
+
+          create_table :teams do |t|
+            t.string :name
+            t.string :slug
+            t.timestamps
+          end
+          add_index :teams, :slug, unique: true
+        SCHEMA
+      end
+
+      def dummy_host_user
+        <<~RB
+          # frozen_string_literal: true
+
+          # Minimal host User for the engine's spec/dummy app.
+          class User < ApplicationRecord
+            include Core::Auditable
+          end
+        RB
       end
 
       # Core's migration sits AHEAD of the canonical engine offsets

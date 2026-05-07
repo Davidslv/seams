@@ -1,0 +1,212 @@
+# frozen_string_literal: true
+
+require "fileutils"
+
+module Seams
+  module Generators
+    # Writes a slim spec/dummy/ Rails app inside a generated engine so
+    # the engine's specs can boot Rails and run against a real
+    # ActiveRecord database without requiring the host application.
+    #
+    # The boilerplate (application.rb, boot.rb, environment.rb,
+    # database.yml, environments/test.rb, application_record.rb,
+    # log/.gitkeep, spec_helper.rb, rails_helper.rb) is emitted by
+    # this helper. Engines supply the bits that vary: the schema, the
+    # optional host User model, and the routes block.
+    #
+    #   Seams::Generators::DummyAppWriter.write!(
+    #     engine_path:   "engines/auth",
+    #     engine_module: "Auth",
+    #     mount_at:      "/auth",
+    #     schema:        "<schema body>",
+    #     host_user:     "<class User body>",   # optional
+    #   )
+    module DummyAppWriter
+      module_function
+
+      def write!(engine_path:, engine_module:, schema:, mount_at: nil, host_user: nil)
+        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/config/environments"))
+        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/config/initializers"))
+        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/db"))
+        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/app/models"))
+        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/log"))
+        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/tmp"))
+        FileUtils.mkdir_p(File.join(engine_path, "spec/runtime"))
+
+        write(File.join(engine_path, "spec/dummy/config/boot.rb"),         boot_rb)
+        write(File.join(engine_path, "spec/dummy/config/application.rb"),  application_rb(engine_module))
+        write(File.join(engine_path, "spec/dummy/config/environment.rb"),  environment_rb)
+        write(File.join(engine_path, "spec/dummy/config/database.yml"),    database_yml)
+        write(File.join(engine_path, "spec/dummy/config/environments/test.rb"),       test_environment_rb)
+        write(File.join(engine_path, "spec/dummy/config/initializers/secret_key.rb"), secret_key_rb)
+        write(File.join(engine_path, "spec/dummy/config/routes.rb"),       routes_rb(engine_module, mount_at))
+        write(File.join(engine_path, "spec/dummy/db/schema.rb"),           schema_rb(schema))
+        write(File.join(engine_path, "spec/dummy/app/models/application_record.rb"), application_record_rb)
+        write(File.join(engine_path, "spec/dummy/app/models/user.rb"),     host_user) if host_user
+        write(File.join(engine_path, "spec/dummy/log/.keep"),              "")
+        write(File.join(engine_path, "spec/dummy/tmp/.keep"),              "")
+
+        write(File.join(engine_path, "spec/spec_helper.rb"),               spec_helper_rb)
+        write(File.join(engine_path, "spec/rails_helper.rb"),              rails_helper_rb)
+      end
+
+      def write(path, content)
+        File.write(path, content)
+      end
+
+      def boot_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../../Gemfile", __dir__)
+          require "bundler/setup" if File.exist?(ENV["BUNDLE_GEMFILE"])
+        RB
+      end
+
+      def application_rb(engine_module)
+        <<~RB
+          # frozen_string_literal: true
+
+          require_relative "boot"
+
+          require "rails"
+          require "active_model/railtie"
+          require "active_job/railtie"
+          require "active_record/railtie"
+          require "action_controller/railtie"
+          require "action_view/railtie"
+
+          Bundler.require(*Rails.groups)
+          require "#{engine_module.downcase}"
+
+          module Dummy
+            class Application < Rails::Application
+              config.load_defaults Rails::VERSION::STRING.to_f
+              config.eager_load = false
+              config.active_support.deprecation = :stderr
+              config.action_controller.include_all_helpers = false
+            end
+          end
+        RB
+      end
+
+      def environment_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          require_relative "application"
+          Rails.application.initialize!
+        RB
+      end
+
+      def database_yml
+        <<~YML
+          test:
+            adapter: sqlite3
+            database: ":memory:"
+            pool: 5
+            timeout: 5000
+        YML
+      end
+
+      def test_environment_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          Rails.application.configure do
+            config.cache_classes               = true
+            config.eager_load                  = false
+            config.public_file_server.enabled  = true
+            config.consider_all_requests_local = true
+            config.action_controller.perform_caching = false
+            config.action_dispatch.show_exceptions   = :rescuable
+            config.action_controller.allow_forgery_protection = false
+            config.active_support.deprecation = :stderr
+          end
+        RB
+      end
+
+      def secret_key_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          Rails.application.config.secret_key_base = "test_secret_key_base_for_dummy_app"
+        RB
+      end
+
+      def routes_rb(engine_module, mount_at)
+        body = mount_at ? %(  mount #{engine_module}::Engine, at: "#{mount_at}") : ""
+        <<~RB
+          # frozen_string_literal: true
+
+          Rails.application.routes.draw do
+          #{body}
+          end
+        RB
+      end
+
+      def schema_rb(schema_body)
+        <<~RB
+          # frozen_string_literal: true
+
+          ActiveRecord::Schema[7.1].define(version: 0) do
+          #{schema_body.lines.map { |l| "  #{l}" }.join.rstrip}
+          end
+        RB
+      end
+
+      def application_record_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          class ApplicationRecord < ActiveRecord::Base
+            self.abstract_class = true
+          end
+        RB
+      end
+
+      def spec_helper_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          RSpec.configure do |config|
+            config.expect_with :rspec do |expectations|
+              expectations.include_chain_clauses_in_custom_matcher_descriptions = true
+            end
+
+            config.mock_with :rspec do |mocks|
+              mocks.verify_partial_doubles = true
+            end
+
+            config.shared_context_metadata_behavior = :apply_to_host_groups
+            config.disable_monkey_patching!
+            config.order = :random
+            Kernel.srand config.seed
+          end
+        RB
+      end
+
+      def rails_helper_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          require "spec_helper"
+          ENV["RAILS_ENV"] ||= "test"
+          require File.expand_path("dummy/config/environment", __dir__)
+          abort("Rails is in production mode!") if Rails.env.production?
+
+          require "rspec/rails"
+
+          ActiveRecord::Schema.verbose = false
+          load File.expand_path("dummy/db/schema.rb", __dir__)
+
+          RSpec.configure do |config|
+            config.use_transactional_fixtures = true
+            config.infer_spec_type_from_file_location!
+            config.filter_rails_from_backtrace!
+          end
+        RB
+      end
+    end
+  end
+end

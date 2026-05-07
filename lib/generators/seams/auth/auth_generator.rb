@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/dummy_app_writer"
 
 module Seams
   module Generators
@@ -126,8 +127,21 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def create_dummy_app
+        Seams::Generators::DummyAppWriter.write!(
+          engine_path: File.join(destination_root, "engines", ENGINE_NAME),
+          engine_module: "Auth",
+          mount_at: "/auth",
+          schema: dummy_schema,
+          host_user: dummy_host_user
+        )
+        template "spec/runtime/boot_spec.rb.tt",
+                 engine_path("spec/runtime/auth_boot_spec.rb")
+      end
+
       def wire_into_host
-        host_inject_gem("bcrypt", "~> 3.1")
+        host_inject_gem("bcrypt",  "~> 3.1")
+        host_inject_gem("sqlite3", ">= 1.4", group: :test)
         host_inject_mount(engine_class: "Auth::Engine", at: "/auth")
         host_inject_include_in_user("Auth::Authenticatable")
         host_inject_include_in_application_controller("Auth::Authentication")
@@ -158,6 +172,41 @@ module Seams
         base = Time.now.utc
         seconds = base.strftime("%Y%m%d%H%M%S").to_i
         (seconds + offset).to_s
+      end
+
+      def dummy_schema
+        <<~SCHEMA
+          create_table :auth_users do |t|
+            t.string  :email,            null: false
+            t.string  :password_digest,  null: false
+            t.bigint  :host_user_id
+            t.string  :password_reset_token
+            t.datetime :password_reset_token_sent_at
+            t.timestamps
+          end
+          add_index :auth_users, :email, unique: true
+          add_index :auth_users, :password_reset_token, unique: true,
+                                                        where: "password_reset_token IS NOT NULL"
+
+          create_table :auth_sessions do |t|
+            t.references :user,       null: false, foreign_key: { to_table: :auth_users }
+            t.string     :token,      null: false
+            t.datetime   :expires_at, null: false
+            t.timestamps
+          end
+          add_index :auth_sessions, :token, unique: true
+        SCHEMA
+      end
+
+      def dummy_host_user
+        <<~RB
+          # frozen_string_literal: true
+
+          class User < ApplicationRecord
+            self.table_name = "auth_users"
+            include Auth::Authenticatable
+          end
+        RB
       end
     end
   end

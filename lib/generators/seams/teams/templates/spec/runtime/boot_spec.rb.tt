@@ -1,0 +1,32 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe "Teams engine boot", type: :integration do
+  it "loads the engine" do
+    expect(defined?(Teams::Engine)).to eq("constant")
+  end
+
+  it "registers the five canonical team events" do
+    %w[
+      team.created.teams
+      team.member_added.teams
+      team.member_removed.teams
+      invitation.sent.teams
+      invitation.accepted.teams
+    ].each do |event|
+      expect(Seams::EventRegistry.registered?(event)).to be(true)
+    end
+  end
+
+  it "creates the team tables from the dummy schema" do
+    %i[teams team_memberships team_invitations].each do |t|
+      expect(ActiveRecord::Base.connection.table_exists?(t)).to be(true), "missing #{t}"
+    end
+  end
+
+  it "creates a Team and auto-assigns a slug" do
+    team = Teams::Team.create!(name: "Acme Corp")
+    expect(team.slug).to eq("acme-corp")
+  end
+end

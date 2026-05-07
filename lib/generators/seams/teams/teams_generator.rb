@@ -99,7 +99,20 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def create_dummy_app
+        Seams::Generators::DummyAppWriter.write!(
+          engine_path: File.join(destination_root, "engines", ENGINE_NAME),
+          engine_module: "Teams",
+          mount_at: "/teams",
+          schema: dummy_schema,
+          host_user: dummy_host_user
+        )
+        template "spec/runtime/boot_spec.rb.tt",
+                 engine_path("spec/runtime/teams_boot_spec.rb")
+      end
+
       def wire_into_host
+        host_inject_gem("sqlite3", ">= 1.4", group: :test)
         host_inject_mount(engine_class: "Teams::Engine", at: "/teams")
         host_inject_include_in_user("Teams::Teamable")
       end
@@ -125,6 +138,51 @@ module Seams
       def timestamp(offset)
         base = Time.now.utc.strftime("%Y%m%d%H%M%S").to_i
         (base + 300 + offset).to_s
+      end
+
+      def dummy_schema
+        <<~SCHEMA
+          create_table :teams do |t|
+            t.string :name, null: false
+            t.string :slug, null: false
+            t.timestamps
+          end
+          add_index :teams, :slug, unique: true
+
+          create_table :team_memberships do |t|
+            t.references :team,    null: false
+            t.bigint     :user_id, null: false
+            t.string     :role,    null: false, default: "member"
+            t.timestamps
+          end
+          add_index :team_memberships, %i[team_id user_id], unique: true
+
+          create_table :team_invitations do |t|
+            t.references :team,        null: false
+            t.string     :email,       null: false
+            t.string     :token,       null: false
+            t.string     :role,        null: false, default: "member"
+            t.datetime   :expires_at,  null: false
+            t.datetime   :accepted_at
+            t.timestamps
+          end
+          add_index :team_invitations, :token, unique: true
+
+          create_table :users do |t|
+            t.string :email
+            t.timestamps
+          end
+        SCHEMA
+      end
+
+      def dummy_host_user
+        <<~RB
+          # frozen_string_literal: true
+
+          class User < ApplicationRecord
+            include Teams::Teamable
+          end
+        RB
       end
     end
   end

@@ -41,6 +41,14 @@ Metrics/MethodLength:
 Metrics/ClassLength:
   Max: 200
 
+Metrics/ModuleLength:
+  Exclude:
+    - "lib/seams/generators/dummy_app_writer.rb"
+
+Metrics/AbcSize:
+  Exclude:
+    - "lib/seams/generators/dummy_app_writer.rb"
+
 RSpec/ExampleLength:
   Max: 15
   Exclude:

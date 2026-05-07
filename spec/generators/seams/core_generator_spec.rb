@@ -143,6 +143,20 @@ RSpec.describe Seams::Generators::CoreGenerator do
       assert_file "engines/core/spec/concerns/core/sluggable_spec.rb"
       assert_file "engines/core/spec/validators/core/email_format_validator_spec.rb"
     end
+
+    it "ships a dummy app + runtime boot spec" do
+      assert_file "engines/core/spec/dummy/config/application.rb" do |content|
+        expect(content).to include('require "core"')
+      end
+      assert_file "engines/core/spec/dummy/db/schema.rb" do |content|
+        expect(content).to include("create_table :core_audit_logs")
+      end
+      assert_file "engines/core/spec/dummy/app/models/user.rb" do |content|
+        expect(content).to include("include Core::Auditable")
+      end
+      assert_file "engines/core/spec/rails_helper.rb"
+      assert_file "engines/core/spec/runtime/core_boot_spec.rb"
+    end
   end
 
   describe "documentation" do

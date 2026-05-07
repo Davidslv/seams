@@ -1,0 +1,55 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe "Notifications schedule round-trip", type: :integration do
+  let(:user) { User.create!(email: "x@y.com") }
+
+  describe "ice_cube serialisation" do
+    it "round-trips an immediate one-shot" do
+      sched = IceCube::Schedule.new(Time.current)
+      n = Notifications::Strategies::InApp.new(owner: user, template: "default")
+      n.schedule = sched
+      n.save!
+
+      reloaded = Notifications::Notification.find(n.id)
+      expect(reloaded.schedule).to be_a(IceCube::Schedule)
+      expect(reloaded.next_delivery_at).to be_within(1.second).of(sched.first)
+    end
+
+    it "round-trips a weekly recurring schedule" do
+      sched = IceCube::Schedule.new(Time.current)
+      sched.add_recurrence_rule(IceCube::Rule.weekly)
+
+      n = Notifications::Strategies::Email.new(owner: user, template: "default")
+      n.schedule = sched
+      n.save!
+
+      reloaded = Notifications::Notification.find(n.id)
+      expect(reloaded.schedule.recurrence_rules.first).to be_a(IceCube::WeeklyRule)
+    end
+  end
+
+  describe "schedule_config=" do
+    it "builds an IceCube schedule from a structured hash" do
+      n = Notifications::Strategies::Email.new(owner: user, template: "default")
+      n.schedule_config = { starts_at: 1.day.from_now, frequency: "daily", interval: 2 }
+      n.save!
+
+      expect(n.schedule).to be_a(IceCube::Schedule)
+      expect(n.schedule.recurrence_rules.first).to be_a(IceCube::DailyRule)
+    end
+  end
+
+  describe "#advance!" do
+    it "sets next_delivery_at to nil for a completed one-shot" do
+      sched = IceCube::Schedule.new(2.days.ago)
+      n = Notifications::Strategies::InApp.new(owner: user, template: "default")
+      n.schedule = sched
+      n.save!
+      n.advance!
+
+      expect(n.reload.next_delivery_at).to be_nil
+    end
+  end
+end

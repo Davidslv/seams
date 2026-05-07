@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe "Core engine boot", type: :integration do
+  it "loads the engine" do
+    expect(defined?(Core::Engine)).to eq("constant")
+  end
+
+  it "registers record.audited.core in Seams::EventRegistry on boot" do
+    expect(Seams::EventRegistry.registered?("record.audited.core")).to be(true)
+  end
+
+  it "exposes the canonical concerns as constants" do
+    expect(defined?(Core::Auditable)).to            eq("constant")
+    expect(defined?(Core::SoftDeletable)).to        eq("constant")
+    expect(defined?(Core::Sluggable)).to            eq("constant")
+    expect(defined?(Core::TenantScoped)).to         eq("constant")
+    expect(defined?(Core::HasCurrentAttributes)).to eq("constant")
+  end
+
+  it "creates the core_audit_logs table from the dummy schema" do
+    expect(ActiveRecord::Base.connection.table_exists?(:core_audit_logs)).to be(true)
+  end
+end

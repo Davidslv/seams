@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/dummy_app_writer"
 
 module Seams
   module Generators
@@ -124,8 +125,21 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def create_dummy_app
+        Seams::Generators::DummyAppWriter.write!(
+          engine_path: File.join(destination_root, "engines", ENGINE_NAME),
+          engine_module: "Billing",
+          mount_at: "/billing",
+          schema: dummy_schema,
+          host_user: dummy_host_user
+        )
+        template "spec/runtime/boot_spec.rb.tt",
+                 engine_path("spec/runtime/billing_boot_spec.rb")
+      end
+
       def wire_into_host
-        host_inject_gem("stripe", "~> 12.0")
+        host_inject_gem("stripe",  "~> 12.0")
+        host_inject_gem("sqlite3", ">= 1.4", group: :test)
         host_inject_mount(engine_class: "Billing::Engine", at: "/billing")
         host_inject_include_in_user("Billing::Billable")
       end
@@ -151,6 +165,68 @@ module Seams
       def timestamp(offset)
         base = Time.now.utc.strftime("%Y%m%d%H%M%S").to_i
         (base + 200 + offset).to_s
+      end
+
+      def dummy_schema
+        <<~SCHEMA
+          create_table :billing_subscriptions do |t|
+            t.string   :customer_ref,       null: false
+            t.string   :plan_ref,           null: false
+            t.string   :gateway_ref,        null: false
+            t.string   :status,             null: false, default: "incomplete"
+            t.datetime :current_period_end
+            t.timestamps
+          end
+          add_index :billing_subscriptions, :gateway_ref, unique: true
+
+          create_table :billing_invoices do |t|
+            t.references :subscription
+            t.string     :gateway_ref,  null: false
+            t.integer    :amount_cents, null: false
+            t.string     :currency,     null: false, default: "usd"
+            t.string     :status,       null: false, default: "open"
+            t.datetime   :paid_at
+            t.timestamps
+          end
+
+          create_table :billing_webhook_events do |t|
+            t.string   :gateway,           null: false
+            t.string   :gateway_event_id,  null: false
+            t.string   :event_type,        null: false
+            t.boolean  :livemode,          null: false, default: false
+            t.timestamps
+          end
+          add_index :billing_webhook_events, %i[gateway gateway_event_id], unique: true
+
+          create_table :billing_plans do |t|
+            t.string  :gateway_ref,       null: false
+            t.string  :name,              null: false
+            t.text    :description
+            t.integer :amount_cents,      null: false, default: 0
+            t.string  :currency,          null: false, default: "usd"
+            t.string  :interval,          null: false, default: "month"
+            t.integer :trial_period_days
+            t.boolean :active,            null: false, default: true
+            t.text    :features,          null: false, default: "{}"
+            t.timestamps
+          end
+
+          create_table :users do |t|
+            t.string :email
+            t.string :stripe_customer_id
+            t.timestamps
+          end
+        SCHEMA
+      end
+
+      def dummy_host_user
+        <<~RB
+          # frozen_string_literal: true
+
+          class User < ApplicationRecord
+            include Billing::Billable
+          end
+        RB
       end
     end
   end
