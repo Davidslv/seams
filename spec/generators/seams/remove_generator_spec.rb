@@ -94,4 +94,50 @@ RSpec.describe Seams::Generators::RemoveGenerator do
       expect(File.exist?(engine_path)).to be(true)
     end
   end
+
+  describe "drop-table migration (Phase 1.7)" do
+    let(:host_migrate_dir) { File.join(destination_root, "db/migrate") }
+
+    def seed_engine_migration(filename, body)
+      dir = File.join(engine_path, "db/migrate")
+      FileUtils.mkdir_p(dir)
+      File.write(File.join(dir, filename), body)
+    end
+
+    def seed_two_billing_migrations
+      seed_engine_migration("20250101000000_create_billing_plans.rb",
+                            "class CreateBillingPlans < ActiveRecord::Migration[7.1]\n  " \
+                            "def change\n    create_table :billing_plans\n  end\nend\n")
+      seed_engine_migration("20250102000000_create_billing_subscriptions.rb",
+                            "class CreateBillingSubscriptions < ActiveRecord::Migration[7.1]\n  " \
+                            "def change\n    create_table :billing_subscriptions\n  end\nend\n")
+    end
+
+    it "generates a drop migration listing every table the engine created" do
+      seed_two_billing_migrations
+      run_generator(["billing", "--force"])
+
+      generated = Dir.glob(File.join(host_migrate_dir, "*_drop_billing_tables.rb"))
+      expect(generated.size).to eq(1)
+      content = File.read(generated.first)
+
+      [
+        "class DropBillingTables < ActiveRecord::Migration",
+        "drop_table :billing_plans, force: :cascade if table_exists?(:billing_plans)",
+        "drop_table :billing_subscriptions, force: :cascade if table_exists?(:billing_subscriptions)",
+        "ActiveRecord::IrreversibleMigration"
+      ].each { |needle| expect(content).to include(needle) }
+    end
+
+    it "skips when the engine had no migrations" do
+      run_generator(["billing", "--force"])
+      expect(Dir.glob(File.join(host_migrate_dir, "*_drop_billing_tables.rb"))).to be_empty
+    end
+
+    it "skips when the engine never existed" do
+      run_generator(["ghost", "--force"])
+      generated = Dir.glob(File.join(host_migrate_dir, "*_drop_ghost_tables.rb"))
+      expect(generated).to be_empty
+    end
+  end
 end
