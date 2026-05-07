@@ -67,4 +67,32 @@ RSpec.describe Seams::Generators::InstallGenerator do
       end
     end
   end
+
+  describe "#create_ci_workflow" do
+    before { run_generator }
+
+    it "creates .github/workflows/ci.yml with engine-matrix testing" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("name: CI")
+        expect(content).to include("test_engine")
+        expect(content).to include("matrix:")
+        expect(content).to include("brakeman")
+        expect(content).to include("bundle-audit")
+      end
+    end
+  end
+
+  describe "#create_bin_seams" do
+    before { run_generator }
+
+    it "creates an executable bin/seams wrapper" do
+      assert_file "bin/seams" do |content|
+        expect(content).to include("Usage: bin/seams")
+        expect(content).to include("seams:engine")
+      end
+
+      full = File.join(destination_root, "bin/seams")
+      expect(File.executable?(full)).to be(true)
+    end
+  end
 end

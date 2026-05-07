@@ -32,10 +32,27 @@ module Seams
         template "seams_engines.rb.tt", "config/initializers/seams_engines.rb"
       end
 
+      def create_ci_workflow
+        template "ci.yml.tt", ".github/workflows/ci.yml"
+      end
+
+      def create_bin_seams
+        template "bin_seams.tt", "bin/seams"
+        full_path = File.join(destination_root, "bin/seams")
+        File.chmod(0o755, full_path) if File.exist?(full_path)
+      end
+
       def post_install_message
         say ""
         say "  Seams is installed. Generate your first engine with:", :green
-        say "    bin/rails generate seams:engine core"
+        say "    bin/seams engine core   (or bin/rails generate seams:engine core)"
+        say ""
+        say "  Other useful commands:", :yellow
+        say "    bin/seams list          - list engines + their events"
+        say "    bin/seams auth          - generate the canonical Auth engine"
+        say "    bin/seams notifications - generate the canonical Notifications engine"
+        say "    bin/seams billing       - generate the canonical Billing engine"
+        say "    bin/seams teams         - generate the canonical Teams engine"
         say ""
       end
     end

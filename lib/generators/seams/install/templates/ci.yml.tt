@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  BUNDLE_JOBS: 4
+  BUNDLE_RETRY: 3
+
+jobs:
+  lint:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - run: bundle exec rubocop --parallel
+
+  security:
+    name: Security (brakeman + bundle-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - run: bundle exec brakeman --no-pager --no-progress --quiet
+      - run: bundle exec bundle-audit check --update
+
+  # Discover engines once and fan out — every engine's specs run in
+  # parallel under its own job. Seams custom RuboCop cops still run
+  # against engine code (in the lint job above) but unit specs run
+  # per engine for fast signal.
+  discover:
+    name: Discover engines
+    runs-on: ubuntu-latest
+    outputs:
+      engines: ${{ steps.set.outputs.engines }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set
+        run: |
+          if [ -d engines ]; then
+            engines=$(ls -1 engines | jq -R -s -c 'split("\n")[:-1]')
+          else
+            engines='[]'
+          fi
+          echo "engines=$engines" >> "$GITHUB_OUTPUT"
+
+  test_engine:
+    name: Test ${{ matrix.engine }}
+    needs: discover
+    if: needs.discover.outputs.engines != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: ${{ fromJson(needs.discover.outputs.engines) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - run: bundle exec rspec engines/${{ matrix.engine }}/spec
+
+  test_app:
+    name: Test host app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - run: bundle exec rspec spec
