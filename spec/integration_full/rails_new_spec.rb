@@ -66,7 +66,8 @@ RSpec.describe "rails new integration", type: :integration_full do
       f.puts %(gem "ice_cube", ">= 0.16")
       f.puts
       f.puts "group :test do"
-      f.puts %(  gem "rspec-rails", "~> 7.1")
+      f.puts %(  gem "rspec-rails",       "~> 7.1")
+      f.puts %(  gem "factory_bot_rails", "~> 6.4")
       f.puts "end"
     end
   end

@@ -1,0 +1,64 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Auth::OAuthProvider do
+  describe "validations" do
+    it "requires provider, provider_uid, user_id" do
+      record = described_class.new
+      expect(record).not_to be_valid
+      %i[provider provider_uid user_id].each do |attr|
+        expect(record.errors[attr]).not_to be_empty
+      end
+    end
+
+    it "limits provider to the known set" do
+      record = build(:auth_oauth_provider, provider: "myspace")
+      expect(record).not_to be_valid
+      expect(record.errors[:provider].join).to match(/included|inclusion/i)
+    end
+
+    it "rejects a duplicate (provider, provider_uid) pair" do
+      create(:auth_oauth_provider, provider: "google", provider_uid: "abc")
+      dup = build(:auth_oauth_provider, provider: "google", provider_uid: "abc")
+      expect(dup).not_to be_valid
+      expect(dup.errors[:provider_uid].join).to match(/already linked/)
+    end
+
+    it "rejects a user being linked to the same provider twice" do
+      user = create(:auth_user)
+      create(:auth_oauth_provider, user: user, provider: "google", provider_uid: "uid-1")
+      dup = build(:auth_oauth_provider, user: user, provider: "google", provider_uid: "uid-2")
+      expect(dup).not_to be_valid
+      expect(dup.errors[:user_id].join).to match(/already linked/)
+    end
+  end
+
+  describe "encryption" do
+    it "round-trips access_token / refresh_token through Rails encryption" do
+      record = create(:auth_oauth_provider,
+                      access_token:  "secret-access",
+                      refresh_token: "secret-refresh")
+      record.reload
+      expect(record.access_token).to  eq("secret-access")
+      expect(record.refresh_token).to eq("secret-refresh")
+    end
+
+    it "round-trips provider_uid (deterministic so it remains queryable)" do
+      record = create(:auth_oauth_provider, provider: "google", provider_uid: "google-sub-42")
+      found  = described_class.find_by(provider: "google", provider_uid: "google-sub-42")
+      expect(found).to eq(record)
+    end
+  end
+
+  describe "#access_token_expired?" do
+    it "is false when expires_at is nil or in the future" do
+      expect(build(:auth_oauth_provider, expires_at: nil)).not_to be_access_token_expired
+      expect(build(:auth_oauth_provider, expires_at: 1.hour.from_now)).not_to be_access_token_expired
+    end
+
+    it "is true when expires_at is in the past" do
+      expect(build(:auth_oauth_provider, expires_at: 1.minute.ago)).to be_access_token_expired
+    end
+  end
+end

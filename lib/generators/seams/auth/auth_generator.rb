@@ -155,6 +155,15 @@ module Seams
                  engine_path("spec/models/auth/user_spec.rb")
         template "spec/models/session_spec.rb.tt",
                  engine_path("spec/models/auth/session_spec.rb")
+        # Phase 2A finish — coverage for the new Wave-9/10 models.
+        template "spec/models/api_token_spec.rb.tt",
+                 engine_path("spec/models/auth/api_token_spec.rb")
+        template "spec/models/oauth_provider_spec.rb.tt",
+                 engine_path("spec/models/auth/oauth_provider_spec.rb")
+        template "spec/mailers/passwords_mailer_spec.rb.tt",
+                 engine_path("spec/mailers/auth/passwords_mailer_spec.rb")
+        template "spec/factories/auth.rb.tt",
+                 engine_path("spec/factories/auth.rb")
       end
 
       def overwrite_readme
@@ -183,6 +192,9 @@ module Seams
                  engine_path("spec/runtime/auth_boot_spec.rb")
         template "spec/runtime/event_payload_spec.rb.tt",
                  engine_path("spec/runtime/auth_event_payload_spec.rb")
+        # Phase 2A finish — login flow round-trip via the request stack.
+        template "spec/runtime/login_flow_spec.rb.tt",
+                 engine_path("spec/runtime/auth_login_flow_spec.rb")
       end
 
       def wire_into_host
@@ -191,6 +203,9 @@ module Seams
         # memory feedback_external_apis.md). The host needs Faraday on
         # the load path even if it never configures an OAuth provider.
         host_inject_gem("faraday", "~> 2.0")
+        # factory_bot_rails powers the engine's spec/factories/*. Lives
+        # in the host's test group only.
+        host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
         host_inject_mount(engine_class: "Auth::Engine", at: "/auth")
         host_inject_include_in_user("Auth::Authenticatable")
         host_inject_include_in_application_controller("Auth::Authentication")

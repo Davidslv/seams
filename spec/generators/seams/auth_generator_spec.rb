@@ -463,6 +463,73 @@ RSpec.describe Seams::Generators::AuthGenerator do
     end
   end
 
+  describe "Phase 2A — factories + spec coverage" do
+    it "ships FactoryBot factories for users, sessions, oauth_providers, api_tokens" do
+      assert_file "engines/auth/spec/factories/auth.rb" do |content|
+        [
+          "FactoryBot.define",
+          "factory :auth_user",
+          "factory :auth_session",
+          "factory :auth_oauth_provider",
+          "factory :auth_api_token",
+          "Auth::ApiToken.digest"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships ApiToken model spec covering digest + find_by_plaintext + expired? + scopes" do
+      assert_file "engines/auth/spec/models/auth/api_token_spec.rb" do |content|
+        [
+          "RSpec.describe Auth::ApiToken",
+          ".digest",
+          ".find_by_plaintext",
+          "#expired?",
+          "scope",
+          ".active"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships OAuthProvider model spec covering encryption round-trip + uniqueness" do
+      assert_file "engines/auth/spec/models/auth/oauth_provider_spec.rb" do |content|
+        [
+          "RSpec.describe Auth::OAuthProvider",
+          "round-trips access_token",
+          "round-trips provider_uid",
+          "find_by(provider: \"google\""
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships an end-to-end login flow request spec" do
+      assert_file "engines/auth/spec/runtime/auth_login_flow_spec.rb" do |content|
+        [
+          "type: :request",
+          'post "/auth/registration"',
+          'post "/auth/session"',
+          'delete "/auth/session"'
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships PasswordsMailer spec covering recipient + token embed" do
+      assert_file "engines/auth/spec/mailers/auth/passwords_mailer_spec.rb" do |content|
+        [
+          "RSpec.describe Auth::PasswordsMailer",
+          "type: :mailer",
+          "described_class.reset_email(user)"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "wire_into_host adds factory_bot_rails to the test group" do
+      gen_path = File.expand_path("../../../lib/generators/seams/auth/auth_generator.rb", __dir__)
+      content  = File.read(gen_path)
+      expect(content).to include('host_inject_gem("factory_bot_rails"')
+      expect(content).to include("group: :test")
+    end
+  end
+
   describe "PII encryption (Wave 11 GDPR)" do
     it "User#email is encrypted deterministically with downcase normalisation" do
       assert_file "engines/auth/app/models/auth/user.rb" do |content|

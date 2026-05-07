@@ -29,6 +29,7 @@ module Seams
         FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/config/initializers"))
         FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/db"))
         FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/app/models"))
+        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/app/controllers"))
         FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/log"))
         FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/tmp"))
         FileUtils.mkdir_p(File.join(engine_path, "spec/runtime"))
@@ -42,6 +43,7 @@ module Seams
         write(File.join(engine_path, "spec/dummy/config/routes.rb"),       routes_rb(engine_module, mount_at))
         write(File.join(engine_path, "spec/dummy/db/schema.rb"),           schema_rb(schema))
         write(File.join(engine_path, "spec/dummy/app/models/application_record.rb"), application_record_rb)
+        write(File.join(engine_path, "spec/dummy/app/controllers/application_controller.rb"), application_controller_rb)
         write(File.join(engine_path, "spec/dummy/app/models/user.rb"),     host_user) if host_user
         write(File.join(engine_path, "spec/dummy/log/.keep"),              "")
         write(File.join(engine_path, "spec/dummy/tmp/.keep"),              "")
@@ -199,6 +201,19 @@ module Seams
         RB
       end
 
+      def application_controller_rb
+        # Minimal host ApplicationController so engine controllers that
+        # inherit from ::ApplicationController (the seams:engine generator
+        # default) can boot inside a request spec. Real hosts will have
+        # their own; this is dummy-only.
+        <<~RB
+          # frozen_string_literal: true
+
+          class ApplicationController < ActionController::Base
+          end
+        RB
+      end
+
       def rakefile_rb
         <<~RB
           # frozen_string_literal: true
@@ -283,6 +298,19 @@ module Seams
 
           require "rspec/rails"
 
+          # FactoryBot is optional — engines that ship factories add
+          # `factory_bot_rails` to the host Gemfile. If it's loaded, wire
+          # the syntax methods + auto-discover the engine's
+          # spec/factories/*.rb (default search paths look in the host's
+          # spec/factories which doesn't exist when running engine specs
+          # from the host root).
+          if defined?(FactoryBot)
+            require "factory_bot_rails"
+            engine_factories = File.expand_path("factories", __dir__)
+            FactoryBot.definition_file_paths = [engine_factories]
+            FactoryBot.find_definitions if FactoryBot.factories.none?
+          end
+
           ActiveRecord::Schema.verbose = false
           # Drop and reload the schema for a clean slate every run.
           ActiveRecord::Base.connection.tables.each do |t|
@@ -294,6 +322,10 @@ module Seams
             config.use_transactional_fixtures = true
             config.infer_spec_type_from_file_location!
             config.filter_rails_from_backtrace!
+
+            if defined?(FactoryBot)
+              config.include FactoryBot::Syntax::Methods
+            end
           end
         RB
       end
