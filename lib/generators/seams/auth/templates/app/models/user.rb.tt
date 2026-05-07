@@ -16,5 +16,12 @@ module Auth
       user = find_by(email: email.to_s.strip.downcase)
       user&.authenticate(password) || nil
     end
+
+    def password_reset_token_valid?
+      return false if password_reset_token.blank?
+      return false if password_reset_token_sent_at.blank?
+
+      password_reset_token_sent_at > Auth::ResetPassword::TOKEN_TTL.seconds.ago
+    end
   end
 end

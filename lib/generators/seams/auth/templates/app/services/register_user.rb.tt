@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+module Auth
+  # Sign-up service. Creates the user + first session in a transaction
+  # and publishes user.signed_up.auth on success.
+  #
+  # Returns a Result struct: ok?, user, session, error.
+  class RegisterUser
+    Result = Struct.new(:ok?, :user, :session, :error, keyword_init: true)
+
+    def self.call(...)
+      new(...).call
+    end
+
+    def initialize(email:, password:, password_confirmation: nil, attributes: {})
+      @email                 = email
+      @password              = password
+      @password_confirmation = password_confirmation
+      @attributes            = attributes
+    end
+
+    def call
+      user, session = nil
+      Auth::User.transaction do
+        user    = Auth::User.create!(@attributes.merge(
+          email: @email, password: @password, password_confirmation: @password_confirmation
+        ))
+        session = user.sessions.create!
+      end
+
+      Seams::Events::Publisher.publish(
+        "user.signed_up.auth", user_id: user.id, email: user.email
+      )
+      Result.new(ok?: true, user: user, session: session)
+    rescue ActiveRecord::RecordInvalid => e
+      Result.new(ok?: false, error: e.message)
+    end
+  end
+end

@@ -1,0 +1,11 @@
+<h1>Forgot your password?</h1>
+
+<%%= form_with url: password_reset_path, method: :post, local: true do |f| %>
+  <p>
+    <%%= label_tag :email %>
+    <%%= email_field_tag :email, nil, required: true, autofocus: true %>
+  </p>
+  <%%= f.submit "Send reset link" %>
+<%% end %>
+
+<p><%%= link_to "Back to sign in", new_session_path %></p>

@@ -7,24 +7,22 @@ module Auth
     end
 
     def create
-      @user = Auth::User.new(user_params)
+      result = Auth::RegisterUser.call(
+        email:                 params.dig(:user, :email),
+        password:              params.dig(:user, :password),
+        password_confirmation: params.dig(:user, :password_confirmation)
+      )
 
-      if @user.save
-        session = @user.sessions.create!
+      if result.ok?
         cookies.encrypted[Auth.configuration.cookie_name] = {
-          value: session.token, httponly: true, expires: session.expires_at
+          value: result.session.token, httponly: true, expires: result.session.expires_at
         }
-        Seams::Events::Publisher.publish("user.signed_up.auth", user_id: @user.id, email: @user.email)
         redirect_to Auth.configuration.after_sign_in_url, notice: "Welcome"
       else
+        @user = Auth::User.new(email: params.dig(:user, :email))
+        flash.now[:alert] = result.error
         render :new, status: :unprocessable_entity
       end
-    end
-
-    private
-
-    def user_params
-      params.require(:user).permit(:email, :password, :password_confirmation)
     end
   end
 end

@@ -3,21 +3,21 @@
 module Auth
   class SessionsController < ApplicationController
     def new
-      # render the sign-in form (app/views/auth/sessions/new.html.erb)
+      # render the sign-in form
     end
 
     def create
-      user = Auth::User.authenticate(email: params[:email], password: params[:password])
+      result = Auth::AuthenticateUser.call(
+        email: params[:email], password: params[:password]
+      )
 
-      if user
-        session = user.sessions.create!
+      if result.ok?
         cookies.encrypted[Auth.configuration.cookie_name] = {
-          value: session.token, httponly: true, expires: session.expires_at
+          value: result.session.token, httponly: true, expires: result.session.expires_at
         }
-        Seams::Events::Publisher.publish("user.signed_in.auth", user_id: user.id, session_id: session.id)
         redirect_to Auth.configuration.after_sign_in_url, notice: "Signed in"
       else
-        flash.now[:alert] = "Invalid email or password"
+        flash.now[:alert] = result.error
         render :new, status: :unprocessable_entity
       end
     end

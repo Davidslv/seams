@@ -58,6 +58,24 @@ module Seams
                  engine_path("app/controllers/auth/sessions_controller.rb")
         template "app/controllers/registrations_controller.rb.tt",
                  engine_path("app/controllers/auth/registrations_controller.rb")
+        template "app/controllers/password_resets_controller.rb.tt",
+                 engine_path("app/controllers/auth/password_resets_controller.rb")
+      end
+
+      def create_services
+        template "app/services/register_user.rb.tt",
+                 engine_path("app/services/auth/register_user.rb")
+        template "app/services/authenticate_user.rb.tt",
+                 engine_path("app/services/auth/authenticate_user.rb")
+        template "app/services/reset_password.rb.tt",
+                 engine_path("app/services/auth/reset_password.rb")
+      end
+
+      def create_mailer
+        template "app/mailers/passwords_mailer.rb.tt",
+                 engine_path("app/mailers/auth/passwords_mailer.rb")
+        template "app/views/passwords_mailer/reset_email.html.erb.tt",
+                 engine_path("app/views/auth/passwords_mailer/reset_email.html.erb")
       end
 
       def create_views
@@ -65,6 +83,10 @@ module Seams
                  engine_path("app/views/auth/sessions/new.html.erb")
         template "app/views/registrations/new.html.erb.tt",
                  engine_path("app/views/auth/registrations/new.html.erb")
+        template "app/views/password_resets/new.html.erb.tt",
+                 engine_path("app/views/auth/password_resets/new.html.erb")
+        template "app/views/password_resets/edit.html.erb.tt",
+                 engine_path("app/views/auth/password_resets/edit.html.erb")
       end
 
       def create_concerns
@@ -79,6 +101,8 @@ module Seams
                  engine_path("db/migrate/#{timestamp(0)}_create_auth_users.rb")
         template "db/migrate/create_auth_sessions.rb.tt",
                  engine_path("db/migrate/#{timestamp(1)}_create_auth_sessions.rb")
+        template "db/migrate/add_password_reset_to_auth_users.rb.tt",
+                 engine_path("db/migrate/#{timestamp(2)}_add_password_reset_to_auth_users.rb")
       end
 
       def create_specs

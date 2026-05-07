@@ -1,0 +1,12 @@
+<h1>Choose a new password</h1>
+
+<%% if flash[:alert] %><p style="color: red"><%%= flash[:alert] %></p><%% end %>
+
+<%%= form_with url: password_reset_path, method: :patch, local: true do |f| %>
+  <%%= hidden_field_tag :token, @token %>
+  <p>
+    <%%= label_tag :password, "New password" %>
+    <%%= password_field_tag :password, nil, required: true, autofocus: true %>
+  </p>
+  <%%= f.submit "Update password" %>
+<%% end %>

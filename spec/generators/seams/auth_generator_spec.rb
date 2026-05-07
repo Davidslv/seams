@@ -71,17 +71,57 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "controllers" do
-    it "creates SessionsController with sign-in / sign-out actions and event publishes" do
+    it "creates SessionsController that delegates to Auth::AuthenticateUser" do
       assert_file "engines/auth/app/controllers/auth/sessions_controller.rb" do |content|
-        expect(content).to include('Seams::Events::Publisher.publish("user.signed_in.auth"')
-        expect(content).to include('Seams::Events::Publisher.publish("user.signed_out.auth"')
+        expect(content).to include("Auth::AuthenticateUser.call")
       end
     end
 
-    it "creates RegistrationsController with sign-up that publishes user.signed_up.auth" do
+    it "creates RegistrationsController that delegates to Auth::RegisterUser" do
       assert_file "engines/auth/app/controllers/auth/registrations_controller.rb" do |content|
-        expect(content).to include('Seams::Events::Publisher.publish("user.signed_up.auth"')
+        expect(content).to include("Auth::RegisterUser.call")
       end
+    end
+
+    it "creates PasswordResetsController with new/create/edit/update" do
+      assert_file "engines/auth/app/controllers/auth/password_resets_controller.rb" do |content|
+        expect(content).to include("Auth::ResetPassword.request")
+        expect(content).to include("Auth::ResetPassword.complete")
+      end
+    end
+  end
+
+  describe "services" do
+    it "creates Auth::RegisterUser that publishes user.signed_up.auth" do
+      assert_file "engines/auth/app/services/auth/register_user.rb" do |content|
+        expect(content).to include("class RegisterUser")
+        expect(content).to include('"user.signed_up.auth"')
+      end
+    end
+
+    it "creates Auth::AuthenticateUser that publishes user.signed_in.auth" do
+      assert_file "engines/auth/app/services/auth/authenticate_user.rb" do |content|
+        expect(content).to include("class AuthenticateUser")
+        expect(content).to include('"user.signed_in.auth"')
+      end
+    end
+
+    it "creates Auth::ResetPassword with two-phase request/complete API" do
+      assert_file "engines/auth/app/services/auth/reset_password.rb" do |content|
+        expect(content).to include("def request")
+        expect(content).to include("def complete")
+        expect(content).to include("TOKEN_TTL")
+      end
+    end
+  end
+
+  describe "mailer" do
+    it "creates Auth::PasswordsMailer + reset_email template" do
+      assert_file "engines/auth/app/mailers/auth/passwords_mailer.rb" do |content|
+        expect(content).to include("class PasswordsMailer < ::ApplicationMailer")
+        expect(content).to include("def reset_email")
+      end
+      assert_file "engines/auth/app/views/auth/passwords_mailer/reset_email.html.erb"
     end
   end
 
@@ -125,9 +165,15 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "views" do
-    it "creates ERB templates for sessions and registrations new" do
-      assert_file "engines/auth/app/views/auth/sessions/new.html.erb"
-      assert_file "engines/auth/app/views/auth/registrations/new.html.erb"
+    it "creates ERB templates for sessions, registrations, and password resets" do
+      %w[
+        sessions/new
+        registrations/new
+        password_resets/new
+        password_resets/edit
+      ].each do |view|
+        assert_file "engines/auth/app/views/auth/#{view}.html.erb"
+      end
     end
   end
 
@@ -151,6 +197,18 @@ RSpec.describe Seams::Generators::AuthGenerator do
       content = File.read(file)
       expect(content).to include("create_table :auth_sessions")
       expect(content).to include("to_table: :auth_users")
+    end
+
+    it "creates the password-reset migration with token + sent_at columns" do
+      pattern = File.join(destination_root,
+                          "engines/auth/db/migrate",
+                          "*_add_password_reset_to_auth_users.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+
+      content = File.read(file)
+      expect(content).to include("add_column :auth_users, :password_reset_token")
+      expect(content).to include("password_reset_token_sent_at")
     end
   end
 

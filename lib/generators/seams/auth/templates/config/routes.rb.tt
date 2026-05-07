@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 Auth::Engine.routes.draw do
-  resource  :session,       only: %i[new create destroy], controller: :sessions
-  resource  :registration,  only: %i[new create],         controller: :registrations
+  resource :session,        only: %i[new create destroy], controller: :sessions
+  resource :registration,   only: %i[new create],         controller: :registrations
+  resource :password_reset, only: %i[new create edit update]
 end
