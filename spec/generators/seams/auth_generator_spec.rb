@@ -59,7 +59,7 @@ RSpec.describe Seams::Generators::AuthGenerator do
       assert_file "engines/auth/app/models/auth/session.rb" do |content|
         expect(content).to include("class Session < ApplicationRecord")
         expect(content).to include("SecureRandom.hex(32)")
-        expect(content).to include("SESSION_TTL")
+        expect(content).to include("Auth.configuration.session_ttl")
       end
     end
 
@@ -85,18 +85,49 @@ RSpec.describe Seams::Generators::AuthGenerator do
     end
   end
 
-  describe "exposed concern" do
+  describe "exposed concerns" do
     it "creates Auth::Authenticatable" do
       assert_file "engines/auth/lib/auth/concerns/authenticatable.rb" do |content|
         expect(content).to include("module Authenticatable")
-        expect(content).to include("extend ActiveSupport::Concern")
+        expect(content).to include('require "active_support/concern"')
       end
     end
 
-    it "registers Auth::Authenticatable in the engine's ExposedConcerns rubocop list" do
+    it "creates Auth::Authentication with current_user / authenticate_user! helpers" do
+      assert_file "engines/auth/lib/auth/concerns/authentication.rb" do |content|
+        expect(content).to include("def current_user")
+        expect(content).to include("def authenticate_user!")
+        expect(content).to include('require "active_support/concern"')
+      end
+    end
+
+    it "registers both concerns in the engine's ExposedConcerns rubocop list" do
       assert_file "engines/auth/.rubocop.yml" do |content|
         expect(content).to include("Auth::Authenticatable")
+        expect(content).to include("Auth::Authentication")
       end
+    end
+  end
+
+  describe "configuration" do
+    it "creates Auth::Configuration with session_ttl + cookie_name knobs" do
+      assert_file "engines/auth/lib/auth/configuration.rb" do |content|
+        expect(content).to include("attr_accessor :session_ttl, :cookie_name")
+      end
+    end
+
+    it "rewrites lib/auth.rb to expose Auth.configure" do
+      assert_file "engines/auth/lib/auth.rb" do |content|
+        expect(content).to include("def configure")
+        expect(content).to include("def configuration")
+      end
+    end
+  end
+
+  describe "views" do
+    it "creates ERB templates for sessions and registrations new" do
+      assert_file "engines/auth/app/views/auth/sessions/new.html.erb"
+      assert_file "engines/auth/app/views/auth/registrations/new.html.erb"
     end
   end
 

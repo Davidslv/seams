@@ -11,9 +11,11 @@ module Auth
 
       if @user.save
         session = @user.sessions.create!
-        cookies.encrypted[:auth_session] = { value: session.token, httponly: true, expires: session.expires_at }
+        cookies.encrypted[Auth.configuration.cookie_name] = {
+          value: session.token, httponly: true, expires: session.expires_at
+        }
         Seams::Events::Publisher.publish("user.signed_up.auth", user_id: @user.id, email: @user.email)
-        redirect_to main_app.root_path, notice: "Welcome"
+        redirect_to Auth.configuration.after_sign_in_url, notice: "Welcome"
       else
         render :new, status: :unprocessable_entity
       end

@@ -32,7 +32,9 @@ module Seams
       end
 
       def overwrite_engine_entry_point
-        template "lib/engine.rb.tt", engine_path("lib/auth/engine.rb"), force: true
+        template "lib/engine.rb.tt",         engine_path("lib/auth/engine.rb"),        force: true
+        template "lib/auth.rb.tt",           engine_path("lib/auth.rb"),               force: true
+        template "lib/configuration.rb.tt",  engine_path("lib/auth/configuration.rb")
       end
 
       def overwrite_routes
@@ -55,9 +57,18 @@ module Seams
                  engine_path("app/controllers/auth/registrations_controller.rb")
       end
 
-      def create_concern
+      def create_views
+        template "app/views/sessions/new.html.erb.tt",
+                 engine_path("app/views/auth/sessions/new.html.erb")
+        template "app/views/registrations/new.html.erb.tt",
+                 engine_path("app/views/auth/registrations/new.html.erb")
+      end
+
+      def create_concerns
         template "lib/concerns/authenticatable.rb.tt",
                  engine_path("lib/auth/concerns/authenticatable.rb")
+        template "lib/concerns/authentication.rb.tt",
+                 engine_path("lib/auth/concerns/authentication.rb")
       end
 
       def create_migrations
@@ -83,7 +94,7 @@ module Seams
         return unless File.exist?(rubocop_path)
 
         contents = File.read(rubocop_path)
-        replacement = "  ExposedConcerns:\n    - Auth::Authenticatable"
+        replacement = "  ExposedConcerns:\n    - Auth::Authenticatable\n    - Auth::Authentication"
         contents.sub!(/^  ExposedConcerns: \[\]$/, replacement)
         File.write(rubocop_path, contents)
       end
@@ -91,8 +102,12 @@ module Seams
       def report_summary
         say ""
         say "  Auth engine generated at engines/auth/", :green
-        say "  Run its specs with: bin/rails seams:test[auth]"
-        say "  Mount in config/routes.rb: mount Auth::Engine, at: '/auth'"
+        say ""
+        say "  Next steps:", :yellow
+        say "    1. Add `mount Auth::Engine, at: \"/auth\"` to config/routes.rb"
+        say "    2. `include Auth::Authentication` in your ApplicationController"
+        say "    3. `bin/rails db:migrate` to create the auth tables"
+        say "    4. Run the engine specs: bin/rails seams:test[auth]"
         say ""
       end
 
@@ -103,9 +118,13 @@ module Seams
       end
 
       def timestamp(offset)
-        # Deterministic-ish migration timestamp: now + offset seconds.
-        # Two migrations generated together get distinct timestamps.
-        (Time.now + offset).utc.strftime("%Y%m%d%H%M%S")
+        # Microsecond-resolution timestamp so migrations generated
+        # back-to-back (and across sibling generators in the same
+        # second) don't collide. The 14-digit format is what Rails
+        # uses for its own generators.
+        base = Time.now.utc
+        seconds = base.strftime("%Y%m%d%H%M%S").to_i
+        (seconds + offset).to_s
       end
     end
   end

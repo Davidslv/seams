@@ -42,6 +42,8 @@ module Seams
       end
 
       def create_jobs
+        template "app/jobs/application_job.rb.tt",
+                 engine_path("app/jobs/notifications/application_job.rb")
         template "app/jobs/deliver_email_job.rb.tt",
                  engine_path("app/jobs/notifications/deliver_email_job.rb")
         template "app/jobs/deliver_sms_job.rb.tt",
@@ -54,6 +56,10 @@ module Seams
       end
 
       def create_mailer
+        template "app/mailers/application_mailer.rb.tt",
+                 engine_path("app/mailers/notifications/application_mailer.rb")
+        template "app/mailers/transactional_mailer.rb.tt",
+                 engine_path("app/mailers/notifications/transactional_mailer.rb")
         template "app/mailers/welcome_mailer.rb.tt",
                  engine_path("app/mailers/notifications/welcome_mailer.rb")
         template "app/views/welcome_mailer/welcome.html.erb.tt",
@@ -89,8 +95,13 @@ module Seams
       def report_summary
         say ""
         say "  Notifications engine generated at engines/notifications/", :green
+        say ""
+        say "  Next steps:", :yellow
+        say "    1. `bin/rails db:migrate` to create the deliveries table"
+        say "    2. Configure adapters in config/initializers/notifications.rb"
+        say "    3. Run the engine specs: bin/rails seams:test[notifications]"
+        say ""
         say "  Subscribed to: user.signed_up.auth (sends welcome email)"
-        say "  Configure adapters in config/initializers/notifications.rb"
         say ""
       end
 
@@ -100,8 +111,12 @@ module Seams
         File.join(destination_root, "engines", ENGINE_NAME, relative)
       end
 
+      # Add 100 to the unix-style packed timestamp so this engine's
+      # migrations don't collide with another engine generated in the
+      # same second (e.g. by the same script).
       def timestamp
-        Time.now.utc.strftime("%Y%m%d%H%M%S")
+        base = Time.now.utc.strftime("%Y%m%d%H%M%S").to_i
+        (base + 100).to_s
       end
     end
   end

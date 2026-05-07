@@ -4,15 +4,16 @@ require "notifications/adapters/abstract"
 
 module Notifications
   module Adapters
-    # Default email adapter — wraps ActionMailer with a simple
-    # subject/body interface. Suitable for development and small
-    # production volumes; swap to Mailgun / SendGrid for higher scale.
+    # Default email adapter — dispatches via Notifications::TransactionalMailer
+    # which is a real ActionMailer subclass. Suitable for development and
+    # small production volumes; swap to Mailgun / SendGrid for higher scale
+    # by configuring config.email_adapter to a different class.
     class ActionMailer < Abstract
       def deliver(to:, subject:, body:, from: Notifications.configuration.default_from, **)
-        mail = ::Mail.new(to: to, from: from, subject: subject, body: body)
-        ::ActionMailer::Base.wrap_delivery_behavior(mail)
-        mail.deliver
-        { ok: true, provider: "action_mailer", message_id: mail.message_id }
+        message = Notifications::TransactionalMailer.message(to: to, subject: subject, body: body)
+        message.from = from if from
+        message.deliver_now
+        { ok: true, provider: "action_mailer", message_id: message.message_id }
       end
     end
   end

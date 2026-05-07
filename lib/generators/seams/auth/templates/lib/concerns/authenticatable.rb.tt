@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_support/concern"
+
 module Auth
   # Concern that the host application's user-facing model can include
   # to gain Auth-engine sign-in tracking, password helpers, and

@@ -4,14 +4,28 @@ module Notifications
   # Consumes Auth events and enqueues outbound notification jobs.
   # Subscribers always enqueue jobs — they never run side effects
   # synchronously inside the publisher's transaction.
+  #
+  # `.attach!` is idempotent — if Rails reloads in development the
+  # subscription is registered exactly once.
   class AuthSubscriber
-    def self.attach!
-      Seams::Events::Publisher.subscribe("user.signed_up.auth") do |payload|
-        DeliverEmailJob.perform_later(
-          to: payload[:email],
-          subject: "Welcome",
-          body: "Thanks for signing up. Reply to this email if you need anything."
-        )
+    @attached = false
+
+    class << self
+      attr_accessor :attached
+      alias_method :attached?, :attached
+
+      def attach!
+        return if attached?
+
+        Seams::Events::Publisher.subscribe("user.signed_up.auth") do |payload|
+          DeliverEmailJob.perform_later(
+            to: payload[:email],
+            subject: "Welcome",
+            body: "Thanks for signing up. Reply to this email if you need anything."
+          )
+        end
+
+        self.attached = true
       end
     end
   end

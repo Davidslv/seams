@@ -49,7 +49,7 @@ RSpec.describe "Phase 2 integration", type: :integration do
 
     # Each engine's exposed concern survived the auto-population of OtherEngines
     expect(auth_yml.dig("Seams/NoCrossEngineModelAccess", "ExposedConcerns"))
-      .to eq(["Auth::Authenticatable"])
+      .to eq(["Auth::Authenticatable", "Auth::Authentication"])
     expect(notifications_yml.dig("Seams/NoCrossEngineModelAccess", "ExposedConcerns"))
       .to eq(["Notifications::Notifiable"])
   end
@@ -90,5 +90,30 @@ RSpec.describe "Phase 2 integration", type: :integration do
     Seams::EventRegistry.register("notification.failed.notifications",       emitted_by: "Notifications")
 
     expect(Seams::EventRegistry.all.size).to eq(7)
+  end
+
+  it "every generated Ruby file parses without syntax errors" do
+    run(Seams::Generators::InstallGenerator)
+    run(Seams::Generators::AuthGenerator)
+    run(Seams::Generators::NotificationsGenerator)
+
+    failures = []
+    Dir[File.join(host_root, "engines/**/*.rb")].each do |path|
+      result = `ruby -c #{path.shellescape} 2>&1`
+      failures << "#{path}: #{result.strip}" unless $CHILD_STATUS.success?
+    end
+
+    expect(failures).to be_empty, "expected all generated files to parse, got:\n#{failures.join("\n")}"
+  end
+
+  it "auth + notifications migrations get distinct timestamps" do
+    run(Seams::Generators::InstallGenerator)
+    run(Seams::Generators::AuthGenerator)
+    run(Seams::Generators::NotificationsGenerator)
+
+    timestamps = Dir[File.join(host_root, "engines/*/db/migrate/*.rb")]
+                 .map { |p| File.basename(p).split("_").first }
+
+    expect(timestamps).to eq(timestamps.uniq), "migration timestamps collided: #{timestamps}"
   end
 end

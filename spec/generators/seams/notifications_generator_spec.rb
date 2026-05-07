@@ -85,6 +85,7 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       assert_file "engines/notifications/lib/notifications/concerns/notifiable.rb" do |content|
         expect(content).to include("def notify_email")
         expect(content).to include("def notify_sms")
+        expect(content).to include('require "active_support/concern"')
       end
     end
 
@@ -96,6 +97,12 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
   end
 
   describe "jobs" do
+    it "creates Notifications::ApplicationJob extending the host's ApplicationJob" do
+      assert_file "engines/notifications/app/jobs/notifications/application_job.rb" do |content|
+        expect(content).to include("class ApplicationJob < ::ApplicationJob")
+      end
+    end
+
     it "creates DeliverEmailJob with queue + event publishing" do
       assert_file "engines/notifications/app/jobs/notifications/deliver_email_job.rb" do |content|
         expect(content).to include("queue_as :notifications")
@@ -119,9 +126,28 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
         expect(content).to include("DeliverEmailJob.perform_later")
       end
     end
+
+    it "guards .attach! so a Rails reload doesn't double-subscribe" do
+      assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
+        expect(content).to include("return if attached?")
+      end
+    end
   end
 
   describe "mailer" do
+    it "creates Notifications::ApplicationMailer extending the host's ApplicationMailer" do
+      assert_file "engines/notifications/app/mailers/notifications/application_mailer.rb" do |content|
+        expect(content).to include("class ApplicationMailer < ::ApplicationMailer")
+      end
+    end
+
+    it "creates a TransactionalMailer used by the ActionMailer adapter" do
+      assert_file "engines/notifications/app/mailers/notifications/transactional_mailer.rb" do |content|
+        expect(content).to include("class TransactionalMailer < ApplicationMailer")
+        expect(content).to include("def message")
+      end
+    end
+
     it "creates WelcomeMailer + html template" do
       assert_file "engines/notifications/app/mailers/notifications/welcome_mailer.rb" do |content|
         expect(content).to include("class WelcomeMailer < ApplicationMailer")

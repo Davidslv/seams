@@ -15,11 +15,11 @@ module Notifications
     end
 
     def email_adapter
-      Object.const_get(configuration.email_adapter).new
+      configuration.email_adapter.constantize.new
     end
 
     def sms_adapter
-      Object.const_get(configuration.sms_adapter).new
+      configuration.sms_adapter.constantize.new
     end
   end
 end

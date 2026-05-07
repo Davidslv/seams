@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+module Auth
+  # Engine-scoped configuration. Override in
+  # config/initializers/auth.rb of the host application:
+  #
+  #   Auth.configure do |c|
+  #     c.session_ttl       = 14.days
+  #     c.cookie_name       = :_my_app_session
+  #     c.after_sign_in_url = "/dashboard"
+  #   end
+  class Configuration
+    attr_accessor :session_ttl, :cookie_name, :after_sign_in_url, :after_sign_out_url,
+                  :password_min_length
+
+    def initialize
+      @session_ttl         = 30 * 24 * 60 * 60   # 30 days, in seconds
+      @cookie_name         = :auth_session
+      @after_sign_in_url   = "/"
+      @after_sign_out_url  = "/"
+      @password_min_length = 8
+    end
+  end
+end

@@ -1,0 +1,8 @@
+# frozen_string_literal: true
+
+module Notifications
+  class ApplicationMailer < ::ApplicationMailer
+    default from: -> { Notifications.configuration.default_from }
+    layout "mailer"
+  end
+end

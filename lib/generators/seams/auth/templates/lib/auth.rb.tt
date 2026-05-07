@@ -1,0 +1,17 @@
+# frozen_string_literal: true
+
+require "auth/version"
+require "auth/configuration"
+require "auth/engine"
+
+module Auth
+  class << self
+    def configuration
+      @configuration ||= Configuration.new
+    end
+
+    def configure
+      yield configuration
+    end
+  end
+end

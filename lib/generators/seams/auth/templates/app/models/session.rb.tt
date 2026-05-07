@@ -6,8 +6,6 @@ module Auth
 
     belongs_to :user, class_name: "Auth::User"
 
-    SESSION_TTL = 30.days
-
     before_create :assign_token
     before_create :assign_expiry
 
@@ -24,7 +22,7 @@ module Auth
     end
 
     def assign_expiry
-      self.expires_at ||= Time.current + SESSION_TTL
+      self.expires_at ||= Time.current + Auth.configuration.session_ttl
     end
   end
 end

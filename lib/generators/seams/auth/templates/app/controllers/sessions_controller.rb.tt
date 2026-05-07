@@ -3,7 +3,7 @@
 module Auth
   class SessionsController < ApplicationController
     def new
-      # render the sign-in form
+      # render the sign-in form (app/views/auth/sessions/new.html.erb)
     end
 
     def create
@@ -11,9 +11,11 @@ module Auth
 
       if user
         session = user.sessions.create!
-        cookies.encrypted[:auth_session] = { value: session.token, httponly: true, expires: session.expires_at }
+        cookies.encrypted[Auth.configuration.cookie_name] = {
+          value: session.token, httponly: true, expires: session.expires_at
+        }
         Seams::Events::Publisher.publish("user.signed_in.auth", user_id: user.id, session_id: session.id)
-        redirect_to main_app.root_path, notice: "Signed in"
+        redirect_to Auth.configuration.after_sign_in_url, notice: "Signed in"
       else
         flash.now[:alert] = "Invalid email or password"
         render :new, status: :unprocessable_entity
@@ -21,7 +23,7 @@ module Auth
     end
 
     def destroy
-      token = cookies.encrypted[:auth_session]
+      token = cookies.encrypted[Auth.configuration.cookie_name]
       if token
         session = Auth::Session.find_by(token: token)
         if session
@@ -30,8 +32,8 @@ module Auth
           session.destroy
         end
       end
-      cookies.delete(:auth_session)
-      redirect_to main_app.root_path, notice: "Signed out"
+      cookies.delete(Auth.configuration.cookie_name)
+      redirect_to Auth.configuration.after_sign_out_url, notice: "Signed out"
     end
   end
 end

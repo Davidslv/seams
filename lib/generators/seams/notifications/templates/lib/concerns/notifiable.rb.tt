@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_support/concern"
+
 module Notifications
   # Mix into the host application's user-facing model to gain a
   # consistent way to fire transactional messages without coupling to

@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+module Notifications
+  # Generic transactional mailer used by the ActionMailer adapter when
+  # the host hasn't supplied its own mailer. Hosts can subclass this
+  # to add layouts / per-template helpers.
+  class TransactionalMailer < ApplicationMailer
+    def message(to:, subject:, body:)
+      mail(to: to, subject: subject, body: body, content_type: "text/plain")
+    end
+  end
+end
