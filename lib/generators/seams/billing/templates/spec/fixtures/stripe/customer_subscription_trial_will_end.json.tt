@@ -1,0 +1,17 @@
+{
+  "id": "evt_test_trial_will_end",
+  "object": "event",
+  "type": "customer.subscription.trial_will_end",
+  "livemode": false,
+  "created": 1730300000,
+  "data": {
+    "object": {
+      "id": "sub_test_123",
+      "object": "subscription",
+      "customer": "cus_test_123",
+      "status": "trialing",
+      "trial_end": 1730560000,
+      "items": { "data": [{ "price": { "lookup_key": "pro" } }] }
+    }
+  }
+}

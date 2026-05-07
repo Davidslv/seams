@@ -1,0 +1,28 @@
+{
+  "id": "evt_test_subscription_updated",
+  "object": "event",
+  "type": "customer.subscription.updated",
+  "livemode": false,
+  "created": 1730100000,
+  "data": {
+    "object": {
+      "id": "sub_test_123",
+      "object": "subscription",
+      "customer": "cus_test_123",
+      "status": "active",
+      "current_period_end": 1735270400,
+      "items": {
+        "data": [
+          {
+            "id": "si_test_123",
+            "price": { "id": "price_test_pro_annual", "lookup_key": "pro_annual" },
+            "current_period_end": 1735270400
+          }
+        ]
+      }
+    },
+    "previous_attributes": {
+      "items": { "data": [{ "price": { "lookup_key": "pro" } }] }
+    }
+  }
+}

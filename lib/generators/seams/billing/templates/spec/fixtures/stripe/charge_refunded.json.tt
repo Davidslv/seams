@@ -1,0 +1,19 @@
+{
+  "id": "evt_test_charge_refunded",
+  "object": "event",
+  "type": "charge.refunded",
+  "livemode": false,
+  "created": 1731100000,
+  "data": {
+    "object": {
+      "id": "ch_test_123",
+      "object": "charge",
+      "customer": "cus_test_123",
+      "payment_intent": "pi_test_123",
+      "amount": 1299,
+      "amount_refunded": 1299,
+      "currency": "gbp",
+      "refunded": true
+    }
+  }
+}

@@ -68,6 +68,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       f.puts "group :test do"
       f.puts %(  gem "rspec-rails",       "~> 7.1")
       f.puts %(  gem "factory_bot_rails", "~> 6.4")
+      f.puts %(  gem "webmock",           "~> 3.23")
       f.puts "end"
     end
   end

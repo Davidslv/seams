@@ -1,0 +1,21 @@
+{
+  "id": "evt_test_payment_intent_payment_failed",
+  "object": "event",
+  "type": "payment_intent.payment_failed",
+  "livemode": false,
+  "created": 1731000000,
+  "data": {
+    "object": {
+      "id": "pi_test_123",
+      "object": "payment_intent",
+      "customer": "cus_test_123",
+      "amount": 1299,
+      "currency": "gbp",
+      "status": "requires_payment_method",
+      "last_payment_error": {
+        "code": "card_declined",
+        "message": "Your card was declined."
+      }
+    }
+  }
+}

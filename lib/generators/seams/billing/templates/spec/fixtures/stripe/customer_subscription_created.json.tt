@@ -1,0 +1,25 @@
+{
+  "id": "evt_test_subscription_created",
+  "object": "event",
+  "type": "customer.subscription.created",
+  "livemode": false,
+  "created": 1730000000,
+  "data": {
+    "object": {
+      "id": "sub_test_123",
+      "object": "subscription",
+      "customer": "cus_test_123",
+      "status": "active",
+      "current_period_end": 1732678400,
+      "items": {
+        "data": [
+          {
+            "id": "si_test_123",
+            "price": { "id": "price_test_pro", "lookup_key": "pro" },
+            "current_period_end": 1732678400
+          }
+        ]
+      }
+    }
+  }
+}

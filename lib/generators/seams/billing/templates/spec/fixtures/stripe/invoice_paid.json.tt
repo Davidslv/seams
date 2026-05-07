@@ -1,0 +1,19 @@
+{
+  "id": "evt_test_invoice_paid",
+  "object": "event",
+  "type": "invoice.paid",
+  "livemode": false,
+  "created": 1730500000,
+  "data": {
+    "object": {
+      "id": "in_test_123",
+      "object": "invoice",
+      "customer": "cus_test_123",
+      "subscription": "sub_test_123",
+      "status": "paid",
+      "amount_paid": 1299,
+      "currency": "gbp",
+      "paid_at": 1730500000
+    }
+  }
+}

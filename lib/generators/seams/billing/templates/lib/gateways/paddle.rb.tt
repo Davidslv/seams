@@ -1,0 +1,22 @@
+# frozen_string_literal: true
+
+module Billing
+  module Gateways
+    # Paddle gateway stub — generated when the host runs
+    # `bin/rails generate seams:billing --gateway=paddle`. Each method
+    # raises NotImplementedError so the host knows exactly where to
+    # plug in Paddle's REST API. Verify against
+    # https://developer.paddle.com/api-reference and ship via Faraday
+    # (no Net::HTTP — see feedback_external_apis.md).
+    class Paddle < Abstract
+      # Override every Abstract method here. As a starting point:
+      #
+      #   def create_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **)
+      #     # POST /transactions to https://api.paddle.com via Faraday.
+      #     # Return: { id:, url: }
+      #   end
+      #
+      # See lib/billing/stripe/client.rb for the Faraday wrapper pattern.
+    end
+  end
+end

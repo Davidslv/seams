@@ -13,9 +13,9 @@ module Billing
     attr_accessor :gateway, :api_key, :webhook_secret, :default_currency
 
     def initialize
-      @gateway          = "Billing::Gateways::Stripe"
-      @api_key          = ENV.fetch("STRIPE_SECRET_KEY",     nil)
-      @webhook_secret   = ENV.fetch("STRIPE_WEBHOOK_SECRET", nil)
+      @gateway          = "<%= gateway_class_name %>"
+      @api_key          = ENV.fetch("<%= gateway_env_prefix %>_SECRET_KEY",     nil)
+      @webhook_secret   = ENV.fetch("<%= gateway_env_prefix %>_WEBHOOK_SECRET", nil)
       @default_currency = "usd"
     end
 

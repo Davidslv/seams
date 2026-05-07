@@ -1,0 +1,18 @@
+{
+  "id": "evt_test_invoice_voided",
+  "object": "event",
+  "type": "invoice.voided",
+  "livemode": false,
+  "created": 1730800000,
+  "data": {
+    "object": {
+      "id": "in_test_123",
+      "object": "invoice",
+      "customer": "cus_test_123",
+      "subscription": "sub_test_123",
+      "status": "void",
+      "amount_due": 1299,
+      "currency": "gbp"
+    }
+  }
+}

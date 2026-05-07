@@ -419,4 +419,135 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
   end
+
+  describe "Phase 3 (1/4) — service foundation" do
+    it "ships Billing::ServiceResult with ok/failure constructors" do
+      assert_file "engines/billing/app/services/billing/service_result.rb" do |content|
+        [
+          "ServiceResult = Struct.new",
+          "def self.ok",
+          "def self.failure",
+          "def ok?",
+          "def failure?"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Billing::StripeService base class with uniform error mapping" do
+      assert_file "engines/billing/app/services/billing/stripe_service.rb" do |content|
+        [
+          "class StripeService",
+          "def call_stripe",
+          "rescue Billing::GatewayError",
+          "classify_gateway_error",
+          ":gateway_unreachable",
+          ":gateway_auth",
+          ":gateway_error"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships Billing::CurrencyHelper with zero-decimal awareness" do
+      assert_file "engines/billing/app/helpers/billing/currency_helper.rb" do |content|
+        [
+          "module CurrencyHelper",
+          "ZERO_DECIMAL",
+          "JPY",
+          "format_money"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
+
+  describe "Phase 3 (1/4) — spec scaffolding" do
+    it "ships FactoryBot factories for plan + subscription + invoice + lifetime_pass + webhook_event" do
+      assert_file "engines/billing/spec/factories/billing.rb" do |content|
+        %w[
+          billing_plan
+          billing_lifetime_plan
+          billing_subscription
+          billing_invoice
+          billing_lifetime_pass
+          billing_webhook_event
+        ].each { |name| expect(content).to include("factory :#{name}") }
+      end
+    end
+
+    it "ships StripeHelpers webmock module" do
+      assert_file "engines/billing/spec/support/stripe_helpers.rb" do |content|
+        [
+          "module StripeHelpers",
+          "STRIPE_BASE",
+          "WebMock.stub_request",
+          "stub_stripe_fixture",
+          "stripe_event_fixture"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships 13 Stripe event fixtures covering the full webhook surface" do
+      %w[
+        customer_subscription_created customer_subscription_updated
+        customer_subscription_deleted customer_subscription_trial_will_end
+        invoice_created invoice_paid invoice_payment_failed
+        invoice_finalized invoice_voided
+        payment_intent_succeeded payment_intent_payment_failed
+        charge_refunded checkout_session_completed
+      ].each do |name|
+        assert_file "engines/billing/spec/fixtures/stripe/#{name}.json"
+      end
+    end
+  end
+
+  describe "Phase 3 (1/4) — --gateway flag" do
+    let(:gateway_destination) { File.expand_path("../../../tmp/billing_gateway_flag", __dir__) }
+
+    def run_billing_with(gateway)
+      FileUtils.rm_rf(gateway_destination)
+      FileUtils.mkdir_p(gateway_destination)
+      FileUtils.mkdir_p(File.join(gateway_destination, "engines"))
+      described_class.start(["--gateway=#{gateway}"], destination_root: gateway_destination)
+    end
+
+    it "default ships Stripe; the configuration's @gateway points at the Stripe class" do
+      content = File.read(File.join(destination_root,
+                                    "engines/billing/lib/billing/configuration.rb"))
+      expect(content).to include('@gateway          = "Billing::Gateways::Stripe"')
+      expect(content).to include("STRIPE_SECRET_KEY")
+
+      expect(File.exist?(File.join(destination_root,
+                                   "engines/billing/lib/billing/gateways/paddle.rb"))).to be(false)
+      expect(File.exist?(File.join(destination_root,
+                                   "engines/billing/lib/billing/gateways/adyen.rb"))).to be(false)
+    end
+
+    it "--gateway=paddle ships the Paddle stub + points configuration at it" do
+      run_billing_with("paddle")
+
+      paddle_path = File.join(gateway_destination,
+                              "engines/billing/lib/billing/gateways/paddle.rb")
+      expect(File.exist?(paddle_path)).to be(true)
+
+      config = File.read(File.join(gateway_destination,
+                                   "engines/billing/lib/billing/configuration.rb"))
+      expect(config).to include('@gateway          = "Billing::Gateways::Paddle"')
+      expect(config).to include("PADDLE_SECRET_KEY")
+    end
+
+    it "--gateway=garbage falls back to Stripe (no surprising half-installed engine)" do
+      run_billing_with("garbage")
+
+      config = File.read(File.join(gateway_destination,
+                                   "engines/billing/lib/billing/configuration.rb"))
+      expect(config).to include('@gateway          = "Billing::Gateways::Stripe"')
+    end
+
+    it "wire_into_host adds factory_bot_rails + webmock to the test group" do
+      gen_path = File.expand_path("../../../lib/generators/seams/billing/billing_generator.rb",
+                                  __dir__)
+      content  = File.read(gen_path)
+      expect(content).to include('host_inject_gem("factory_bot_rails"')
+      expect(content).to include('host_inject_gem("webmock"')
+    end
+  end
 end

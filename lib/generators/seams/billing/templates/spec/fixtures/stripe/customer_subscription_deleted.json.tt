@@ -1,0 +1,17 @@
+{
+  "id": "evt_test_subscription_deleted",
+  "object": "event",
+  "type": "customer.subscription.deleted",
+  "livemode": false,
+  "created": 1730200000,
+  "data": {
+    "object": {
+      "id": "sub_test_123",
+      "object": "subscription",
+      "customer": "cus_test_123",
+      "status": "canceled",
+      "canceled_at": 1730200000,
+      "items": { "data": [] }
+    }
+  }
+}

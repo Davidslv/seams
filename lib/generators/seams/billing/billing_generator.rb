@@ -22,7 +22,12 @@ module Seams
 
       source_root File.expand_path("templates", __dir__)
 
-      ENGINE_NAME = "billing"
+      ENGINE_NAME      = "billing"
+      DEFAULT_GATEWAY  = "stripe"
+      KNOWN_GATEWAYS   = %w[stripe paddle adyen].freeze
+
+      class_option :gateway, type: :string, default: DEFAULT_GATEWAY,
+                             desc: "Billing gateway: stripe (default), paddle, or adyen (stub)"
 
       def create_base_engine
         EngineGenerator.start([ENGINE_NAME], destination_root: destination_root)
@@ -56,14 +61,21 @@ module Seams
       def create_gateways
         template "lib/gateways/abstract.rb.tt",
                  engine_path("lib/billing/gateways/abstract.rb")
+
+        # Stripe ships unconditionally (it's the default + reference
+        # implementation that sibling specs reference). Paddle / Adyen
+        # are stubs — copied only when --gateway=paddle/adyen.
         template "lib/gateways/stripe.rb.tt",
                  engine_path("lib/billing/gateways/stripe.rb")
-        # Stripe REST + webhook signature owned in-tree (Faraday-based,
-        # no Net::HTTP). See feedback_external_apis.md for the rule.
         template "lib/stripe/client.rb.tt",
                  engine_path("lib/billing/stripe/client.rb")
         template "lib/stripe/webhook_signature.rb.tt",
                  engine_path("lib/billing/stripe/webhook_signature.rb")
+
+        return if gateway == "stripe"
+
+        template "lib/gateways/#{gateway}.rb.tt",
+                 engine_path("lib/billing/gateways/#{gateway}.rb")
       end
 
       def create_concern
@@ -81,6 +93,12 @@ module Seams
       end
 
       def create_services
+        # Phase 3 (1/4) — uniform service object foundation.
+        template "app/services/service_result.rb.tt",
+                 engine_path("app/services/billing/service_result.rb")
+        template "app/services/stripe_service.rb.tt",
+                 engine_path("app/services/billing/stripe_service.rb")
+
         template "app/services/checkout_session_service.rb.tt",
                  engine_path("app/services/billing/checkout/create_session_service.rb")
         template "app/services/portal_session_service.rb.tt",
@@ -141,6 +159,40 @@ module Seams
                  engine_path("spec/models/billing/subscription_spec.rb")
         template "spec/gateways/stripe_spec.rb.tt",
                  engine_path("spec/gateways/billing/stripe_spec.rb")
+        # Phase 3 (1/4) — factories + Stripe webmock helpers + event fixtures.
+        template "spec/factories/billing.rb.tt",
+                 engine_path("spec/factories/billing.rb")
+        template "spec/support/stripe_helpers.rb.tt",
+                 engine_path("spec/support/stripe_helpers.rb")
+        create_stripe_event_fixtures
+      end
+
+      def create_stripe_event_fixtures
+        %w[
+          customer_subscription_created
+          customer_subscription_updated
+          customer_subscription_deleted
+          customer_subscription_trial_will_end
+          invoice_created
+          invoice_paid
+          invoice_payment_failed
+          invoice_finalized
+          invoice_voided
+          payment_intent_succeeded
+          payment_intent_payment_failed
+          charge_refunded
+          checkout_session_completed
+        ].each do |name|
+          template "spec/fixtures/stripe/#{name}.json.tt",
+                   engine_path("spec/fixtures/stripe/#{name}.json")
+        end
+      end
+
+      def create_helpers
+        # Phase 3 (1/4) — currency formatter for the pricing page +
+        # invoice views.
+        template "app/helpers/currency_helper.rb.tt",
+                 engine_path("app/helpers/billing/currency_helper.rb")
       end
 
       def overwrite_readme
@@ -175,6 +227,8 @@ module Seams
         # gem uses Net::HTTP and is forbidden by the Faraday-only rule
         # (memory feedback_external_apis.md).
         host_inject_gem("faraday", "~> 2.0")
+        host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
+        host_inject_gem("webmock",           "~> 3.23", group: :test)
         host_inject_mount(engine_class: "Billing::Engine", at: "/billing")
         host_inject_include_in_user("Billing::Billable")
       end
@@ -192,6 +246,24 @@ module Seams
       end
 
       private
+
+      # Resolved gateway choice from --gateway. Garbage / unknown
+      # values fall back to stripe (no surprising half-installed
+      # engine). Memoised so ERB conditionals stay consistent.
+      def gateway
+        @gateway ||= begin
+          requested = options[:gateway].to_s.downcase.strip
+          KNOWN_GATEWAYS.include?(requested) ? requested : DEFAULT_GATEWAY
+        end
+      end
+
+      def gateway_class_name
+        "Billing::Gateways::#{gateway.capitalize}"
+      end
+
+      def gateway_env_prefix
+        gateway.upcase
+      end
 
       def engine_path(relative)
         File.join(destination_root, "engines", ENGINE_NAME, relative)

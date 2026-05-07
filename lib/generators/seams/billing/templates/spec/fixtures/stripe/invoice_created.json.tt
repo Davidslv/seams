@@ -1,0 +1,18 @@
+{
+  "id": "evt_test_invoice_created",
+  "object": "event",
+  "type": "invoice.created",
+  "livemode": false,
+  "created": 1730400000,
+  "data": {
+    "object": {
+      "id": "in_test_123",
+      "object": "invoice",
+      "customer": "cus_test_123",
+      "subscription": "sub_test_123",
+      "status": "draft",
+      "amount_due": 1299,
+      "currency": "gbp"
+    }
+  }
+}

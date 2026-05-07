@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+module Billing
+  module Gateways
+    # Adyen gateway stub — generated when the host runs
+    # `bin/rails generate seams:billing --gateway=adyen`. Each method
+    # raises NotImplementedError. Verify against
+    # https://docs.adyen.com/api-explorer/ and ship via Faraday
+    # (no Net::HTTP — see feedback_external_apis.md).
+    class Adyen < Abstract
+      # Override every Abstract method here. Adyen uses a recurring
+      # payments / shopper reference flow — design your customer_ref
+      # mapping accordingly.
+    end
+  end
+end

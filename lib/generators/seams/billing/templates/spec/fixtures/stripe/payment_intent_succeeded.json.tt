@@ -1,0 +1,17 @@
+{
+  "id": "evt_test_payment_intent_succeeded",
+  "object": "event",
+  "type": "payment_intent.succeeded",
+  "livemode": false,
+  "created": 1730900000,
+  "data": {
+    "object": {
+      "id": "pi_test_123",
+      "object": "payment_intent",
+      "customer": "cus_test_123",
+      "amount": 1299,
+      "currency": "gbp",
+      "status": "succeeded"
+    }
+  }
+}
