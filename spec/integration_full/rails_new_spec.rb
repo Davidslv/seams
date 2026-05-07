@@ -97,5 +97,22 @@ RSpec.describe "rails new integration", type: :integration_full do
 
       shell(["bundle", "exec", "rspec", "engines/#{engine}/spec/runtime"])
     end
+
+    # The host must (a) load every engine as a Railtie and (b) pick up
+    # each engine's migrations through the append_migrations
+    # initializer. Both regressed silently in the past.
+    shell(%w[bin/rails db:migrate])
+
+    expected = %w[
+      auth_users auth_sessions
+      core_audit_logs
+      billing_subscriptions billing_invoices billing_plans
+      teams team_memberships
+      notifications notification_deliveries
+    ]
+    tables = shell_capture(["bin/rails", "runner", "puts ActiveRecord::Base.connection.tables.sort.join(',')"])
+    actual = tables.lines.last.to_s.strip.split(",")
+    missing = expected - actual
+    expect(missing).to be_empty, "host db is missing engine tables: #{missing.join(', ')} (got: #{actual.inspect})"
   end
 end

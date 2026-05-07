@@ -15,5 +15,13 @@ module Teams
       Seams::EventRegistry.register("invitation.sent.teams",      emitted_by: "Teams")
       Seams::EventRegistry.register("invitation.accepted.teams",  emitted_by: "Teams")
     end
+
+    initializer "teams.append_migrations" do |app|
+      unless app.root.to_s.match?(root.to_s)
+        config.paths["db/migrate"].expanded.each do |expanded_path|
+          app.config.paths["db/migrate"] << expanded_path
+        end
+      end
+    end
   end
 end

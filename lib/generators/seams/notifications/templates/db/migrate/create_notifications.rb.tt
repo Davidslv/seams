@@ -14,7 +14,7 @@ class CreateNotifications < ActiveRecord::Migration[7.1]
       t.references :owner,         polymorphic: true, null: false, index: true
       t.string  :recipient                       # destination address (override of owner default)
       t.string  :template,         null: false
-      t.jsonb   :schedule_data                   # IceCube::Schedule#to_hash
+      t.json    :schedule_data                   # IceCube::Schedule#to_hash (use jsonb on Postgres if you need GIN indexes)
       t.datetime :next_delivery_at
       t.datetime :read_at                        # InApp only
       t.timestamps

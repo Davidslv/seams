@@ -14,7 +14,9 @@ class CreateCoreAuditLogs < ActiveRecord::Migration[7.1]
       t.string  :auditable_type
       t.bigint  :auditable_id
       t.bigint  :actor_id
-      t.jsonb   :payload,         null: false, default: {}
+      # `json` works on Postgres, MySQL, and SQLite. Switch to `jsonb`
+      # if you need GIN indexes / containment ops on Postgres.
+      t.json    :payload,         null: false, default: {}
       t.timestamps
     end
 

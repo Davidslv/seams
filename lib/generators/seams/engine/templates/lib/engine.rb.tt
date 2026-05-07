@@ -15,5 +15,13 @@ module <%= module_name %>
       # Example:
       #   Seams::EventRegistry.register("<%= name %>.something_happened.<%= name %>", emitted_by: "<%= module_name %>")
     end
+
+    initializer "<%= name %>.append_migrations" do |app|
+      unless app.root.to_s.match?(root.to_s)
+        config.paths["db/migrate"].expanded.each do |expanded_path|
+          app.config.paths["db/migrate"] << expanded_path
+        end
+      end
+    end
   end
 end
