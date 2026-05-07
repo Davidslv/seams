@@ -2,7 +2,10 @@
 
 module Teams
   class InvitationsController < ApplicationController
-    before_action :set_team, except: %i[accept]
+    include Teams::Authorization
+
+    before_action :set_team,             only: %i[index create destroy]
+    before_action :require_team_admin!,  only: %i[create destroy]
 
     def index
       @invitations = @team.invitations.pending
@@ -25,20 +28,38 @@ module Teams
       redirect_to team_invitations_path(@team), notice: "Invitation revoked"
     end
 
-    def accept
-      invitation = Teams::Invitation.find_by!(token: params[:token])
-      raise Teams::AuthorizationError, "Invitation expired" if invitation.expired?
+    # GET /invitations/accept/:token — show the confirmation page.
+    def accept_form
+      @invitation = Teams::Invitation.find_by!(token: params[:token])
+    end
 
+    # POST /invitations/accept/:token — perform the accept.
+    # Wraps the lookup in a row lock and short-circuits if the
+    # invitation has already been accepted, so a double-click on the
+    # email link returns a friendly redirect instead of a 500.
+    def accept
       Teams::Invitation.transaction do
-        invitation.team.memberships.create!(user_id: current_user_id, role: invitation.role)
-        invitation.update!(accepted_at: Time.current)
+        @invitation = Teams::Invitation.lock.find_by!(token: params[:token])
+
+        if @invitation.accepted?
+          return redirect_to team_path(@invitation.team), notice: "You're already a member"
+        end
+
+        if @invitation.expired?
+          return redirect_to root_path, alert: "Invitation expired"
+        end
+
+        @invitation.team.memberships.create!(user_id: current_user_id, role: @invitation.role)
+        @invitation.update!(accepted_at: Time.current)
       end
 
       Seams::Events::Publisher.publish(
         "invitation.accepted.teams",
-        team_id: invitation.team_id, email: invitation.email, user_id: current_user_id
+        team_id: @invitation.team_id, email: @invitation.email, user_id: current_user_id
       )
-      redirect_to team_path(invitation.team), notice: "Joined #{invitation.team.name}"
+      redirect_to team_path(@invitation.team), notice: "Joined #{@invitation.team.name}"
+    rescue ActiveRecord::RecordNotUnique
+      redirect_to team_path(@invitation.team), notice: "You're already a member"
     end
 
     private
@@ -49,10 +70,6 @@ module Teams
 
     def invitation_params
       params.require(:invitation).permit(:email, :role)
-    end
-
-    def current_user_id
-      respond_to?(:current_user) && current_user&.id
     end
   end
 end

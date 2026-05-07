@@ -2,7 +2,10 @@
 
 module Teams
   class MembershipsController < ApplicationController
+    include Teams::Authorization
+
     before_action :set_team
+    before_action :require_team_admin!, only: %i[create destroy]
 
     def index
       @memberships = @team.memberships

@@ -43,7 +43,7 @@ RSpec.describe "Phase 4 integration", type: :integration do
     expect(teams_yml.dig("Seams/NoCrossEngineModelAccess", "OtherEngines"))
       .to match_array(%w[Auth Billing Notifications])
     expect(teams_yml.dig("Seams/NoCrossEngineModelAccess", "ExposedConcerns"))
-      .to eq(["Teams::Teamable"])
+      .to eq(["Teams::Teamable", "Teams::Authorization"])
   end
 
   it "every generated teams Ruby file parses without syntax errors" do

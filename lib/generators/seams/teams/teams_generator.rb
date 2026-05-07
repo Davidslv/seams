@@ -52,9 +52,11 @@ module Seams
                  engine_path("app/controllers/teams/invitations_controller.rb")
       end
 
-      def create_concern
+      def create_concerns
         template "lib/concerns/teamable.rb.tt",
                  engine_path("lib/teams/concerns/teamable.rb")
+        template "lib/concerns/authorization.rb.tt",
+                 engine_path("lib/teams/concerns/authorization.rb")
       end
 
       def create_jobs
@@ -89,7 +91,7 @@ module Seams
         return unless File.exist?(rubocop_path)
 
         contents = File.read(rubocop_path)
-        replacement = "  ExposedConcerns:\n    - Teams::Teamable"
+        replacement = "  ExposedConcerns:\n    - Teams::Teamable\n    - Teams::Authorization"
         contents.sub!(/^  ExposedConcerns: \[\]$/, replacement)
         File.write(rubocop_path, contents)
       end

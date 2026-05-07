@@ -94,9 +94,29 @@ RSpec.describe Seams::Generators::TeamsGenerator do
         expect(content).to include("def accept")
       end
     end
+
+    it "InvitationsController#accept reads token from params and locks the row" do
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
+        expect(content).to include("Teams::Invitation.lock.find_by!(token: params[:token])")
+        expect(content).to include("@invitation.accepted?")
+        expect(content).to include("ActiveRecord::RecordNotUnique")
+      end
+    end
+
+    it "controllers include Teams::Authorization for require_team_admin!" do
+      assert_file "engines/teams/app/controllers/teams/memberships_controller.rb" do |content|
+        expect(content).to include("include Teams::Authorization")
+        expect(content).to include("require_team_admin!")
+      end
+
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
+        expect(content).to include("include Teams::Authorization")
+        expect(content).to include("require_team_admin!")
+      end
+    end
   end
 
-  describe "concern" do
+  describe "concerns" do
     it "creates Teams::Teamable with member_of?, admin_of?, owner_of?" do
       assert_file "engines/teams/lib/teams/concerns/teamable.rb" do |content|
         expect(content).to include('require "active_support/concern"')
@@ -106,9 +126,17 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       end
     end
 
-    it "registers Teams::Teamable in ExposedConcerns" do
+    it "creates Teams::Authorization with require_team_admin!" do
+      assert_file "engines/teams/lib/teams/concerns/authorization.rb" do |content|
+        expect(content).to include("def require_team_admin!")
+        expect(content).to include("def require_team_member!")
+      end
+    end
+
+    it "registers both concerns in ExposedConcerns" do
       assert_file "engines/teams/.rubocop.yml" do |content|
         expect(content).to include("Teams::Teamable")
+        expect(content).to include("Teams::Authorization")
       end
     end
   end
@@ -132,7 +160,13 @@ RSpec.describe Seams::Generators::TeamsGenerator do
         expect(content).to include("resources :teams")
         expect(content).to include("resources :memberships")
         expect(content).to include("resources :invitations")
-        expect(content).to include("post :accept")
+      end
+    end
+
+    it "exposes a top-level token-keyed accept route (no team_id needed)" do
+      assert_file "engines/teams/config/routes.rb" do |content|
+        expect(content).to include('"/invitations/accept/:token"')
+        expect(content).to include("as: :accept_invitation")
       end
     end
   end
