@@ -1,0 +1,15 @@
+<h1>Plans</h1>
+
+<%% @plans.each do |plan| %>
+  <article class="plan">
+    <h2><%%= plan.name %></h2>
+    <p class="plan-price">
+      <%%= number_to_currency(plan.amount_cents / 100.0, unit: plan.currency.upcase + " ") %> /
+      <%%= plan.interval %>
+    </p>
+    <%% if plan.has_trial? %>
+      <p><%%= plan.trial_period_days %>-day free trial</p>
+    <%% end %>
+    <%%= button_to "Subscribe", billing.checkout_path(plan: plan.gateway_ref), method: :post %>
+  </article>
+<%% end %>

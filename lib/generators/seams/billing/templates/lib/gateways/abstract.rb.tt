@@ -23,6 +23,21 @@ module Billing
         raise NotImplementedError, "#{self.class} must implement #fetch_subscription"
       end
 
+      # Create a hosted checkout session. Returns a normalised hash:
+      #   { id:, url: }
+      # The host redirects the user to `url`, the gateway handles the
+      # payment UI, and webhooks tell us the result.
+      def create_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **)
+        raise NotImplementedError, "#{self.class} must implement #create_checkout_session"
+      end
+
+      # Create a customer-portal session so the user can self-serve
+      # their subscription (cancel, change plan, update payment
+      # method). Returns: { id:, url: }.
+      def create_billing_portal_session(customer_ref:, return_url:, **)
+        raise NotImplementedError, "#{self.class} must implement #create_billing_portal_session"
+      end
+
       # Verify a webhook payload + signature and return a normalised
       # event hash:
       #   { id:, type:, livemode:, object: <provider's raw object>, raw: <payload> }

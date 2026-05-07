@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+module Billing
+  # A subscription plan. Mirror of a Stripe Price (or whatever your
+  # gateway calls a recurring billable thing). Hosts seed Plans
+  # locally so the pricing page can render without a Stripe round-trip.
+  class Plan < ApplicationRecord
+    self.table_name = "billing_plans"
+
+    INTERVALS = %w[day week month year].freeze
+
+    validates :gateway_ref, presence: true, uniqueness: true
+    validates :name, presence: true
+    validates :amount_cents, numericality: { greater_than_or_equal_to: 0 }
+    validates :currency, presence: true
+    validates :interval, inclusion: { in: INTERVALS }
+
+    scope :active, -> { where(active: true) }
+
+    def free?
+      amount_cents.zero?
+    end
+
+    def has_trial?
+      trial_period_days.to_i.positive?
+    end
+  end
+end

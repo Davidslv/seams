@@ -45,6 +45,8 @@ module Seams
                  engine_path("app/models/billing/invoice.rb")
         template "app/models/webhook_event.rb.tt",
                  engine_path("app/models/billing/webhook_event.rb")
+        template "app/models/plan.rb.tt",
+                 engine_path("app/models/billing/plan.rb")
       end
 
       def create_gateways
@@ -68,9 +70,26 @@ module Seams
                  engine_path("app/jobs/billing/cancel_subscription_job.rb")
       end
 
-      def create_webhooks
+      def create_services
+        template "app/services/checkout_session_service.rb.tt",
+                 engine_path("app/services/billing/checkout/create_session_service.rb")
+        template "app/services/portal_session_service.rb.tt",
+                 engine_path("app/services/billing/portal/create_session_service.rb")
+      end
+
+      def create_controllers_and_views
         template "app/controllers/webhooks_controller.rb.tt",
                  engine_path("app/controllers/billing/webhooks_controller.rb")
+        template "app/controllers/checkout_controller.rb.tt",
+                 engine_path("app/controllers/billing/checkout_controller.rb")
+        template "app/controllers/portal_controller.rb.tt",
+                 engine_path("app/controllers/billing/portal_controller.rb")
+        template "app/controllers/plans_controller.rb.tt",
+                 engine_path("app/controllers/billing/plans_controller.rb")
+        template "app/views/checkout/success.html.erb.tt",
+                 engine_path("app/views/billing/checkout/success.html.erb")
+        template "app/views/plans/index.html.erb.tt",
+                 engine_path("app/views/billing/plans/index.html.erb")
       end
 
       def create_migrations
@@ -80,6 +99,8 @@ module Seams
                  engine_path("db/migrate/#{timestamp(1)}_create_billing_invoices.rb")
         template "db/migrate/create_billing_webhook_events.rb.tt",
                  engine_path("db/migrate/#{timestamp(2)}_create_billing_webhook_events.rb")
+        template "db/migrate/create_billing_plans.rb.tt",
+                 engine_path("db/migrate/#{timestamp(3)}_create_billing_plans.rb")
       end
 
       def create_specs

@@ -1,0 +1,5 @@
+<h1>Thanks!</h1>
+
+<p>Your subscription is being activated. You'll receive a confirmation email shortly.</p>
+
+<p><%%= link_to "Back to plans", billing.plans_path %></p>

@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+module Billing
+  class PlansController < ApplicationController
+    def index
+      @plans = Billing::Plan.active.order(:amount_cents)
+    end
+  end
+end

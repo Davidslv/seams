@@ -54,10 +54,14 @@ RSpec.describe Seams::Generators::BillingGenerator do
         ::Stripe::Subscription.create
         ::Stripe::Subscription.cancel
         ::Stripe::Subscription.retrieve
+        ::Stripe::Checkout::Session.create
+        ::Stripe::BillingPortal::Session.create
         ::Stripe::Webhook.construct_event
         docs.stripe.com/api/subscriptions/create
         docs.stripe.com/api/subscriptions/cancel
         docs.stripe.com/api/subscriptions/retrieve
+        docs.stripe.com/api/checkout/sessions/create
+        docs.stripe.com/api/customer_portal/sessions/create
         docs.stripe.com/webhooks/signatures
         Billing::GatewayError
         Billing::WebhookError
@@ -117,6 +121,57 @@ RSpec.describe Seams::Generators::BillingGenerator do
       assert_file "engines/billing/app/models/billing/webhook_event.rb" do |content|
         expect(content).to include("class WebhookEvent")
         expect(content).to include("uniqueness: { scope: :gateway }")
+      end
+    end
+
+    it "creates Billing::Plan with INTERVALS + free?/has_trial?" do
+      assert_file "engines/billing/app/models/billing/plan.rb" do |content|
+        expect(content).to include("INTERVALS")
+        expect(content).to include("def free?")
+        expect(content).to include("def has_trial?")
+      end
+    end
+  end
+
+  describe "checkout + portal" do
+    it "creates Billing::Checkout::CreateSessionService" do
+      assert_file "engines/billing/app/services/billing/checkout/create_session_service.rb" do |content|
+        expect(content).to include("module CreateSessionService")
+        expect(content).to include("Billing.gateway.create_checkout_session")
+      end
+    end
+
+    it "creates Billing::Portal::CreateSessionService" do
+      assert_file "engines/billing/app/services/billing/portal/create_session_service.rb" do |content|
+        expect(content).to include("module CreateSessionService")
+        expect(content).to include("Billing.gateway.create_billing_portal_session")
+      end
+    end
+
+    it "creates CheckoutController + PortalController + PlansController" do
+      assert_file "engines/billing/app/controllers/billing/checkout_controller.rb" do |content|
+        expect(content).to include("def create")
+        expect(content).to include("def success")
+        expect(content).to include("Billing::Checkout::CreateSessionService.call")
+      end
+      assert_file "engines/billing/app/controllers/billing/portal_controller.rb" do |content|
+        expect(content).to include("Billing::Portal::CreateSessionService.call")
+      end
+      assert_file "engines/billing/app/controllers/billing/plans_controller.rb" do |content|
+        expect(content).to include("Billing::Plan.active")
+      end
+    end
+
+    it "creates plans index + checkout success views" do
+      assert_file "engines/billing/app/views/billing/plans/index.html.erb"
+      assert_file "engines/billing/app/views/billing/checkout/success.html.erb"
+    end
+
+    it "draws checkout, portal, and plans routes" do
+      assert_file "engines/billing/config/routes.rb" do |content|
+        expect(content).to include("resources :plans")
+        expect(content).to include('"/checkout"')
+        expect(content).to include('"/portal"')
       end
     end
   end
@@ -198,6 +253,18 @@ RSpec.describe Seams::Generators::BillingGenerator do
       content = File.read(file)
       expect(content).to include("create_table :billing_webhook_events")
       expect(content).to include("unique: true")
+    end
+
+    it "creates billing_plans migration" do
+      pattern = File.join(destination_root,
+                          "engines/billing/db/migrate",
+                          "*_create_billing_plans.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+
+      content = File.read(file)
+      expect(content).to include("create_table :billing_plans")
+      expect(content).to include("amount_cents")
     end
   end
 

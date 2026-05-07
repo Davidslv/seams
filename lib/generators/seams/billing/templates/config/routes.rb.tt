@@ -1,5 +1,12 @@
 # frozen_string_literal: true
 
 Billing::Engine.routes.draw do
+  resources :plans, only: %i[index]
+
+  post "/checkout",         to: "checkout#create",  as: :checkout
+  get  "/checkout/success", to: "checkout#success", as: :checkout_success
+
+  post "/portal", to: "portal#create", as: :portal
+
   post "/webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
 end
