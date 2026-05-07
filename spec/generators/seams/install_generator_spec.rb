@@ -206,4 +206,65 @@ RSpec.describe Seams::Generators::InstallGenerator do
       expect(File.read(File.join(destination_root, "bin/docker-entrypoint"))).to eq("# my entrypoint\n")
     end
   end
+
+  describe "Phase 1.5 — helper scripts + architecture doc" do
+    before { run_generator }
+
+    it "ships script/collate_coverage.rb" do
+      assert_file "script/collate_coverage.rb" do |content|
+        [
+          "SimpleCov.collate",
+          "engines/*/coverage/.resultset.json",
+          "SimpleCov::Formatter::HTMLFormatter"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships executable script/run_affected_tests.sh" do
+      assert_file "script/run_affected_tests.sh" do |content|
+        [
+          "#!/usr/bin/env bash",
+          "set -euo pipefail",
+          'BASE_BRANCH="${BASE_BRANCH:-main}"',
+          "git merge-base",
+          'bundle exec rspec "engines/$engine/spec"'
+        ].each { |needle| expect(content).to include(needle) }
+      end
+
+      runner = File.join(destination_root, "script/run_affected_tests.sh")
+      expect(File.executable?(runner)).to be(true)
+    end
+
+    it "ships doc/ARCHITECTURE.md adapted for the host" do
+      assert_file "doc/ARCHITECTURE.md" do |content|
+        [
+          "Architecture (host)",
+          "isolate_namespace",
+          "Cross-engine rules",
+          "script/run_affected_tests.sh"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
+
+  describe "Phase 1.5 — auto-add gem 'seams' to Gemfile" do
+    it "injects gem 'seams' pinned to the current version when Gemfile is present" do
+      File.write(File.join(destination_root, "Gemfile"), "source \"https://rubygems.org\"\n")
+
+      run_generator
+
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      expect(gemfile).to match(/gem ["']seams["'],\s*["']~> 0\.\d+/)
+    end
+
+    it "is idempotent when seams is already in the Gemfile" do
+      File.write(File.join(destination_root, "Gemfile"),
+                 "source \"https://rubygems.org\"\ngem \"seams\", path: \"../seams\"\n")
+
+      run_generator
+
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      expect(gemfile.scan(/gem ["']seams["']/).size).to eq(1)
+    end
+  end
 end

@@ -116,7 +116,24 @@ module Seams
         File.chmod(0o755, full_path) if File.exist?(full_path)
       end
 
+      # Phase 1.5 — per-host helper scripts and architecture doc.
+      def create_helper_scripts
+        template_if_missing "script/collate_coverage.rb.tt",   "script/collate_coverage.rb"
+        template_if_missing "script/run_affected_tests.sh.tt", "script/run_affected_tests.sh"
+
+        runner = File.join(destination_root, "script/run_affected_tests.sh")
+        File.chmod(0o755, runner) if File.exist?(runner)
+      end
+
+      def create_architecture_doc
+        template_if_missing "doc/ARCHITECTURE.md.tt", "doc/ARCHITECTURE.md"
+      end
+
       def wire_into_host
+        # Auto-add seams to the host Gemfile if not already present —
+        # covers the `gem install seams` global-install path. Pinned to
+        # a pessimistic 0.x to keep major-version bumps explicit.
+        host_inject_gem("seams", "~> #{Seams::VERSION}")
         # Every Seams host needs rspec-rails so the per-engine
         # spec/dummy specs can actually run. Idempotent — skipped if
         # the host already has these gems.
