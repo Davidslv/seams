@@ -234,4 +234,118 @@ RSpec.describe Seams::Generators::AuthGenerator do
       assert_file "engines/auth/spec/models/auth/session_spec.rb"
     end
   end
+
+  describe "OAuth (Google + GitHub via Faraday)" do
+    it "ships the abstract OAuth adapter contract" do
+      assert_file "engines/auth/lib/auth/oauth/abstract.rb" do |content|
+        [
+          "class Abstract",
+          "def authorize_url",
+          "def exchange_code",
+          "def fetch_user_info",
+          "Profile = Struct.new",
+          "Faraday.new"
+        ].each { |needle| expect(content).to include(needle.tr("\\", "")) }
+      end
+    end
+
+    it "ships the Google adapter with verified URLs + openid+email+profile scopes" do
+      assert_file "engines/auth/lib/auth/oauth/google.rb" do |content|
+        [
+          "accounts.google.com/o/oauth2/v2/auth",
+          "oauth2.googleapis.com/token",
+          "openidconnect.googleapis.com/v1/userinfo",
+          "openid email profile"
+        ].each { |needle| expect(content).to include(needle.tr("\\", "")) }
+      end
+    end
+
+    it "ships the GitHub adapter with verified URLs + read:user user:email scopes + JSON Accept" do
+      assert_file "engines/auth/lib/auth/oauth/github.rb" do |content|
+        [
+          "github.com/login/oauth/authorize",
+          "github.com/login/oauth/access_token",
+          "api.github.com/user",
+          "api.github.com/user/emails",
+          "read:user user:email",
+          "application/json"
+        ].each { |needle| expect(content).to include(needle.tr("\\", "")) }
+      end
+    end
+
+    it "Auth.oauth(:provider) builder + OAuthProviderUnknown error class are defined" do
+      assert_file "engines/auth/lib/auth.rb" do |content|
+        expect(content).to include("def oauth(provider_name)")
+        expect(content).to include("OAuthProviderUnknown")
+      end
+    end
+
+    it "Configuration exposes oauth_providers Hash with documentation" do
+      assert_file "engines/auth/lib/auth/configuration.rb" do |content|
+        expect(content).to include("oauth_providers")
+        expect(content).to include("Auth::OAuth::Google")
+        expect(content).to include("Auth::OAuth::Github")
+      end
+    end
+
+    it "OAuthProvider model uses encrypts for tokens + correct uniqueness scopes" do
+      assert_file "engines/auth/app/models/auth/oauth_provider.rb" do |content|
+        expect(content).to include("encrypts :access_token")
+        expect(content).to include("encrypts :refresh_token")
+        expect(content).to include("uniqueness: { scope: :provider")
+      end
+    end
+
+    it "create_auth_oauth_providers migration exists with unique indexes" do
+      pattern = File.join(destination_root,
+                          "engines/auth/db/migrate",
+                          "*_create_auth_oauth_providers.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+
+      content = File.read(file)
+      expect(content).to include("create_table :auth_oauth_providers")
+      expect(content).to include("add_index :auth_oauth_providers, %i[provider provider_uid], unique: true")
+    end
+
+    it "OAuthAuthenticator service publishes the canonical signed_up/signed_in events" do
+      assert_file "engines/auth/app/services/auth/oauth_authenticator.rb" do |content|
+        expect(content).to include("Auth.oauth(@provider)")
+        expect(content).to include("user.signed_up.auth")
+        expect(content).to include("user.signed_in.auth")
+        expect(content).to include("auth_user_id")
+        expect(content).to include("host_user_id")
+      end
+    end
+
+    it "OAuthCallbacksController verifies state on callback (CSRF guard)" do
+      assert_file "engines/auth/app/controllers/auth/oauth_callbacks_controller.rb" do |content|
+        expect(content).to include("def start")
+        expect(content).to include("def callback")
+        expect(content).to include("OAuth state mismatch")
+        expect(content).to include("Auth::OAuthAuthenticator.call")
+      end
+    end
+
+    it "routes register the per-provider start + callback URLs" do
+      assert_file "engines/auth/config/routes.rb" do |content|
+        expect(content).to include('scope "/oauth/:provider"')
+        expect(content).to include("oauth_callbacks#start")
+        expect(content).to include("oauth_callbacks#callback")
+      end
+    end
+
+    it "ships the _oauth_buttons partial that iterates configured providers" do
+      assert_file "engines/auth/app/views/auth/sessions/_oauth_buttons.html.erb" do |content|
+        expect(content).to include("Auth.configuration.oauth_providers.each_key")
+        expect(content).to include("auth.oauth_start_path(provider: provider)")
+      end
+    end
+
+    it "wire_into_host adds faraday (in addition to bcrypt) so OAuth adapters can be loaded" do
+      gen_path = File.expand_path("../../../lib/generators/seams/auth/auth_generator.rb", __dir__)
+      content  = File.read(gen_path)
+      expect(content).to include('host_inject_gem("faraday"')
+    end
+  end
 end

@@ -28,10 +28,81 @@ This engine does not subscribe to any other engine's events.
 
 ## Adapters
 
-This engine uses no swappable adapters in its first cut. Password
-hashing is provided by `bcrypt` via Rails' `has_secure_password`. To
-swap in a different hasher, override `Auth::User`'s
-`password_digest=` setter in your host application.
+Password hashing is provided by `bcrypt` via Rails' `has_secure_password`.
+To swap in a different hasher, override `Auth::User`'s `password_digest=`
+setter in your host application.
+
+## OAuth (Sign in with Google / GitHub)
+
+Two adapters ship with the engine — `Auth::OAuth::Google` and
+`Auth::OAuth::Github` — both built on Faraday. **No `oauth2` gem
+dependency**, no `Net::HTTP`. Adapter contract lives in
+`lib/auth/oauth/abstract.rb`; subclass it for additional providers
+(Apple, GitLab, Microsoft, etc.).
+
+### Configure
+
+```ruby
+# config/initializers/auth.rb
+Auth.configure do |c|
+  c.oauth_providers = {
+    google: {
+      adapter:       "Auth::OAuth::Google",
+      client_id:     ENV.fetch("GOOGLE_OAUTH_CLIENT_ID"),
+      client_secret: ENV.fetch("GOOGLE_OAUTH_CLIENT_SECRET")
+    },
+    github: {
+      adapter:       "Auth::OAuth::Github",
+      client_id:     ENV.fetch("GITHUB_OAUTH_CLIENT_ID"),
+      client_secret: ENV.fetch("GITHUB_OAUTH_CLIENT_SECRET")
+    }
+  }
+end
+```
+
+The provider's redirect URI must match the URL Rails generates for
+`auth.oauth_callback_url(provider: :google)` (e.g.
+`https://your-app.com/auth/oauth/google/callback`).
+
+### Token storage + encryption
+
+`Auth::OAuthProvider` rows store `access_token` + `refresh_token`
+encrypted at the column level via Rails 7+ ActiveRecord::Encryption.
+**One-time host setup:**
+
+```bash
+bin/rails db:encryption:init
+```
+
+This prints three keys (primary, deterministic, key derivation salt).
+Store them in Rails credentials (`bin/rails credentials:edit`) under
+`active_record_encryption.*` — see
+https://guides.rubyonrails.org/active_record_encryption.html.
+
+### Render the sign-in buttons
+
+Drop the partial into your sessions or registrations form:
+
+```erb
+<%%= render "auth/sessions/oauth_buttons" %>
+```
+
+It iterates `Auth.configuration.oauth_providers` and renders one
+`auth.oauth_start_path(provider:)` link per configured provider.
+
+### Routes
+
+```
+GET  /auth/oauth/:provider/start    → redirect to provider's authorize URL
+GET  /auth/oauth/:provider/callback → exchange code, sign in, set cookie
+```
+
+Verified against:
+- https://developers.google.com/identity/protocols/oauth2/web-server
+- https://developers.google.com/identity/openid-connect/openid-connect
+- https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
+- https://docs.github.com/en/rest/users/users
+- https://docs.github.com/en/rest/users/emails
 
 ## Mounting
 
