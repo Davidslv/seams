@@ -1,0 +1,15 @@
+<%%# Lists every team the signed-in user is a member of. Override at %>
+<%%# app/views/teams/teams/index.html.erb in your host. %>
+<h1>Your teams</h1>
+
+<%%= link_to "New team", new_team_path %>
+
+<%% if @teams.empty? %>
+  <p>You're not on any teams yet.</p>
+<%% else %>
+  <ul>
+    <%% @teams.each do |team| %>
+      <li><%%= link_to team.name, team %> <small>(<%%= team.slug %>)</small></li>
+    <%% end %>
+  </ul>
+<%% end %>

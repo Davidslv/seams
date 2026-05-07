@@ -64,6 +64,22 @@ module Seams
                  engine_path("app/controllers/teams/invitations_controller.rb")
       end
 
+      # Phase 4A (2/2) — bare-bones views so the engine renders out
+      # of the box. Hosts override by dropping files at
+      # app/views/teams/teams/* in their own tree.
+      def create_views
+        %w[index show new edit].each do |action|
+          template "app/views/teams/#{action}.html.erb.tt",
+                   engine_path("app/views/teams/teams/#{action}.html.erb")
+        end
+        template "app/views/memberships/index.html.erb.tt",
+                 engine_path("app/views/teams/memberships/index.html.erb")
+        return unless features.include?("invitations")
+
+        template "app/views/invitations/index.html.erb.tt",
+                 engine_path("app/views/teams/invitations/index.html.erb")
+      end
+
       def create_concerns
         template "lib/concerns/teamable.rb.tt",
                  engine_path("lib/teams/concerns/teamable.rb")

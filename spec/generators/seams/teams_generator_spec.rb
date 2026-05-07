@@ -327,4 +327,39 @@ RSpec.describe Seams::Generators::TeamsGenerator do
                                    "engines/teams/lib/teams/concerns/authorization.rb"))).to be(true)
     end
   end
+
+  describe "Phase 4A (2/2) — views" do
+    it "ships team list / show / new / edit views" do
+      %w[index show new edit].each do |action|
+        assert_file "engines/teams/app/views/teams/teams/#{action}.html.erb"
+      end
+    end
+
+    it "ships members table view" do
+      assert_file "engines/teams/app/views/teams/memberships/index.html.erb" do |content|
+        expect(content).to include("Members of")
+        expect(content).to include("team_membership_path")
+      end
+    end
+
+    it "ships invitations management view when --with=invitations is enabled" do
+      assert_file "engines/teams/app/views/teams/invitations/index.html.erb" do |content|
+        expect(content).to include("Invitations")
+        expect(content).to include("team_invitations_path")
+        expect(content).to include("Send a new invitation")
+      end
+    end
+
+    it "omits invitations view when --with=roles only" do
+      flag_destination = File.expand_path("../../../tmp/teams_views_roles_only", __dir__)
+      FileUtils.rm_rf(flag_destination)
+      FileUtils.mkdir_p(File.join(flag_destination, "engines"))
+      described_class.start(["--with=roles"], destination_root: flag_destination)
+
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/teams/app/views/teams/invitations/index.html.erb"))).to be(false)
+      expect(File.exist?(File.join(flag_destination,
+                                   "engines/teams/app/views/teams/teams/index.html.erb"))).to be(true)
+    end
+  end
 end

@@ -1,0 +1,28 @@
+<%%# Members table. Owners + admins can remove a member or change %>
+<%%# their role; members read-only see the list. %>
+<h1>Members of <%%= @team.name %></h1>
+
+<%%= link_to "← Back to team", @team %>
+
+<table>
+  <thead>
+    <tr><th>User</th><th>Role</th><th>Joined</th><th></th></tr>
+  </thead>
+  <tbody>
+    <%% @memberships.each do |membership| %>
+      <tr>
+        <td><%%= membership.user_id %></td>
+        <td><%%= membership.role.titleize %></td>
+        <td><%%= membership.created_at.to_date %></td>
+        <td>
+          <%% if can_manage_team_members? %>
+            <%%= button_to "Remove",
+                          team_membership_path(@team, membership),
+                          method: :delete,
+                          data: { confirm: "Remove this member?" } %>
+          <%% end %>
+        </td>
+      </tr>
+    <%% end %>
+  </tbody>
+</table>

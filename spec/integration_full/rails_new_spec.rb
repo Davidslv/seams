@@ -234,6 +234,33 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(billing_count).to eq("1"),
                              "expected exactly one Notification(template: billing/invoice_paid) " \
                              "to be created by the BillingSubscriber, got #{billing_count.inspect}"
+
+    # Phase 4A — verify the Teams engine's full lifecycle in the host:
+    # Team.create + Membership.create + canonical team.created.teams
+    # event publish. Catches Railtie / autoload / migration regressions
+    # in the Teams engine that would not show up in a generator spec.
+    teams_state = boot_probe(<<~RUBY)
+      ActiveJob::Base.queue_adapter = :inline
+
+      received = []
+      Seams::Events::Publisher.subscribe("team.created.teams") { |payload| received << payload }
+
+      user = User.create!(email: "phase4a-\#{Process.pid}@example.com")
+      team = Teams::Team.create!(name: "Phase 4A Co.", slug: "phase4a-\#{Process.pid}")
+      Teams::Membership.create!(team: team, user_id: user.id, role: "owner")
+
+      Seams::Events::Publisher.publish(
+        "team.created.teams", team_id: team.id, owner_id: user.id
+      )
+
+      puts "team_persisted=\#{Teams::Team.exists?(team.id)};" \\
+           "membership_count=\#{Teams::Membership.where(team: team).count};" \\
+           "events_received=\#{received.size}"
+    RUBY
+
+    expect(teams_state).to include("team_persisted=true")
+    expect(teams_state).to include("membership_count=1")
+    expect(teams_state).to include("events_received=1")
   end
 
   # Phase 1.9 round-trip: the generic engine generator + the remove

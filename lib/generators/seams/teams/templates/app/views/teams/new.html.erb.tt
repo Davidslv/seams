@@ -1,0 +1,24 @@
+<%%# New team form — the creator becomes the owner via TeamsController#create. %>
+<h1>New team</h1>
+
+<%%= form_with model: @team, url: teams_path do |form| %>
+  <%% if @team.errors.any? %>
+    <ul class="errors">
+      <%% @team.errors.full_messages.each do |message| %>
+        <li><%%= message %></li>
+      <%% end %>
+    </ul>
+  <%% end %>
+
+  <p>
+    <%%= form.label :name %>
+    <%%= form.text_field :name, required: true %>
+  </p>
+
+  <p>
+    <%%= form.label :slug %>
+    <%%= form.text_field :slug, required: true %>
+  </p>
+
+  <%%= form.submit "Create team" %>
+<%% end %>

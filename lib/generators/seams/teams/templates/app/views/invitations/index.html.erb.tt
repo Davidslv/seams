@@ -1,0 +1,44 @@
+<%%# Pending + sent invitations for a team. Owners + admins can %>
+<%%# revoke pending invitations; the recipient accepts via the %>
+<%%# token-keyed top-level route (/invitations/accept/:token). %>
+<h1>Invitations — <%%= @team.name %></h1>
+
+<%%= link_to "← Back to team", @team %>
+
+<h2>Send a new invitation</h2>
+<%%= form_with url: team_invitations_path(@team) do |form| %>
+  <p>
+    <%%= form.label :email %>
+    <%%= form.email_field :email, required: true %>
+  </p>
+  <p>
+    <%%= form.label :role %>
+    <%%= form.select :role, %w[member admin] %>
+  </p>
+  <%%= form.submit "Send invite" %>
+<%% end %>
+
+<h2>Pending</h2>
+<%% if @invitations.empty? %>
+  <p>No pending invitations.</p>
+<%% else %>
+  <table>
+    <thead>
+      <tr><th>Email</th><th>Role</th><th>Expires</th><th></th></tr>
+    </thead>
+    <tbody>
+      <%% @invitations.each do |invitation| %>
+        <tr>
+          <td><%%= invitation.email %></td>
+          <td><%%= invitation.role.titleize %></td>
+          <td><%%= invitation.expires_at.to_date %></td>
+          <td>
+            <%%= button_to "Revoke",
+                          team_invitation_path(@team, invitation),
+                          method: :delete %>
+          </td>
+        </tr>
+      <%% end %>
+    </tbody>
+  </table>
+<%% end %>

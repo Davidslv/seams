@@ -1,0 +1,17 @@
+<%%# Single team page. Top section = team metadata + edit link. %>
+<%%# Members table linked to the memberships endpoint. Invitations %>
+<%%# linked to the invitations endpoint when the engine ships them. %>
+<h1><%%= @team.name %></h1>
+<p><small><%%= @team.slug %></small></p>
+
+<%%= link_to "Settings", edit_team_path(@team) %>
+
+<h2>Members</h2>
+<%%= link_to "Manage members", team_memberships_path(@team) %>
+
+<h2>Invitations</h2>
+<%% if defined?(team_invitations_path) %>
+  <%%= link_to "Manage invitations", team_invitations_path(@team) %>
+<%% else %>
+  <p><em>Invitation feature not enabled (regenerate with --with=invitations).</em></p>
+<%% end %>

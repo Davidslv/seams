@@ -1,0 +1,28 @@
+<%%# Team settings — name + slug. Roles + member operations live %>
+<%%# under the memberships endpoint, not here. %>
+<h1>Settings — <%%= @team.name %></h1>
+
+<%%= form_with model: @team, url: team_path(@team), method: :patch do |form| %>
+  <%% if @team.errors.any? %>
+    <ul class="errors">
+      <%% @team.errors.full_messages.each do |message| %>
+        <li><%%= message %></li>
+      <%% end %>
+    </ul>
+  <%% end %>
+
+  <p>
+    <%%= form.label :name %>
+    <%%= form.text_field :name, required: true %>
+  </p>
+
+  <p>
+    <%%= form.label :slug %>
+    <%%= form.text_field :slug, required: true %>
+  </p>
+
+  <%%= form.submit "Save" %>
+<%% end %>
+
+<%%= button_to "Delete team", team_path(@team), method: :delete,
+                                                data: { confirm: "This is irreversible. Continue?" } %>
