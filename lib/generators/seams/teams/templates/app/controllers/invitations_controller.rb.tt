@@ -73,7 +73,12 @@ module Teams
     end
 
     def invitation_params
-      params.require(:invitation).permit(:email, :role)
+      # Coerce :role to a known value (default "member") so a request
+      # parameter cannot smuggle through arbitrary strings. require_team_admin!
+      # has already gated the action; this is defence in depth.
+      raw = params.require(:invitation).permit(:email, :role)
+      raw[:role] = "member" unless Teams::Membership::ROLES.include?(raw[:role])
+      raw
     end
   end
 end

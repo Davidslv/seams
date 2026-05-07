@@ -1,16 +1,27 @@
 #!/bin/bash
 # bin/docker-entrypoint
 #
-# Runs db:prepare on every container boot (idempotent — Rails
-# tolerates an already-migrated DB) so engine migrations land
-# automatically on first deploy. Comment the migrate line out and
-# run migrations from a one-off task if you'd rather control them
-# manually.
+# Runs db:prepare on the WEB container only — workers skip it. With
+# Kamal, web boots before workers, so by the time worker starts the
+# migrations are already applied.
+#
+# If you want stricter migration control (CI-driven, separate job),
+# comment the db:prepare branch out and run migrations from a Kamal
+# pre-deploy hook:
+#
+#   kamal app exec --reuse "bin/rails db:migrate"
+#
+# Then redeploy the web image. The race-free pattern.
 
 set -e
 
-if [ "${1}" = "./bin/rails" ] || [ "${1}" = "bundle" ]; then
-  bundle exec rails db:prepare
-fi
+# Web command is `bundle exec rails server` (or `./bin/rails server`).
+# Workers use `bundle exec rails solid_queue:start` — never run
+# db:prepare from a worker, two containers racing CREATE TABLE breaks.
+case "${1}${2}${3}" in
+  *server*|*"./bin/rails"*"server"*|*"bin/rails"*"server"*)
+    bundle exec rails db:prepare
+    ;;
+esac
 
 exec "$@"

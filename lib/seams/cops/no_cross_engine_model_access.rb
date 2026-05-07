@@ -70,8 +70,18 @@ module RuboCop
           return false if exposed_concern?(full_name)
           return false if framework_constant?(parts)
           return false if ignored_suffix?(parts.last)
+          return false if inside_defined_check?(node)
 
           true
+        end
+
+        # `defined?(Teams::Team)` is a soft existence check — the
+        # constant is not actually accessed for value, just probed for
+        # presence. Skip the cop in that case so guards like
+        # `Teams::Team if defined?(Teams::Team)` don't false-fire.
+        def inside_defined_check?(node)
+          parent = node.parent
+          parent&.defined_type?
         end
 
         # Returns the segments of the constant if `node` is the

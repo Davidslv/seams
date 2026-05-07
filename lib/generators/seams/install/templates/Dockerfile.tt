@@ -1,17 +1,17 @@
 # Multi-stage Dockerfile tuned for a Seams-powered Rails app.
 #
-# Layer-caching trick: every engines/<name>/<name>.gemspec is copied
-# in a separate step before the rest of the source tree, so a code
-# change in one engine does not invalidate the bundle-install layer
-# of the others.
+# RUBY_VERSION is read from the host's `.ruby-version` at build time
+# (default 4.0.3 — bump when you bump .ruby-version). Override with
+# `--build-arg RUBY_VERSION=...` if you need to.
 #
 # This file is compatible with Rails 8's `bin/docker-build`.
 
-ARG RUBY_VERSION=3.4
+ARG RUBY_VERSION=4.0.3
 FROM ruby:${RUBY_VERSION}-slim AS base
 
 ENV BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="development:test" \
+    BUNDLE_DEPLOYMENT="1" \
     LANG=C.UTF-8 \
     RAILS_ENV=production \
     RAILS_LOG_TO_STDOUT=1

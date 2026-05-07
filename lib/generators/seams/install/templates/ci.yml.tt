@@ -22,6 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
+          ruby-version: ".ruby-version"
           bundler-cache: true
       - run: bundle exec rubocop --parallel
 
@@ -32,6 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
+          ruby-version: ".ruby-version"
           bundler-cache: true
       - run: bundle exec brakeman --no-pager --no-progress --quiet
       - run: bundle exec bundle-audit check --update
@@ -80,10 +82,15 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432"
+      PGHOST:     "localhost"
+      PGPORT:     "5432"
+      PGUSER:     "postgres"
+      PGPASSWORD: "postgres"
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
+          ruby-version: ".ruby-version"
           bundler-cache: true
       - run: bundle exec rspec engines/${{ matrix.engine }}/spec
 
@@ -103,9 +110,14 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432"
+      PGHOST:     "localhost"
+      PGPORT:     "5432"
+      PGUSER:     "postgres"
+      PGPASSWORD: "postgres"
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
+          ruby-version: ".ruby-version"
           bundler-cache: true
       - run: bundle exec rspec spec

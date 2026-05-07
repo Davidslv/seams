@@ -1,8 +1,32 @@
-inherit_from:
-  - ../../.rubocop.yml
+# Self-contained — engines do not inherit from the host's .rubocop.yml
+# so a host using `rubocop-rails-omakase` (or any other style) doesn't
+# force engine code to follow rules written for application code.
+# Engine code is gem-shaped and uses default RuboCop styles.
 
 require:
   - seams/cops
+
+AllCops:
+  TargetRubyVersion: 4.0
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "spec/dummy/**/*"
+    - "db/migrate/**/*_create_*.rb"
+    - "tmp/**/*"
+    - "vendor/**/*"
+
+Style/Documentation:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Layout/LineLength:
+  Max: 120
+
+Metrics/MethodLength:
+  Max: 25
 
 # Engine-scoped boundary enforcement. List every other engine in your
 # host application here so this engine cannot reach into them

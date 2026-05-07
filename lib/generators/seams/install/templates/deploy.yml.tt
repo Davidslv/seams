@@ -1,21 +1,32 @@
-# Kamal deploy config — skeleton. Fill in the host names and
-# secrets, then `kamal setup`.
+# Kamal deploy config — TEMPLATE. Every value below is a placeholder
+# and `kamal setup` will fail until you replace them. Reference:
+# https://kamal-deploy.org
 #
-# https://kamal-deploy.org for the full options reference.
+# Required edits before first deploy:
+#   - service / image — your app + container registry repo
+#   - servers.web / servers.worker hosts — real IPs or hostnames
+#   - registry.username + KAMAL_REGISTRY_PASSWORD secret in .kamal/secrets
+#   - accessories.postgres — choose between Kamal-managed Postgres
+#     (uncomment + size the volume) or a managed service (delete the
+#     accessory + provide DATABASE_URL via env.secret)
+#   - solid_queue migrations: run `bin/rails solid_queue:install:migrations`
+#     once locally, commit the migrations, and they'll apply on first deploy
+#     via bin/docker-entrypoint.
 
-service: my-app
-image: my-org/my-app
+# TODO: replace placeholders before running `kamal setup`.
+service: TODO_my_app
+image: TODO_org/TODO_my_app
 
 servers:
   web:
-    - 1.2.3.4
+    - TODO.web.example.com
   worker:
     cmd: bundle exec rails solid_queue:start
     hosts:
-      - 1.2.3.5
+      - TODO.worker.example.com
 
 registry:
-  username: my-registry-user
+  username: TODO_registry_user
   password:
     - KAMAL_REGISTRY_PASSWORD
 
@@ -29,6 +40,22 @@ env:
     - REDIS_URL
     - STRIPE_SECRET_KEY
     - STRIPE_WEBHOOK_SECRET
+
+# Uncomment + size if you want Kamal to manage Postgres for you.
+# Otherwise delete this block and provide DATABASE_URL via env.secret.
+# accessories:
+#   postgres:
+#     image: postgres:16
+#     host: TODO.web.example.com
+#     port: "127.0.0.1:5432:5432"
+#     env:
+#       clear:
+#         POSTGRES_USER: TODO_app
+#         POSTGRES_DB: TODO_app_production
+#       secret:
+#         - POSTGRES_PASSWORD
+#     volumes:
+#       - /var/lib/postgresql/data:/var/lib/postgresql/data
 
 asset_path: /rails/public/assets
 

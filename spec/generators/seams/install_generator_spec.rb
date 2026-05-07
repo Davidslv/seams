@@ -134,11 +134,21 @@ RSpec.describe Seams::Generators::InstallGenerator do
       end
     end
 
-    it "does not overwrite an existing host .rubocop.yml" do
+    it "does not overwrite an existing host .rubocop.yml, but appends an engines exclude" do
       File.write(File.join(destination_root, ".rubocop.yml"), "# host's own config\n")
       run_generator
       content = File.read(File.join(destination_root, ".rubocop.yml"))
-      expect(content).to eq("# host's own config\n")
+      expect(content).to start_with("# host's own config\n")
+      expect(content).to include('"engines/**/*"')
+    end
+
+    it "is idempotent — repeated runs do not duplicate the engines exclude" do
+      File.write(File.join(destination_root, ".rubocop.yml"), "# host's own config\n")
+      run_generator
+      first = File.read(File.join(destination_root, ".rubocop.yml"))
+      run_generator
+      second = File.read(File.join(destination_root, ".rubocop.yml"))
+      expect(second).to eq(first)
     end
   end
 

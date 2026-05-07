@@ -38,7 +38,12 @@ module Teams
     end
 
     def membership_params
-      params.require(:membership).permit(:user_id, :role)
+      # Coerce :role to a known value (default "member") so a request
+      # parameter cannot smuggle through arbitrary strings. require_team_admin!
+      # has already gated the action; this is defence in depth.
+      raw = params.require(:membership).permit(:user_id, :role)
+      raw[:role] = "member" unless Teams::Membership::ROLES.include?(raw[:role])
+      raw
     end
   end
 end

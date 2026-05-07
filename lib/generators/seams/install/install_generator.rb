@@ -55,11 +55,40 @@ module Seams
       end
 
       def create_host_rubocop
-        # Generated engine .rubocop.yml files inherit from ../../.rubocop.yml
-        # so the host needs one. We don't overwrite an existing config.
-        return if File.exist?(File.join(destination_root, ".rubocop.yml"))
+        # Three cases:
+        #   1. Host has no .rubocop.yml → write the seams baseline.
+        #   2. Host already has one → don't overwrite, but inject an
+        #      `engines/**/*` Exclude so host RuboCop (which may use
+        #      rubocop-rails-omakase or another flavor) doesn't lint
+        #      engine code under rules written for application code.
+        #      Engines have their own self-contained .rubocop.yml.
+        host_path = File.join(destination_root, ".rubocop.yml")
+        unless File.exist?(host_path)
+          template "rubocop.yml.tt", ".rubocop.yml"
+          return
+        end
 
-        template "rubocop.yml.tt", ".rubocop.yml"
+        return if File.read(host_path).include?("engines/**/*")
+
+        say "  inject  .rubocop.yml (Exclude engines/**/*)", :green
+        append_to_file(host_path, <<~YML)
+
+          # Engines have their own self-contained .rubocop.yml. Linting them
+          # from the host runs gem-style code under whatever flavor of rules
+          # the host uses (omakase / etc.) and produces noisy false positives.
+          AllCops:
+            Exclude:
+              - "engines/**/*"
+        YML
+      end
+
+      def create_ruby_version
+        # The host CI workflow does `ruby-version: ".ruby-version"`, so the
+        # host needs a `.ruby-version` file. Rails 8's `rails new` doesn't
+        # ship one. Don't overwrite if the host has pinned their own.
+        return if File.exist?(File.join(destination_root, ".ruby-version"))
+
+        template "ruby-version.tt", ".ruby-version"
       end
 
       def create_ci_workflow

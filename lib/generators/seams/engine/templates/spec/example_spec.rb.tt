@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+# Force-load this engine's lib/ so the constant resolves whether rspec
+# is run from the host root (`bundle exec rspec engines/<%= name %>/spec`)
+# or from inside the engine. The host's spec_helper does not require us.
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "<%= name %>"
+
 RSpec.describe <%= module_name %> do
   it "defines a VERSION constant" do
     expect(<%= module_name %>::VERSION).to match(/\A\d+\.\d+\.\d+\z/)
