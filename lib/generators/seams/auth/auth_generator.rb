@@ -52,6 +52,9 @@ module Seams
                  engine_path("app/models/auth/user.rb")
         template "app/models/session.rb.tt",
                  engine_path("app/models/auth/session.rb")
+        # OAuth identity link table — issue #2 section 2A.
+        template "app/models/oauth_provider.rb.tt",
+                 engine_path("app/models/auth/oauth_provider.rb")
       end
 
       def create_controllers
@@ -61,6 +64,8 @@ module Seams
                  engine_path("app/controllers/auth/registrations_controller.rb")
         template "app/controllers/password_resets_controller.rb.tt",
                  engine_path("app/controllers/auth/password_resets_controller.rb")
+        template "app/controllers/oauth_callbacks_controller.rb.tt",
+                 engine_path("app/controllers/auth/oauth_callbacks_controller.rb")
       end
 
       def create_services
@@ -70,6 +75,17 @@ module Seams
                  engine_path("app/services/auth/authenticate_user.rb")
         template "app/services/reset_password.rb.tt",
                  engine_path("app/services/auth/reset_password.rb")
+        template "app/services/oauth_authenticator.rb.tt",
+                 engine_path("app/services/auth/oauth_authenticator.rb")
+      end
+
+      def create_oauth_adapters
+        template "lib/oauth/abstract.rb.tt",
+                 engine_path("lib/auth/oauth/abstract.rb")
+        template "lib/oauth/google.rb.tt",
+                 engine_path("lib/auth/oauth/google.rb")
+        template "lib/oauth/github.rb.tt",
+                 engine_path("lib/auth/oauth/github.rb")
       end
 
       def create_mailer
@@ -82,6 +98,8 @@ module Seams
       def create_views
         template "app/views/sessions/new.html.erb.tt",
                  engine_path("app/views/auth/sessions/new.html.erb")
+        template "app/views/sessions/_oauth_buttons.html.erb.tt",
+                 engine_path("app/views/auth/sessions/_oauth_buttons.html.erb")
         template "app/views/registrations/new.html.erb.tt",
                  engine_path("app/views/auth/registrations/new.html.erb")
         template "app/views/password_resets/new.html.erb.tt",
@@ -104,6 +122,8 @@ module Seams
                  engine_path("db/migrate/#{timestamp(1)}_create_auth_sessions.rb")
         template "db/migrate/add_password_reset_to_auth_users.rb.tt",
                  engine_path("db/migrate/#{timestamp(2)}_add_password_reset_to_auth_users.rb")
+        template "db/migrate/create_auth_oauth_providers.rb.tt",
+                 engine_path("db/migrate/#{timestamp(3)}_create_auth_oauth_providers.rb")
       end
 
       def create_specs
@@ -142,7 +162,11 @@ module Seams
       end
 
       def wire_into_host
-        host_inject_gem("bcrypt", "~> 3.1")
+        host_inject_gem("bcrypt",  "~> 3.1")
+        # OAuth adapters speak HTTP via Faraday (no Net::HTTP — see
+        # memory feedback_external_apis.md). The host needs Faraday on
+        # the load path even if it never configures an OAuth provider.
+        host_inject_gem("faraday", "~> 2.0")
         host_inject_mount(engine_class: "Auth::Engine", at: "/auth")
         host_inject_include_in_user("Auth::Authenticatable")
         host_inject_include_in_application_controller("Auth::Authentication")
@@ -196,6 +220,20 @@ module Seams
             t.timestamps
           end
           add_index :auth_sessions, :token, unique: true
+
+          create_table :auth_oauth_providers do |t|
+            t.references :user,         null: false, foreign_key: { to_table: :auth_users }
+            t.string     :provider,     null: false
+            t.string     :provider_uid, null: false
+            t.text       :access_token
+            t.text       :refresh_token
+            t.datetime   :expires_at
+            t.string     :token_type,   default: "Bearer"
+            t.jsonb      :profile_data, null: false, default: {}
+            t.timestamps
+          end
+          add_index :auth_oauth_providers, %i[provider provider_uid], unique: true
+          add_index :auth_oauth_providers, %i[user_id provider],      unique: true
         SCHEMA
       end
 

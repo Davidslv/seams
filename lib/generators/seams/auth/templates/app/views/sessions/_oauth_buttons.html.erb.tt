@@ -1,0 +1,18 @@
+<%%# Renders one "Sign in with X" link per configured OAuth provider. %>
+<%%# Drop into the sign-in / sign-up form: %>
+<%%#   <%%= render "auth/sessions/oauth_buttons" %> %>
+<%%# Override by replacing the file in your host. %>
+<%% if Auth.configuration.oauth_providers.any? %>
+  <section class="auth-oauth-buttons">
+    <p>Or sign in with:</p>
+    <ul>
+      <%% Auth.configuration.oauth_providers.each_key do |provider| %>
+        <li>
+          <%%= link_to "Sign in with #{provider.to_s.titleize}",
+                      auth.oauth_start_path(provider: provider),
+                      class: "auth-oauth-button auth-oauth-#{provider}" %>
+        </li>
+      <%% end %>
+    </ul>
+  </section>
+<%% end %>
