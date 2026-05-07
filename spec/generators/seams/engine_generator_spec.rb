@@ -163,4 +163,56 @@ RSpec.describe Seams::Generators::EngineGenerator do
         .to raise_error(Seams::GeneratorError, /already exists/)
     end
   end
+
+  describe "Phase 1.6 — generic engine templates" do
+    before { run_generator(["reporting"]) }
+
+    it "ships an engine-scoped ApplicationRecord (abstract_class = true)" do
+      assert_file "engines/reporting/app/models/reporting/application_record.rb" do |content|
+        [
+          "module Reporting",
+          "class ApplicationRecord < ActiveRecord::Base",
+          "self.abstract_class = true"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships an i18n stub under the engine's namespace key" do
+      assert_file "engines/reporting/config/locales/en.yml" do |content|
+        expect(content).to include("en:")
+        expect(content).to include("reporting:")
+        expect(content).to include("placeholder:")
+      end
+    end
+
+    it "ships a standalone Gemfile that gemspec-resolves the engine" do
+      assert_file "engines/reporting/Gemfile" do |content|
+        [
+          'source "https://rubygems.org"',
+          "gemspec",
+          'gem "rspec-rails"'
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships a Rakefile with the rspec default task" do
+      assert_file "engines/reporting/Rakefile" do |content|
+        expect(content).to include('require "rspec/core/rake_task"')
+        expect(content).to include("RSpec::Core::RakeTask.new(:spec)")
+        expect(content).to include("task default: :spec")
+      end
+    end
+
+    it "ships a per-engine dummy app via DummyAppWriter" do
+      %w[
+        engines/reporting/spec/dummy/config/application.rb
+        engines/reporting/spec/dummy/db/schema.rb
+        engines/reporting/spec/dummy/app/controllers/application_controller.rb
+        engines/reporting/spec/rails_helper.rb
+      ].each do |path|
+        full = File.join(destination_root, path)
+        expect(File.exist?(full)).to be(true), "missing #{path}"
+      end
+    end
+  end
 end

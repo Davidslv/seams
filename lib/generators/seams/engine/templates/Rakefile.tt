@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+# Engine-local Rakefile. Like the Gemfile, this is mostly redundant
+# in-tree — the host's `rake` invokes the engine's specs via
+# seams:test[<name>]. It exists so the engine can be tested
+# standalone:
+#
+#   cd engines/<%= name %> && bundle exec rake
+require "bundler/setup"
+require "rspec/core/rake_task"
+
+RSpec::Core::RakeTask.new(:spec)
+
+task default: :spec

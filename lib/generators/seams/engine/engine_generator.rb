@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "seams/generators/host_injector"
 require "seams/generators/sibling_rubocop_writer"
+require "seams/generators/dummy_app_writer"
 
 module Seams
   module Generators
@@ -52,6 +53,39 @@ module Seams
       def create_app
         template "app/application_controller.rb.tt",
                  "engines/#{name}/app/controllers/#{name}/application_controller.rb"
+        # Phase 1.6 — engine-scoped abstract AR base.
+        template "app/application_record.rb.tt",
+                 "engines/#{name}/app/models/#{name}/application_record.rb"
+      end
+
+      # Phase 1.6 — i18n stub + standalone Gemfile + Rakefile so the
+      # engine can be tested in isolation (cd engines/<name> && rake).
+      def create_locales
+        template "config/locales/en.yml.tt",
+                 "engines/#{name}/config/locales/en.yml"
+      end
+
+      def create_engine_gemfile
+        template "Gemfile.tt", "engines/#{name}/Gemfile"
+      end
+
+      def create_engine_rakefile
+        template "Rakefile.tt", "engines/#{name}/Rakefile"
+      end
+
+      # Phase 1.6 — per-engine dummy app via the shared DummyAppWriter.
+      # Generic engines start with an empty schema; canonical
+      # generators (auth/billing/etc) overwrite this with their own
+      # schema by calling DummyAppWriter.write! again with the right
+      # SCHEMA body. Keeping this here means even a vanilla
+      # `seams:engine reporting` ships a bootable spec/dummy.
+      def create_dummy_app
+        Seams::Generators::DummyAppWriter.write!(
+          engine_path: File.join(destination_root, "engines", name),
+          engine_module: module_name,
+          mount_at: "/#{name}",
+          schema: "# generic engine — no schema yet"
+        )
       end
 
       def create_rubocop_config

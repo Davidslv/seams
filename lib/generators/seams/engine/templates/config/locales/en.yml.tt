@@ -1,0 +1,14 @@
+# Engine-scoped i18n. Every translation key SHOULD start with
+# `<%= name %>.` so two engines can never collide on a key (the host's
+# I18n.load_path picks up engines/*/config/locales/*.yml automatically
+# via Rails::Engine).
+#
+# Usage from inside the engine:
+#
+#   I18n.t("<%= name %>.welcome", name: "Ada")
+#
+# Override in the host by dropping a file at
+# config/locales/<%= name %>.en.yml — keys merge top-down, host wins.
+en:
+  <%= name %>:
+    placeholder: "Translate me — engines/<%= name %>/config/locales/en.yml"

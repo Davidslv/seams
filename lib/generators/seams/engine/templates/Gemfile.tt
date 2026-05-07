@@ -1,0 +1,19 @@
+# Engine-local Gemfile. Mostly redundant in the in-tree layout — the
+# host's Gemfile already loads the engine via path-resolution from
+# seams_engines.rb. This file exists so the engine can ALSO be
+# extracted and bundle-installed standalone (CI matrix run, future
+# gem release, etc.) without rewriting the dependency surface.
+#
+# Keep this file aligned with the engine's gemspec — runtime deps
+# go there, dev/test-only tools go here.
+source "https://rubygems.org"
+
+# Specify your gem's dependencies in <%= name %>.gemspec.
+gemspec
+
+group :development, :test do
+  gem "rspec-rails", "~> 7.1"
+  gem "rubocop",     require: false
+  gem "rubocop-rails", require: false
+  gem "rubocop-rspec", require: false
+end

@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+module <%= module_name %>
+  # Engine-scoped abstract Active Record base. Every <%= module_name %>::*
+  # AR model inherits from this rather than from
+  # ::ApplicationRecord so the engine remains usable in a host that
+  # has its own ApplicationRecord with conflicting concerns.
+  #
+  # Hosts that want shared behaviour across all engines can include
+  # a concern here — but only behaviour the engine itself needs.
+  # Cross-engine domain logic belongs in the host's ApplicationRecord
+  # or in a Core engine concern.
+  class ApplicationRecord < ActiveRecord::Base
+    self.abstract_class = true
+  end
+end
