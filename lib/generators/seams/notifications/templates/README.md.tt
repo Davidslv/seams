@@ -100,6 +100,14 @@ production:
 | Event name | Subscriber | What it does |
 | --- | --- | --- |
 | `user.signed_up.auth` | `Notifications::AuthSubscriber` | Creates an InApp + Email welcome notification (subject to NotificationPreference). |
+| `subscription.created.billing`  | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_started`. |
+| `subscription.canceled.billing` | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_canceled`. |
+| `invoice.paid.billing`          | `Notifications::BillingSubscriber` | InApp notification, template `billing/invoice_paid`. |
+| `invoice.failed.billing`        | `Notifications::BillingSubscriber` | InApp notification, template `billing/invoice_failed`. |
+
+The Billing subscriber resolves the host User by
+`stripe_customer_id` (the column the `Billing::Billable` concern
+documents). It only attaches when `Billing::Engine` is loaded.
 
 Subscribers always create persistent Notification rows and enqueue —
 they don't run side-effects synchronously inside the publisher's

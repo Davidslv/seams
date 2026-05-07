@@ -79,6 +79,8 @@ module Seams
       def create_subscriber
         template "app/subscribers/auth_subscriber.rb.tt",
                  engine_path("app/subscribers/notifications/auth_subscriber.rb")
+        template "app/subscribers/billing_subscriber.rb.tt",
+                 engine_path("app/subscribers/notifications/billing_subscriber.rb")
       end
 
       def create_controllers
@@ -114,6 +116,15 @@ module Seams
                  engine_path("app/views/notifications/templates/default.erb")
         template "app/views/templates/welcome.erb.tt",
                  engine_path("app/views/notifications/templates/welcome.erb")
+        %w[
+          subscription_started
+          subscription_canceled
+          invoice_paid
+          invoice_failed
+        ].each do |name|
+          template "app/views/templates/billing/#{name}.erb.tt",
+                   engine_path("app/views/notifications/templates/billing/#{name}.erb")
+        end
       end
 
       def create_migrations

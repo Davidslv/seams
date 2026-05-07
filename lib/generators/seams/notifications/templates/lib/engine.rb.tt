@@ -25,6 +25,7 @@ module Notifications
     config.after_initialize do
       require "notifications/concerns/notifiable"
       Notifications::AuthSubscriber.attach!
+      Notifications::BillingSubscriber.attach! if defined?(Billing::Engine)
     end
   end
 end

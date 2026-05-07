@@ -1,0 +1,88 @@
+# frozen_string_literal: true
+
+module Notifications
+  # Consumes Billing events and creates an in-app Notification for the
+  # host User who owns the subscription/invoice. Mirrors AuthSubscriber.
+  #
+  # Subscribed events + payload shapes:
+  #   subscription.created.billing  : { customer_ref:, plan_ref:, gateway_ref: }
+  #   subscription.canceled.billing : { gateway_ref:, status: }
+  #   invoice.paid.billing          : { gateway:, livemode:, object_id:, object: }  (webhook envelope)
+  #   invoice.failed.billing        : same as invoice.paid
+  #
+  # The host User is resolved via stripe_customer_id (matches
+  # Billing::Subscription#customer_ref) — that column is the contract
+  # the Billing::Billable concern documents on the host's User model.
+  #
+  # +.attach!+ is idempotent — Rails reload won't double-subscribe.
+  class BillingSubscriber
+    @attached = false
+
+    EVENT_TEMPLATES = {
+      "subscription.created.billing"  => "billing/subscription_started",
+      "subscription.canceled.billing" => "billing/subscription_canceled",
+      "invoice.paid.billing"          => "billing/invoice_paid",
+      "invoice.failed.billing"        => "billing/invoice_failed"
+    }.freeze
+
+    class << self
+      attr_accessor :attached
+      alias_method :attached?, :attached
+
+      def attach!
+        return if attached?
+
+        EVENT_TEMPLATES.each do |event, template|
+          Seams::Events::Publisher.subscribe(event) do |payload|
+            handle(event: event, payload: payload, template: template)
+          end
+        end
+
+        self.attached = true
+      end
+
+      private
+
+      def handle(event:, payload:, template:)
+        customer_ref = customer_ref_for(event, payload)
+        owner = resolve_owner(customer_ref)
+        return unless owner
+
+        notif = Notifications::Strategies::InApp.new(owner: owner, template: template)
+        notif.schedule = IceCube::Schedule.new(Time.current)
+        notif.save!
+        notif.send_async
+      end
+
+      def customer_ref_for(event, payload)
+        case event
+        when "subscription.created.billing"
+          payload[:customer_ref]
+        when "subscription.canceled.billing"
+          subscription_for(gateway_ref: payload[:gateway_ref])&.customer_ref
+        when "invoice.paid.billing", "invoice.failed.billing"
+          invoice_for(gateway_ref: payload[:object_id])&.subscription&.customer_ref
+        end
+      end
+
+      def resolve_owner(customer_ref)
+        return nil if customer_ref.nil?
+        return nil unless defined?(::User) && ::User.column_names.include?("stripe_customer_id")
+
+        ::User.find_by(stripe_customer_id: customer_ref)
+      end
+
+      def subscription_for(gateway_ref:)
+        return nil unless defined?(Billing::Subscription)
+
+        Billing::Subscription.find_by(gateway_ref: gateway_ref)
+      end
+
+      def invoice_for(gateway_ref:)
+        return nil unless defined?(Billing::Invoice)
+
+        Billing::Invoice.find_by(gateway_ref: gateway_ref)
+      end
+    end
+  end
+end

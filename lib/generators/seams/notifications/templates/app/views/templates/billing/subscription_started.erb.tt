@@ -1,0 +1,5 @@
+<%%# Default billing/subscription_started template, used by BillingSubscriber %>
+<%%# when it consumes subscription.created.billing. Override by dropping a %>
+<%%# file at app/views/notifications/templates/billing/subscription_started.erb %>
+<%%# in your host. %>
+Your subscription is active. Welcome aboard.

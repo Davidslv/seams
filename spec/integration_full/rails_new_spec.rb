@@ -107,12 +107,15 @@ RSpec.describe "rails new integration", type: :integration_full do
   end
 
   def create_test_database
+    # db:drop is tolerant of "doesn't exist"; pair it with db:create for
+    # an idempotent clean slate. Suppressed output keeps the spec log
+    # focused on real failures.
     Bundler.with_unbundled_env do
       Dir.chdir(host_path) do
-        system({ "RAILS_ENV" => "development" }, "bin/rails", "db:create",
-               out: File::NULL, err: File::NULL)
-        system({ "RAILS_ENV" => "test" }, "bin/rails", "db:create",
-               out: File::NULL, err: File::NULL)
+        %w[development test].each do |env|
+          system({ "RAILS_ENV" => env }, "bin/rails", "db:drop",   out: File::NULL, err: File::NULL)
+          system({ "RAILS_ENV" => env }, "bin/rails", "db:create", out: File::NULL, err: File::NULL)
+        end
       end
     end
   end

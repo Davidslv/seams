@@ -1,0 +1,3 @@
+<%%# Default billing/invoice_paid template. Override at %>
+<%%# app/views/notifications/templates/billing/invoice_paid.erb. %>
+Your invoice has been paid. Thank you.

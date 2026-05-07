@@ -1,0 +1,4 @@
+<%%# Default billing/invoice_failed template. Override at %>
+<%%# app/views/notifications/templates/billing/invoice_failed.erb. %>
+We couldn't process your latest invoice. Please update your payment method
+to avoid an interruption in service.
