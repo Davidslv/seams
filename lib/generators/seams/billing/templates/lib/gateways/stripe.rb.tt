@@ -84,6 +84,32 @@ module Billing
         raise Billing::GatewayError, "Stripe.create_billing_portal_session failed: #{e.message}"
       end
 
+      # Docs: https://docs.stripe.com/api/checkout/sessions/create
+      #       https://docs.stripe.com/payments/checkout/fulfill-orders
+      # Lifetime Deal flow — `mode: "payment"` instead of `subscription`.
+      # No customer.subscription.* webhooks fire; the
+      # `checkout.session.completed` webhook is what tells us payment
+      # succeeded. payment_intent_data.metadata carries the LTD plan_ref
+      # so the webhook handler can resolve the right plan without an
+      # extra API call.
+      def create_lifetime_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **opts)
+        session = ::Stripe::Checkout::Session.create(
+          mode:        "payment",
+          line_items:  [{ price: plan_ref, quantity: 1 }],
+          customer:    customer_ref,
+          success_url: success_url,
+          cancel_url:  cancel_url,
+          payment_intent_data: {
+            metadata: { access_type: "lifetime", plan_ref: plan_ref }
+          },
+          metadata: { access_type: "lifetime", plan_ref: plan_ref },
+          **opts
+        )
+        { id: session.id, url: session.url }
+      rescue ::Stripe::StripeError => e
+        raise Billing::GatewayError, "Stripe.create_lifetime_checkout_session failed: #{e.message}"
+      end
+
       # Docs: https://docs.stripe.com/webhooks/signatures
       # Stripe::Webhook.construct_event verifies the timestamped HMAC
       # signature in the `Stripe-Signature` header against `secret`,

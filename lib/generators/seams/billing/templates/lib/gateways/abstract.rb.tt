@@ -38,6 +38,16 @@ module Billing
         raise NotImplementedError, "#{self.class} must implement #create_billing_portal_session"
       end
 
+      # Create a one-time-payment hosted-checkout session for an LTD
+      # plan. Same return shape as #create_checkout_session, but uses
+      # the gateway's `mode: payment` flow (Stripe) — no recurring
+      # billing, no customer.subscription.* webhooks. Idempotency
+      # carries through metadata so the webhook handler can resolve
+      # the LTD plan_ref without a separate API call.
+      def create_lifetime_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **)
+        raise NotImplementedError, "#{self.class} must implement #create_lifetime_checkout_session"
+      end
+
       # Verify a webhook payload + signature and return a normalised
       # event hash:
       #   { id:, type:, livemode:, object: <provider's raw object>, raw: <payload> }

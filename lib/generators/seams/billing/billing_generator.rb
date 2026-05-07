@@ -16,6 +16,7 @@ module Seams
     # the host's user model can include.
     #
     # Run with: bin/rails generate seams:billing
+    # rubocop:disable Metrics/ClassLength
     class BillingGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
 
@@ -78,6 +79,15 @@ module Seams
                  engine_path("app/services/billing/checkout/create_session_service.rb")
         template "app/services/portal_session_service.rb.tt",
                  engine_path("app/services/billing/portal/create_session_service.rb")
+        # Lifetime Deal services — see issue #2 section 3A.LTD.
+        template "app/services/lifetime/grant_pass_service.rb.tt",
+                 engine_path("app/services/billing/lifetime/grant_pass_service.rb")
+        template "app/services/lifetime/revoke_pass_service.rb.tt",
+                 engine_path("app/services/billing/lifetime/revoke_pass_service.rb")
+        template "app/services/lifetime/create_pass_from_checkout_service.rb.tt",
+                 engine_path("app/services/billing/lifetime/create_pass_from_checkout_service.rb")
+        template "app/services/lifetime/create_lifetime_session_service.rb.tt",
+                 engine_path("app/services/billing/lifetime/create_lifetime_session_service.rb")
       end
 
       def create_controllers_and_views
@@ -247,5 +257,6 @@ module Seams
         RB
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

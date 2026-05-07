@@ -1,0 +1,33 @@
+# frozen_string_literal: true
+
+module Billing
+  module Lifetime
+    # Creates a Stripe Checkout session for an LTD plan (`mode: payment`).
+    # Validates inventory + plan-is-lifetime before round-tripping to
+    # the gateway so a sold-out plan doesn't burn a Stripe API call.
+    #
+    # Returns a Result with ok?, url, error.
+    module CreateLifetimeSessionService
+      Result = Struct.new(:ok?, :url, :error, keyword_init: true)
+
+      module_function
+
+      def call(customer_ref:, plan_ref:, success_url:, cancel_url:)
+        plan = Billing::Plan.find_by(gateway_ref: plan_ref)
+        return Result.new(ok?: false, error: "Plan #{plan_ref.inspect} not found") unless plan
+        return Result.new(ok?: false, error: "Plan #{plan_ref.inspect} is not a lifetime plan") unless plan.lifetime?
+        return Result.new(ok?: false, error: "Plan #{plan_ref.inspect} is sold out") if plan.lifetime_sold_out?
+
+        session = Billing.gateway.create_lifetime_checkout_session(
+          customer_ref: customer_ref,
+          plan_ref:     plan_ref,
+          success_url:  success_url,
+          cancel_url:   cancel_url
+        )
+        Result.new(ok?: true, url: session[:url])
+      rescue Billing::GatewayError => e
+        Result.new(ok?: false, error: e.message)
+      end
+    end
+  end
+end
