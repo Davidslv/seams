@@ -67,11 +67,14 @@ RSpec.describe "Host injection integration", type: :integration do
     expect(app_controller).to include("include Auth::Authentication")
   end
 
-  it "seams:billing wires stripe + mount + Billable into the host" do
+  it "seams:billing wires faraday + mount + Billable into the host" do
     run(Seams::Generators::InstallGenerator)
     run(Seams::Generators::BillingGenerator)
 
-    expect(gemfile).to    include('gem "stripe"')
+    # Billing speaks Stripe via its own Faraday-based client (no
+    # `stripe` gem dependency — see feedback_external_apis.md).
+    expect(gemfile).to include('gem "faraday"')
+    expect(gemfile).not_to include('gem "stripe"')
     expect(routes).to     include('mount Billing::Engine, at: "/billing"')
     expect(user_model).to include("include Billing::Billable")
   end
@@ -107,7 +110,7 @@ RSpec.describe "Host injection integration", type: :integration do
       expect(user_model).to include("include #{concern}")
     end
 
-    %w[bcrypt stripe].each { |name| expect(gemfile).to include(%(gem "#{name}")) }
+    %w[bcrypt faraday].each { |name| expect(gemfile).to include(%(gem "#{name}")) }
   end
 
   it "running a canonical generator twice does not duplicate host edits" do

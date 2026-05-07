@@ -58,6 +58,12 @@ module Seams
                  engine_path("lib/billing/gateways/abstract.rb")
         template "lib/gateways/stripe.rb.tt",
                  engine_path("lib/billing/gateways/stripe.rb")
+        # Stripe REST + webhook signature owned in-tree (Faraday-based,
+        # no Net::HTTP). See feedback_external_apis.md for the rule.
+        template "lib/stripe/client.rb.tt",
+                 engine_path("lib/billing/stripe/client.rb")
+        template "lib/stripe/webhook_signature.rb.tt",
+                 engine_path("lib/billing/stripe/webhook_signature.rb")
       end
 
       def create_concern
@@ -164,7 +170,11 @@ module Seams
       end
 
       def wire_into_host
-        host_inject_gem("stripe", "~> 12.0")
+        # The Billing engine speaks Stripe via its own Faraday-based
+        # client (lib/billing/stripe/client.rb) — the official `stripe`
+        # gem uses Net::HTTP and is forbidden by the Faraday-only rule
+        # (memory feedback_external_apis.md).
+        host_inject_gem("faraday", "~> 2.0")
         host_inject_mount(engine_class: "Billing::Engine", at: "/billing")
         host_inject_include_in_user("Billing::Billable")
       end

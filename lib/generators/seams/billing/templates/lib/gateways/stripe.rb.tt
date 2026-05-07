@@ -1,141 +1,133 @@
 # frozen_string_literal: true
 
 require "billing/gateways/abstract"
+require "billing/stripe/client"
+require "billing/stripe/webhook_signature"
 
 module Billing
   module Gateways
-    # Stripe billing gateway. Wraps the official `stripe` gem with the
-    # narrow contract defined in Billing::Gateways::Abstract.
+    # Stripe billing gateway. Implements the Billing::Gateways::Abstract
+    # contract on top of Billing::Stripe::Client (a Faraday-based REST
+    # client we own — see lib/billing/stripe/client.rb) and
+    # Billing::Stripe::WebhookSignature (HMAC-SHA256 verification, no
+    # HTTP).
     #
-    # API surface used (verified against the docs cited above each
-    # method). All Stripe.api_key reads come from
-    # Billing.configuration.api_key, so the host can swap test/live
-    # keys without touching this class.
+    # Why Faraday and not the official `stripe` gem: the gem's HTTP
+    # backend is Net::HTTP, which is forbidden by the Faraday-only
+    # rule (see memory feedback_external_apis.md). The five endpoints
+    # we use are stable enough that owning a thin client is cheaper
+    # than carrying the SDK's HTTP layer.
+    #
+    # API surface used (verified against current Stripe docs):
+    #   POST   /v1/subscriptions               https://docs.stripe.com/api/subscriptions/create
+    #   DELETE /v1/subscriptions/{id}          https://docs.stripe.com/api/subscriptions/cancel
+    #   GET    /v1/subscriptions/{id}          https://docs.stripe.com/api/subscriptions/retrieve
+    #   POST   /v1/checkout/sessions           https://docs.stripe.com/api/checkout/sessions/create
+    #   POST   /v1/billing_portal/sessions     https://docs.stripe.com/api/customer_portal/sessions/create
+    #   Webhook signature                      https://docs.stripe.com/webhooks/signatures
     class Stripe < Abstract
-      def initialize
-        super
-        require "stripe"
-        ::Stripe.api_key = Billing.configuration.api_key
+      def initialize(client: nil)
+        super()
+        @client = client || Billing::Stripe::Client.new(api_key: Billing.configuration.api_key)
       end
 
-      # Docs: https://docs.stripe.com/api/subscriptions/create
-      # Required params: `customer`, `items[].price` (a price id).
-      # Returns: a Subscription object with id, status, current_period_end.
+      # POST /v1/subscriptions
       def create_subscription(customer_ref:, plan_ref:, **opts)
-        sub = ::Stripe::Subscription.create(
+        sub = @client.create_subscription(
           customer: customer_ref,
           items:    [{ price: plan_ref }],
           **opts
         )
         normalise_subscription(sub)
-      rescue ::Stripe::StripeError => e
-        raise Billing::GatewayError, "Stripe.create_subscription failed: #{e.message}"
       end
 
-      # Docs: https://docs.stripe.com/api/subscriptions/cancel
-      # Performs an immediate cancel; pass `cancel_at_period_end: true`
-      # via opts to schedule the cancellation instead.
+      # DELETE /v1/subscriptions/{id}
       def cancel_subscription(subscription_ref:, **opts)
-        sub = ::Stripe::Subscription.cancel(subscription_ref, **opts)
+        sub = @client.cancel_subscription(subscription_ref, **opts)
         normalise_subscription(sub)
-      rescue ::Stripe::StripeError => e
-        raise Billing::GatewayError, "Stripe.cancel_subscription failed: #{e.message}"
       end
 
-      # Docs: https://docs.stripe.com/api/subscriptions/retrieve
+      # GET /v1/subscriptions/{id}
       def fetch_subscription(subscription_ref:)
-        sub = ::Stripe::Subscription.retrieve(subscription_ref)
+        sub = @client.retrieve_subscription(subscription_ref)
         normalise_subscription(sub)
-      rescue ::Stripe::StripeError => e
-        raise Billing::GatewayError, "Stripe.fetch_subscription failed: #{e.message}"
       end
 
-      # Docs: https://docs.stripe.com/api/checkout/sessions/create
-      # Required: line_items, mode, success_url, cancel_url. Pass
-      # `customer:` (existing) to attach to a known customer; without
-      # it Stripe creates one and tells us via webhook.
-      # Returns a Session whose `.url` is the hosted checkout page.
+      # POST /v1/checkout/sessions  (mode: "subscription")
       def create_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **opts)
-        session = ::Stripe::Checkout::Session.create(
+        session = @client.create_checkout_session({
           mode:        "subscription",
           line_items:  [{ price: plan_ref, quantity: 1 }],
           customer:    customer_ref,
           success_url: success_url,
-          cancel_url:  cancel_url,
-          **opts
-        )
-        { id: session.id, url: session.url }
-      rescue ::Stripe::StripeError => e
-        raise Billing::GatewayError, "Stripe.create_checkout_session failed: #{e.message}"
+          cancel_url:  cancel_url
+        }.merge(opts))
+        { id: session["id"], url: session["url"] }
       end
 
-      # Docs: https://docs.stripe.com/api/customer_portal/sessions/create
-      # Required: `customer`. `return_url` is the URL Stripe sends the
-      # user back to when they're done with the portal.
-      # Returns a BillingPortal::Session with `.url` for redirect.
-      def create_billing_portal_session(customer_ref:, return_url:, **opts)
-        session = ::Stripe::BillingPortal::Session.create(
+      # POST /v1/billing_portal/sessions
+      def create_billing_portal_session(customer_ref:, return_url:, **)
+        session = @client.create_billing_portal_session(
           customer:   customer_ref,
-          return_url: return_url,
-          **opts
+          return_url: return_url
         )
-        { id: session.id, url: session.url }
-      rescue ::Stripe::StripeError => e
-        raise Billing::GatewayError, "Stripe.create_billing_portal_session failed: #{e.message}"
+        { id: session["id"], url: session["url"] }
       end
 
-      # Docs: https://docs.stripe.com/api/checkout/sessions/create
-      #       https://docs.stripe.com/payments/checkout/fulfill-orders
-      # Lifetime Deal flow — `mode: "payment"` instead of `subscription`.
-      # No customer.subscription.* webhooks fire; the
-      # `checkout.session.completed` webhook is what tells us payment
-      # succeeded. payment_intent_data.metadata carries the LTD plan_ref
-      # so the webhook handler can resolve the right plan without an
-      # extra API call.
+      # POST /v1/checkout/sessions  (mode: "payment", LTD path).
+      # metadata.access_type=lifetime + metadata.plan_ref=<plan_ref>
+      # are duplicated on the session AND payment_intent_data so the
+      # webhook handler can read either one.
       def create_lifetime_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **opts)
-        session = ::Stripe::Checkout::Session.create(
+        session = @client.create_checkout_session({
           mode:        "payment",
           line_items:  [{ price: plan_ref, quantity: 1 }],
           customer:    customer_ref,
           success_url: success_url,
           cancel_url:  cancel_url,
-          payment_intent_data: {
-            metadata: { access_type: "lifetime", plan_ref: plan_ref }
-          },
-          metadata: { access_type: "lifetime", plan_ref: plan_ref },
-          **opts
-        )
-        { id: session.id, url: session.url }
-      rescue ::Stripe::StripeError => e
-        raise Billing::GatewayError, "Stripe.create_lifetime_checkout_session failed: #{e.message}"
+          payment_intent_data: { metadata: { access_type: "lifetime", plan_ref: plan_ref } },
+          metadata:            { access_type: "lifetime", plan_ref: plan_ref }
+        }.merge(opts))
+        { id: session["id"], url: session["url"] }
       end
 
-      # Docs: https://docs.stripe.com/webhooks/signatures
-      # Stripe::Webhook.construct_event verifies the timestamped HMAC
-      # signature in the `Stripe-Signature` header against `secret`,
-      # returning a Stripe::Event when valid and raising
-      # Stripe::SignatureVerificationError otherwise.
+      # https://docs.stripe.com/webhooks/signatures
+      # Verifies the Stripe-Signature header against `secret`. Raises
+      # Billing::WebhookError on any failure (no header / no v1 / no
+      # matching v1 / timestamp outside the 5-minute tolerance window).
+      # Returns the normalised event hash on success.
       def verify_webhook(payload:, signature:, secret:)
-        event = ::Stripe::Webhook.construct_event(payload, signature, secret)
+        Billing::Stripe::WebhookSignature.verify!(
+          payload:          payload,
+          signature_header: signature,
+          secret:           secret
+        )
+        event = JSON.parse(payload)
         {
-          id:       event.id,        # evt_* — used by the controller for dedupe
-          type:     event.type,
-          livemode: event.livemode,
-          object:   event.data.object,
+          id:       event["id"],          # evt_* — controller dedupes via Billing::WebhookEvent
+          type:     event["type"],
+          livemode: event["livemode"],
+          object:   event.dig("data", "object"),
           raw:      payload
         }
-      rescue ::Stripe::SignatureVerificationError => e
-        raise Billing::WebhookError, "Stripe webhook signature verification failed: #{e.message}"
+      rescue JSON::ParserError => e
+        raise Billing::WebhookError, "Stripe webhook payload is not valid JSON: #{e.message}"
       end
 
       private
 
+      # Stripe's response shape changed: current_period_end now lives
+      # on items.data[].current_period_end. We try the subscription
+      # root first for backwards compatibility, then fall back to the
+      # first item.
       def normalise_subscription(sub)
+        items_data = sub.dig("items", "data") || []
+        first_item = items_data.first || {}
         {
-          id:                  sub.id,
-          status:              sub.status,
-          current_period_end:  sub.respond_to?(:current_period_end) ? sub.current_period_end : nil,
-          plan_ref:            sub.items.data.first&.price&.id
+          id:                  sub["id"],
+          status:              sub["status"],
+          current_period_end:  sub["current_period_end"] || first_item["current_period_end"],
+          plan_ref:            first_item.dig("price", "id")
         }
       end
     end

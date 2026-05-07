@@ -1,0 +1,120 @@
+# frozen_string_literal: true
+
+require "faraday"
+require "json"
+
+module Billing
+  module Stripe
+    # Thin Faraday-based REST client for the five Stripe endpoints the
+    # Billing engine uses. Owned in-tree so the gem doesn't depend on
+    # Stripe's official SDK (which uses Net::HTTP under the hood and
+    # violates the Faraday-only rule documented in
+    # feedback_external_apis.md).
+    #
+    # Verified against:
+    #   https://docs.stripe.com/api/subscriptions/create
+    #   https://docs.stripe.com/api/subscriptions/cancel
+    #   https://docs.stripe.com/api/subscriptions/retrieve
+    #   https://docs.stripe.com/api/checkout/sessions/create
+    #   https://docs.stripe.com/api/customer_portal/sessions/create
+    #
+    # Stripe REST API uses HTTP Basic Auth with the secret key as the
+    # username (no password). Form-encoded bodies for POST. Response
+    # is JSON. Errors come back as 4xx with { "error": { "message": ... } }.
+    class Client
+      BASE_URL        = "https://api.stripe.com"
+      DEFAULT_TIMEOUT = 30  # seconds — Stripe's 99th percentile is well under this
+
+      def initialize(api_key:, base_url: BASE_URL, timeout: DEFAULT_TIMEOUT)
+        @api_key = api_key
+        @conn = Faraday.new(url: base_url) do |f|
+          f.request  :url_encoded
+          f.request  :authorization, :basic, api_key, ""
+          f.options.timeout      = timeout
+          f.options.open_timeout = 5
+          f.adapter Faraday.default_adapter
+        end
+      end
+
+      # POST /v1/subscriptions
+      def create_subscription(customer:, items:, **extra)
+        post("/v1/subscriptions", flatten_params({ customer: customer, items: items }.merge(extra)))
+      end
+
+      # DELETE /v1/subscriptions/{id}
+      def cancel_subscription(subscription_id, **extra)
+        delete("/v1/subscriptions/#{subscription_id}", flatten_params(extra))
+      end
+
+      # GET /v1/subscriptions/{id}
+      def retrieve_subscription(subscription_id)
+        get("/v1/subscriptions/#{subscription_id}")
+      end
+
+      # POST /v1/checkout/sessions
+      def create_checkout_session(params)
+        post("/v1/checkout/sessions", flatten_params(params))
+      end
+
+      # POST /v1/billing_portal/sessions
+      def create_billing_portal_session(customer:, return_url: nil)
+        body = { customer: customer }
+        body[:return_url] = return_url if return_url
+        post("/v1/billing_portal/sessions", flatten_params(body))
+      end
+
+      private
+
+      attr_reader :conn
+
+      def get(path)
+        handle(conn.get(path))
+      end
+
+      def post(path, body)
+        handle(conn.post(path, body))
+      end
+
+      def delete(path, body)
+        handle(conn.delete(path) { |req| req.body = URI.encode_www_form(body) unless body.empty? })
+      end
+
+      def handle(response)
+        body = response.body.to_s.empty? ? {} : JSON.parse(response.body)
+        return body if response.success?
+
+        message = body.dig("error", "message") || "HTTP #{response.status}"
+        raise Billing::GatewayError, "Stripe API error (#{response.status}): #{message}"
+      rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
+        raise Billing::GatewayError, "Stripe connection error: #{e.class} #{e.message}"
+      end
+
+      # Stripe's REST API uses bracket-notation for nested params:
+      #   items[0][price]=price_xxx
+      #   payment_intent_data[metadata][access_type]=lifetime
+      # Faraday's :url_encoded middleware handles flat hashes; nested
+      # ones need explicit flattening so we control the bracket layout.
+      def flatten_params(params, parent = nil)
+        params.each_with_object({}) do |(k, v), acc|
+          key = parent ? "#{parent}[#{k}]" : k.to_s
+          case v
+          when Hash
+            acc.merge!(flatten_params(v, key))
+          when Array
+            v.each_with_index do |item, i|
+              if item.is_a?(Hash)
+                acc.merge!(flatten_params(item, "#{key}[#{i}]"))
+              else
+                acc["#{key}[#{i}]"] = item
+              end
+            end
+          when nil
+            # skip
+          else
+            acc[key] = v
+          end
+        end
+      end
+    end
+  end
+end

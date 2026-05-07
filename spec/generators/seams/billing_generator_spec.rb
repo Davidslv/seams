@@ -51,19 +51,14 @@ RSpec.describe Seams::Generators::BillingGenerator do
   describe "gateways" do
     let(:gateway_needles) do
       %w[
-        ::Stripe::Subscription.create
-        ::Stripe::Subscription.cancel
-        ::Stripe::Subscription.retrieve
-        ::Stripe::Checkout::Session.create
-        ::Stripe::BillingPortal::Session.create
-        ::Stripe::Webhook.construct_event
+        Billing::Stripe::Client
+        Billing::Stripe::WebhookSignature
         docs.stripe.com/api/subscriptions/create
         docs.stripe.com/api/subscriptions/cancel
         docs.stripe.com/api/subscriptions/retrieve
         docs.stripe.com/api/checkout/sessions/create
         docs.stripe.com/api/customer_portal/sessions/create
         docs.stripe.com/webhooks/signatures
-        Billing::GatewayError
         Billing::WebhookError
       ]
     end
@@ -77,12 +72,45 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
-    it "creates the Stripe gateway with documented Stripe API calls + doc URLs" do
+    it "creates the Stripe gateway that delegates to the Faraday client + WebhookSignature" do
       assert_file "engines/billing/lib/billing/gateways/stripe.rb" do |content|
         gateway_needles.each do |needle|
           expect(content).to include(needle), "expected gateway to include #{needle}"
         end
       end
+    end
+
+    it "ships the Faraday-based Stripe REST client (no stripe gem dependency)" do
+      assert_file "engines/billing/lib/billing/stripe/client.rb" do |content|
+        [
+          'require "faraday"',
+          "Faraday.new",
+          "https://api.stripe.com",
+          "def create_subscription",
+          "def cancel_subscription",
+          "def create_checkout_session",
+          "flatten_params"
+        ].each { |needle| expect(content).to include(needle.tr("\\", "")) }
+      end
+    end
+
+    it "ships the HMAC-SHA256 WebhookSignature module (no SDK dependency)" do
+      assert_file "engines/billing/lib/billing/stripe/webhook_signature.rb" do |content|
+        expect(content).to include("OpenSSL::HMAC.hexdigest")
+        expect(content).to include('OpenSSL::Digest.new("sha256")')
+        expect(content).to include("DEFAULT_TOLERANCE = 300")
+        expect(content).to include("fixed_length_secure_compare")
+      end
+    end
+
+    it "host_inject_gem adds faraday (not stripe) to the host Gemfile" do
+      # The generator's wire_into_host runs against destination_root
+      # rather than producing a generated file, so we read its source
+      # to assert what it injects.
+      gen_path = File.expand_path("../../../lib/generators/seams/billing/billing_generator.rb", __dir__)
+      content  = File.read(gen_path)
+      expect(content).to include('host_inject_gem("faraday"')
+      expect(content).not_to match(/host_inject_gem\("stripe"/)
     end
   end
 
