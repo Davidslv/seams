@@ -206,7 +206,7 @@ module Seams
             t.string  :interval,          null: false, default: "month"
             t.integer :trial_period_days
             t.boolean :active,            null: false, default: true
-            t.text    :features,          null: false, default: "{}"
+            t.jsonb   :features,          null: false, default: {}
             t.timestamps
           end
 

@@ -25,9 +25,11 @@ Gem::Specification.new do |spec|
   spec.metadata["rubygems_mfa_required"] = "true"
 
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
-    Dir["{lib}/**/*", "LICENSE", "README.md", "CHANGELOG.md"].reject { |f| File.directory?(f) }
+    Dir["{lib,exe}/**/*", "LICENSE", "README.md", "CHANGELOG.md"].reject { |f| File.directory?(f) }
   end
 
+  spec.bindir       = "exe"
+  spec.executables  = Dir["exe/*"].map { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
   spec.add_dependency "rails", ">= 7.1", "< 9.0"

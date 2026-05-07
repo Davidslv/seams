@@ -145,7 +145,7 @@ module Seams
             t.string  :auditable_type
             t.bigint  :auditable_id
             t.bigint  :actor_id
-            t.text    :payload,        null: false, default: "{}"
+            t.jsonb   :payload,        null: false, default: {}
             t.timestamps
           end
           add_index :core_audit_logs, %i[auditable_type auditable_id]

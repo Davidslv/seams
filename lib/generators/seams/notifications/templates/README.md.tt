@@ -109,9 +109,30 @@ The Billing subscriber resolves the host User by
 `stripe_customer_id` (the column the `Billing::Billable` concern
 documents). It only attaches when `Billing::Engine` is loaded.
 
-Subscribers always create persistent Notification rows and enqueue —
-they don't run side-effects synchronously inside the publisher's
-transaction.
+### Cross-engine dependencies
+
+The subscribers in this engine reach into other engines' models and
+the host User class. This dependency direction is intentional but
+worth documenting explicitly:
+
+| Subscriber | Reaches into | Why |
+| --- | --- | --- |
+| `Notifications::AuthSubscriber`    | host `::User` class    | resolve owner from `host_user_id` payload |
+| `Notifications::BillingSubscriber` | host `::User` class    | resolve owner from `customer_ref` via `stripe_customer_id` column |
+| `Notifications::CreateNotificationJob` | host `::User` class | resolve owner before creating the Notification |
+
+If you have a host whose user-facing class isn't `::User`, the
+default subscribers won't find owners. Override by writing your own
+subscriber that publishes `Notifications::CreateNotificationJob`
+with your class name in `owner_class:`.
+
+### Subscribers enqueue, never block the publisher
+
+`Seams::Events::Publisher` runs subscribers synchronously in the
+publisher's thread. Every subscriber here therefore enqueues
+`Notifications::CreateNotificationJob` (which does the actual DB
+write + send) rather than calling `Notification.create!` inline.
+Publishing should never wait on the bus.
 
 ## Exposed concerns
 
