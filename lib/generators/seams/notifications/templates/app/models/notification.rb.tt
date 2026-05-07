@@ -9,7 +9,7 @@ module Notifications
   # scheduling, and audit logic.
   #
   # Scheduling is delegated to ice_cube. The schedule is persisted as
-  # a jsonb hash via +schedule_data+ and exposed through
+  # a json hash via +schedule_data+ and exposed through
   # +schedule+/+schedule=+. +next_delivery_at+ is an indexed cache so
   # the recurring sweeper hits one query.
   class Notification < ApplicationRecord
@@ -63,7 +63,7 @@ module Notifications
       IceCube::Schedule.from_hash(schedule_data)
     end
 
-    # Assigns an IceCube::Schedule, persisting it as jsonb and setting
+    # Assigns an IceCube::Schedule, persisting it as json and setting
     # +next_delivery_at+ to the schedule's first occurrence.
     def schedule=(sched)
       self.schedule_data    = sched&.to_hash
