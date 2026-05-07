@@ -46,9 +46,18 @@ module Seams
       # span multiple following keys — the regex stops as soon as it has
       # consumed either the inline `[]` form or the indented list form.
       def replace_other_engines(content, cop_key, values)
-        formatted_block(values).then do |formatted|
-          content.sub(other_engines_regex(cop_key), "\\1#{formatted}\n")
+        regex     = other_engines_regex(cop_key)
+        formatted = formatted_block(values)
+
+        unless regex.match?(content)
+          raise ArgumentError,
+                "SiblingRubocopWriter could not find a writable `OtherEngines:` " \
+                "value under `#{cop_key}`. Hand-edited or flow-style YAML " \
+                "(`{ OtherEngines: [Foo] }`) is not supported — restore the " \
+                "block-style template and retry."
         end
+
+        content.sub(regex, "\\1#{formatted}\n")
       end
 
       def formatted_block(values)

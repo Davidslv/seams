@@ -35,6 +35,20 @@ RSpec.describe Seams::Generators::RemoveGenerator do
       expect { run_generator(["nonexistent", "--force"]) }.not_to raise_error
     end
 
+    it "does not print a misleading 'update' line when the remove was a no-op" do
+      output = capture_stdout { run_generator(["nonexistent", "--force"]) }
+      expect(output).not_to include("update")
+    end
+
+    def capture_stdout
+      original = $stdout
+      $stdout  = StringIO.new
+      yield
+      $stdout.string
+    ensure
+      $stdout = original
+    end
+
     it "leaves the engines/ root intact even after removing the last engine" do
       run_generator(["billing", "--force"])
       expect(Dir.exist?(File.join(destination_root, "engines"))).to be(true)

@@ -103,5 +103,17 @@ RSpec.describe Seams::Generators::SiblingRubocopWriter do
         described_class.rewrite!(engines_root: engines_root, dirs: %w[no_config auth])
       end.not_to raise_error
     end
+
+    it "raises a clear error when a hand-edited config has no writable OtherEngines block" do
+      FileUtils.mkdir_p(File.join(engines_root, "auth"))
+      File.write(File.join(engines_root, "auth", ".rubocop.yml"), <<~YML)
+        Seams/NoCrossEngineModelAccess: { OtherEngines: [Billing] }
+        Seams/NoCrossEngineDependency: { OtherEngines: [billing] }
+      YML
+
+      expect do
+        described_class.rewrite!(engines_root: engines_root, dirs: %w[auth billing])
+      end.to raise_error(ArgumentError, /OtherEngines/)
+    end
   end
 end

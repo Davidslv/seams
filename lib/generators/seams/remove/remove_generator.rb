@@ -21,6 +21,7 @@ module Seams
         engine_path = File.join(destination_root, "engines", name)
 
         unless File.directory?(engine_path)
+          @engine_was_present = false
           say "  skip    engines/#{name}/ (not found)", :yellow
           return
         end
@@ -28,10 +29,13 @@ module Seams
         return unless options[:force] || confirm_removal?
 
         FileUtils.rm_rf(engine_path)
+        @engine_was_present = true
         say "  remove  engines/#{name}/", :red
       end
 
       def update_sibling_engines
+        return unless @engine_was_present
+
         engines_root = File.join(destination_root, "engines")
         return unless Dir.exist?(engines_root)
 
