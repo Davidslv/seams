@@ -23,5 +23,9 @@ module Teams
         end
       end
     end
+
+    config.after_initialize do
+      Teams::InvitationSubscriber.attach!
+    end
   end
 end

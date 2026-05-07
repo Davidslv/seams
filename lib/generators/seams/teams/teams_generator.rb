@@ -68,6 +68,15 @@ module Seams
                  engine_path("app/jobs/teams/application_job.rb")
       end
 
+      def create_mailer_and_subscriber
+        template "app/mailers/invitation_mailer.rb.tt",
+                 engine_path("app/mailers/teams/invitation_mailer.rb")
+        template "app/views/invitation_mailer/invite.text.erb.tt",
+                 engine_path("app/views/teams/invitation_mailer/invite.text.erb")
+        template "app/subscribers/invitation_subscriber.rb.tt",
+                 engine_path("app/subscribers/teams/invitation_subscriber.rb")
+      end
+
       def create_migrations
         template "db/migrate/create_teams.rb.tt",
                  engine_path("db/migrate/#{timestamp(0)}_create_teams.rb")

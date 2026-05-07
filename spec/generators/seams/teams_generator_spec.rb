@@ -43,7 +43,51 @@ RSpec.describe Seams::Generators::TeamsGenerator do
   describe "configuration" do
     it "creates Teams::Configuration with invitation_ttl + max_members_per_team" do
       assert_file "engines/teams/lib/teams/configuration.rb" do |content|
-        expect(content).to include("attr_accessor :invitation_ttl, :max_members_per_team")
+        expect(content).to include("invitation_ttl")
+        expect(content).to include("max_members_per_team")
+      end
+    end
+
+    it "exposes invitation_mailer_from + host_url for the InvitationMailer" do
+      assert_file "engines/teams/lib/teams/configuration.rb" do |content|
+        expect(content).to include("invitation_mailer_from")
+        expect(content).to include("host_url")
+      end
+    end
+  end
+
+  describe "InvitationMailer + subscriber" do
+    it "ships an InvitationMailer that sends to the invitation.email" do
+      assert_file "engines/teams/app/mailers/teams/invitation_mailer.rb" do |content|
+        expect(content).to include("class InvitationMailer < ActionMailer::Base")
+        expect(content).to include("def invite(invitation_id)")
+        expect(content).to include("Teams.configuration.invitation_mailer_from")
+        expect(content).to include("Teams.configuration.host_url")
+      end
+    end
+
+    it "ships a default invite.text.erb body the host can override" do
+      assert_file "engines/teams/app/views/teams/invitation_mailer/invite.text.erb"
+    end
+
+    it "InvitationSubscriber consumes invitation.sent.teams and enqueues the mailer" do
+      assert_file "engines/teams/app/subscribers/teams/invitation_subscriber.rb" do |content|
+        expect(content).to include('Seams::Events::Publisher.subscribe("invitation.sent.teams")')
+        expect(content).to include("Teams::InvitationMailer.invite(invitation_id).deliver_later")
+        expect(content).to include("return if attached?")
+      end
+    end
+
+    it "engine.rb attaches the subscriber after_initialize" do
+      assert_file "engines/teams/lib/teams/engine.rb" do |content|
+        expect(content).to include("Teams::InvitationSubscriber.attach!")
+      end
+    end
+
+    it "InvitationsController#create publishes invitation_id + token" do
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
+        expect(content).to include("invitation_id: invitation.id")
+        expect(content).to include("token:         invitation.token")
       end
     end
   end

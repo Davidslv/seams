@@ -4,11 +4,14 @@ module Teams
   # Engine-scoped configuration. Override in
   # config/initializers/teams.rb of the host application.
   class Configuration
-    attr_accessor :invitation_ttl, :max_members_per_team
+    attr_accessor :invitation_ttl, :max_members_per_team,
+                  :invitation_mailer_from, :host_url
 
     def initialize
-      @invitation_ttl       = 7 * 24 * 60 * 60  # 7 days, in seconds
-      @max_members_per_team = nil               # nil = unlimited
+      @invitation_ttl         = 7 * 24 * 60 * 60  # 7 days, in seconds
+      @max_members_per_team   = nil               # nil = unlimited
+      @invitation_mailer_from = "no-reply@example.com"
+      @host_url               = "https://example.com"
     end
   end
 end

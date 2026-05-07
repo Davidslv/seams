@@ -1,0 +1,8 @@
+<%%# Default invitation email body. Override at %>
+<%%# app/views/teams/invitation_mailer/invite.text.erb in your host. %>
+You've been invited to join <%%= @team.name %>.
+
+Accept the invitation here:
+<%%= @accept_url %>
+
+If you don't recognise this team, you can ignore this email.

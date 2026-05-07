@@ -9,12 +9,14 @@
 | `team.created.teams`             | `{ team_id:, owner_id: }`                        | TeamsController#create succeeds |
 | `team.member_added.teams`        | `{ team_id:, user_id:, role: }`                  | MembershipsController#create succeeds |
 | `team.member_removed.teams`      | `{ team_id:, user_id: }`                         | MembershipsController#destroy runs |
-| `invitation.sent.teams`          | `{ team_id:, email:, role: }`                    | InvitationsController#create succeeds |
+| `invitation.sent.teams`          | `{ invitation_id:, team_id:, email:, role:, token: }` | InvitationsController#create succeeds |
 | `invitation.accepted.teams`      | `{ team_id:, email:, user_id: }`                 | InvitationsController#accept succeeds |
 
 ## Events consumed
 
-This engine does not subscribe to any other engine's events by default.
+| Event name              | Subscriber                       | What it does |
+| ---                     | ---                              | --- |
+| `invitation.sent.teams` | `Teams::InvitationSubscriber`    | Looks up the invitation by id and enqueues `Teams::InvitationMailer.invite(invitation_id).deliver_later`. The host overrides the email body at `app/views/teams/invitation_mailer/invite.text.erb`. |
 
 ## Exposed concerns
 

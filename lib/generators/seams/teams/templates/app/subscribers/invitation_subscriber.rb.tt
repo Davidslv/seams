@@ -1,0 +1,37 @@
+# frozen_string_literal: true
+
+module Teams
+  # Consumes Teams events. On +invitation.sent.teams+:
+  #   1. Resolves the Teams::Invitation by id from the payload.
+  #   2. Enqueues Teams::InvitationMailer.invite — `deliver_later` so
+  #      the publisher's transaction isn't blocked on SMTP.
+  #
+  # +.attach!+ is idempotent — Rails reload won't double-subscribe.
+  class InvitationSubscriber
+    @attached = false
+
+    class << self
+      attr_accessor :attached
+      alias_method :attached?, :attached
+
+      def attach!
+        return if attached?
+
+        Seams::Events::Publisher.subscribe("invitation.sent.teams") do |payload|
+          handle_invitation_sent(payload)
+        end
+
+        self.attached = true
+      end
+
+      private
+
+      def handle_invitation_sent(payload)
+        invitation_id = payload[:invitation_id]
+        return unless invitation_id
+
+        Teams::InvitationMailer.invite(invitation_id).deliver_later
+      end
+    end
+  end
+end

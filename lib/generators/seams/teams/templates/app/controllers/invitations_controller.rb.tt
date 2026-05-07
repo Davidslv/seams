@@ -15,7 +15,11 @@ module Teams
       invitation = @team.invitations.create!(invitation_params)
       Seams::Events::Publisher.publish(
         "invitation.sent.teams",
-        team_id: @team.id, email: invitation.email, role: invitation.role
+        invitation_id: invitation.id,
+        team_id:       @team.id,
+        email:         invitation.email,
+        role:          invitation.role,
+        token:         invitation.token
       )
       redirect_to team_invitations_path(@team), notice: "Invitation sent"
     rescue ActiveRecord::RecordInvalid => e
