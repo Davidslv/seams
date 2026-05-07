@@ -84,6 +84,10 @@ RSpec.describe "rails new integration", type: :integration_full do
     shell(["bin/rails", "generate", "seams:#{name}"])
   end
 
+  def boot_probe(ruby_expr)
+    shell_capture(["bin/rails", "runner", ruby_expr]).lines.last.to_s.strip
+  end
+
   it "scaffolds + boots all canonical engines from a fresh rails new" do
     run_rails_new
     add_gems_to_gemfile
@@ -114,5 +118,27 @@ RSpec.describe "rails new integration", type: :integration_full do
     actual = tables.lines.last.to_s.strip.split(",")
     missing = expected - actual
     expect(missing).to be_empty, "host db is missing engine tables: #{missing.join(', ')} (got: #{actual.inspect})"
+  end
+
+  # Phase 1.9 round-trip: the generic engine generator + the remove
+  # generator must each leave the host bootable. Tests them together so
+  # we don't need a second `rails new`.
+  it "generates and then removes a generic engine, leaving the host bootable each time" do
+    run_rails_new
+    add_gems_to_gemfile
+    bundle_install
+    generate("install")
+
+    shell(%w[bin/rails generate seams:engine reporting])
+
+    expect(boot_probe("puts defined?(Reporting::Engine)")).to eq("constant")
+    expect(File.directory?(File.join(host_path, "engines/reporting"))).to be(true)
+
+    shell(%w[bin/rails generate seams:remove reporting --force])
+
+    expect(File.directory?(File.join(host_path, "engines/reporting"))).to be(false)
+    # Host still boots — `bin/rails runner` returns 0 and `Reporting::Engine`
+    # is no longer defined.
+    expect(boot_probe("puts defined?(Reporting::Engine).inspect")).to eq("nil")
   end
 end
