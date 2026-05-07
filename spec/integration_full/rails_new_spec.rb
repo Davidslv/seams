@@ -145,9 +145,13 @@ RSpec.describe "rails new integration", type: :integration_full do
     # the right file (Auth::Authenticatable, Notifications::Notifiable,
     # Billing::Billable, Teams::Teamable). Without this, the engines
     # skip with a "User model not found" notice and the cross-engine
-    # wiring assertion at the bottom of this example would have to
+    # wiring assertions at the bottom of this example would have to
     # patch Notifiable in by hand.
-    shell(%w[bin/rails generate model User email:string])
+    #
+    # stripe_customer_id is included so Phase 3B's billing-event check
+    # below can resolve User.find_by(stripe_customer_id: ...) — the
+    # column Billing::Billable documents on the host User.
+    shell(%w[bin/rails generate model User email:string stripe_customer_id:string])
 
     %w[install core auth notifications billing teams].each { |g| generate(g) }
 
@@ -200,6 +204,36 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(notification_count).to eq("1").or(eq("2")),
                                   "expected at least one Notifications::Notification to be created " \
                                   "by the AuthSubscriber, got #{notification_count.inspect}"
+
+    # Phase 3B — verify billing + auth + notifications wire up
+    # end-to-end. Publish a canonical invoice.paid.billing event
+    # whose customer_ref matches a User's stripe_customer_id; the
+    # BillingSubscriber should resolve the host user and enqueue a
+    # CreateNotificationJob. Inline-queue runs it sync so we can
+    # assert on the resulting Notification row directly.
+    billing_count = boot_probe(<<~RUBY)
+      ActiveJob::Base.queue_adapter = :inline
+      user = User.create!(
+        email:              "phase3b-\#{Process.pid}@example.com",
+        stripe_customer_id: "cus_phase3b_\#{Process.pid}"
+      )
+
+      Seams::Events::Publisher.publish(
+        "invoice.paid.billing",
+        gateway:      "stripe",
+        livemode:     false,
+        customer_ref: user.stripe_customer_id,
+        ref:          "in_phase3b",
+        object_id:    "in_phase3b",
+        object:       { id: "in_phase3b", customer: user.stripe_customer_id, status: "paid" }
+      )
+
+      puts Notifications::Notification.where(owner: user, template: "billing/invoice_paid").count
+    RUBY
+
+    expect(billing_count).to eq("1"),
+                             "expected exactly one Notification(template: billing/invoice_paid) " \
+                             "to be created by the BillingSubscriber, got #{billing_count.inspect}"
   end
 
   # Phase 1.9 round-trip: the generic engine generator + the remove
