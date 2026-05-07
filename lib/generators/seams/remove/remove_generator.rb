@@ -97,6 +97,24 @@ module Seams
         say "          → run `bin/rails db:migrate` to drop #{@engine_tables.size} table(s).", :yellow
       end
 
+      # Phase 1.7 — re-run `bundle install` so the host's lockfile no
+      # longer references the removed engine's gem deps (the canonical
+      # generators each inject their own — bcrypt, faraday, etc; the
+      # remover doesn't touch the Gemfile because deps are usually
+      # shared, but a fresh `bundle install` keeps lockfile + Gemfile
+      # in sync if the host did prune anything by hand). Skipped when
+      # the engine was never present (no-op remove) or when there's
+      # no Gemfile to bundle against.
+      def run_bundle_install
+        return unless @engine_was_present
+        return unless File.exist?(File.join(destination_root, "Gemfile"))
+
+        say "  run     bundle install (post-remove sync)", :green
+        Dir.chdir(destination_root) do
+          system("bundle", "install", "--quiet") || say("          → bundle install failed; resolve manually.", :red)
+        end
+      end
+
       def update_sibling_engines
         return unless @engine_was_present
 

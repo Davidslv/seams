@@ -140,4 +140,37 @@ RSpec.describe Seams::Generators::RemoveGenerator do
       expect(generated).to be_empty
     end
   end
+
+  describe "post-remove bundle install (Phase 1.7 follow-up)" do
+    it "runs `bundle install --quiet` from the host root when a Gemfile is present" do
+      # prepare_destination_with_engine in the top-level before-block already
+      # seeded engines/billing/, so the remove path runs end-to-end.
+      File.write(File.join(destination_root, "Gemfile"), "# host Gemfile\n")
+      generator = described_class.new(["billing"], ["--force"], destination_root: destination_root)
+      allow(generator).to receive(:system).and_return(true)
+
+      generator.invoke_all
+
+      expect(generator).to have_received(:system).with("bundle", "install", "--quiet")
+    end
+
+    it "skips bundle install when the engine never existed (no-op remove)" do
+      File.write(File.join(destination_root, "Gemfile"), "# host Gemfile\n")
+      generator = described_class.new(["nonexistent"], ["--force"], destination_root: destination_root)
+      allow(generator).to receive(:system)
+
+      generator.invoke_all
+
+      expect(generator).not_to have_received(:system).with("bundle", "install", anything)
+    end
+
+    it "skips bundle install when the host has no Gemfile" do
+      generator = described_class.new(["billing"], ["--force"], destination_root: destination_root)
+      allow(generator).to receive(:system)
+
+      generator.invoke_all
+
+      expect(generator).not_to have_received(:system).with("bundle", "install", anything)
+    end
+  end
 end
