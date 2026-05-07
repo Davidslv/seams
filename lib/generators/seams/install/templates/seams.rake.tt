@@ -23,4 +23,26 @@ namespace :seams do
     abort("Invalid engine name: #{name.inspect}") unless ENGINE_NAME_PATTERN.match?(name)
     sh "bundle", "exec", "rubocop", "engines/#{name}"
   end
+
+  desc "Pre-push verification: rubocop, host + per-engine specs, brakeman, bundle-audit, orphan-event check"
+  task audit: :environment do
+    Rake::Task["environment"].invoke
+    sh "bundle", "exec", "rubocop", "--parallel"
+    sh "bundle", "exec", "rspec", "spec"
+    Dir["engines/*"].select { |d| File.directory?(d) }.sort.each do |dir|
+      next if Dir.glob("#{dir}/spec/**/*_spec.rb").empty?
+
+      engine_name = File.basename(dir)
+      sh "bundle", "exec", "rspec",
+         "--default-path", "engines/#{engine_name}/spec",
+         "engines/#{engine_name}/spec"
+    end
+    sh "bundle", "exec", "brakeman", "--no-pager", "--no-progress", "--quiet"
+    sh "bundle", "exec", "bundle-audit", "check", "--update"
+
+    orphans = Seams::Events::Publisher.orphan_subscriptions
+    abort "orphan event subscriptions detected: #{orphans.inspect}" unless orphans.empty?
+
+    puts "All audit checks passed."
+  end
 end

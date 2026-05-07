@@ -49,10 +49,16 @@ RSpec.describe Seams::Generators::InstallGenerator do
   describe "#create_rake_tasks" do
     before { run_generator }
 
-    it "creates lib/tasks/seams.rake" do
+    it "creates lib/tasks/seams.rake with the canonical tasks" do
       assert_file "lib/tasks/seams.rake" do |content|
-        expect(content).to include("namespace :seams")
-        expect(content).to include("task list:")
+        [
+          "namespace :seams",
+          "task list:",
+          "task :test, [:engine]",
+          "task :quality, [:engine]",
+          "task audit:",
+          "orphan_subscriptions"
+        ].each { |snippet| expect(content).to include(snippet.tr("\\", "")) }
       end
     end
   end

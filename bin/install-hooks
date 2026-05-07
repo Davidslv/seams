@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# bin/install-hooks — installs the pre-push hook into .git/hooks.
+#
+# Run once after cloning. The hook itself is committed at
+# bin/hooks/pre-push so you can read it before installing.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SOURCE="$ROOT/bin/hooks/pre-push"
+TARGET="$ROOT/.git/hooks/pre-push"
+
+if [ ! -f "$SOURCE" ]; then
+  echo "missing $SOURCE — re-run from the seams repo root"
+  exit 1
+fi
+
+if [ ! -d "$ROOT/.git" ]; then
+  echo "no .git directory at $ROOT — are you running from a checkout?"
+  exit 1
+fi
+
+cp "$SOURCE" "$TARGET"
+chmod +x "$TARGET"
+echo "installed pre-push hook → $TARGET"
+echo "  uninstall with:  rm $TARGET"

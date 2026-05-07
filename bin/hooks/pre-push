@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Pre-push hook for the seams gem.
+#
+# Runs `bin/audit --fast` (rubocop + rspec + bundle-audit + brakeman +
+# orphan check). Skips the ~30s integration suite because pre-push
+# should stay snappy; the full integration job runs on CI on every
+# pushed commit anyway.
+#
+# Bypass for emergency pushes:
+#   git push --no-verify
+#
+# Install via:
+#   bin/install-hooks
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+exec "$ROOT/bin/audit" --fast
