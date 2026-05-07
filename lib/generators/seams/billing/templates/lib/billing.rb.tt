@@ -3,6 +3,9 @@
 require "billing/version"
 require "billing/configuration"
 require "billing/engine"
+require "billing/concerns/billable"
+require "billing/gateways/abstract"
+require "billing/gateways/stripe"
 
 module Billing
   class Error           < StandardError; end

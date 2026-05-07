@@ -3,6 +3,8 @@
 require "auth/version"
 require "auth/configuration"
 require "auth/engine"
+require "auth/concerns/authenticatable"
+require "auth/concerns/authentication"
 
 module Auth
   class << self

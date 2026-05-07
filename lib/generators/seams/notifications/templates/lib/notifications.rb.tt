@@ -3,6 +3,10 @@
 require "notifications/version"
 require "notifications/configuration"
 require "notifications/engine"
+require "notifications/concerns/notifiable"
+require "notifications/adapters/abstract"
+require "notifications/adapters/action_mailer"
+require "notifications/adapters/null_sms"
 
 module Notifications
   class Error          < StandardError; end

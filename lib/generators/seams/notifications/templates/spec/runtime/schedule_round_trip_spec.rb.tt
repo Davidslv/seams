@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "rails_helper"
+require_relative "../rails_helper"
 
 RSpec.describe "Notifications schedule round-trip", type: :integration do
   let(:user) { User.create!(email: "x@y.com") }

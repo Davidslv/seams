@@ -45,6 +45,8 @@ module Seams
         write(File.join(engine_path, "spec/dummy/app/models/user.rb"),     host_user) if host_user
         write(File.join(engine_path, "spec/dummy/log/.keep"),              "")
         write(File.join(engine_path, "spec/dummy/tmp/.keep"),              "")
+        write(File.join(engine_path, "spec/dummy/Rakefile"),               rakefile_rb)
+        write(File.join(engine_path, "spec/dummy/config.ru"),              config_ru)
 
         write(File.join(engine_path, "spec/spec_helper.rb"),               spec_helper_rb)
         write(File.join(engine_path, "spec/rails_helper.rb"),              rails_helper_rb)
@@ -69,18 +71,21 @@ module Seams
 
           require_relative "boot"
 
-          require "rails"
-          require "active_model/railtie"
-          require "active_job/railtie"
-          require "active_record/railtie"
-          require "action_controller/railtie"
-          require "action_view/railtie"
+          require "rails/all"
 
           Bundler.require(*Rails.groups)
+
+          # The engine isn't a published gem; it lives at engines/<name>/.
+          # Put its lib/ on the load path before requiring its root file.
+          $LOAD_PATH.unshift File.expand_path("../../../lib", __dir__)
           require "#{engine_module.downcase}"
 
           module Dummy
             class Application < Rails::Application
+              # Pin root to the dummy app so Rails doesn't walk up
+              # and pick up the host application's Rakefile/config.ru.
+              config.root = File.expand_path("..", __dir__)
+
               config.load_defaults Rails::VERSION::STRING.to_f
               config.eager_load = false
               config.active_support.deprecation = :stderr
@@ -165,6 +170,26 @@ module Seams
         RB
       end
 
+      def rakefile_rb
+        <<~RB
+          # frozen_string_literal: true
+
+          # Marker file so Rails::Engine.find_root anchors here, not
+          # in the parent host application.
+          require_relative "config/application"
+          Rails.application.load_tasks if defined?(Rails.application)
+        RB
+      end
+
+      def config_ru
+        <<~RB
+          # frozen_string_literal: true
+
+          require_relative "config/environment"
+          run Rails.application
+        RB
+      end
+
       def spec_helper_rb
         <<~RB
           # frozen_string_literal: true
@@ -190,7 +215,7 @@ module Seams
         <<~RB
           # frozen_string_literal: true
 
-          require "spec_helper"
+          require_relative "spec_helper"
           ENV["RAILS_ENV"] ||= "test"
           require File.expand_path("dummy/config/environment", __dir__)
           abort("Rails is in production mode!") if Rails.env.production?

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails/generators"
+require "seams/generators/host_injector"
 
 module Seams
   module Generators
@@ -13,6 +14,8 @@ module Seams
     #
     # Run with: bin/rails generate seams:install
     class InstallGenerator < Rails::Generators::Base
+      include Seams::Generators::HostInjector
+
       source_root File.expand_path("templates", __dir__)
 
       def create_initializer
@@ -60,6 +63,13 @@ module Seams
         template "bin_seams.tt", "bin/seams"
         full_path = File.join(destination_root, "bin/seams")
         File.chmod(0o755, full_path) if File.exist?(full_path)
+      end
+
+      def wire_into_host
+        # Every Seams host needs rspec-rails so the per-engine
+        # spec/dummy specs can actually run. Idempotent — skipped if
+        # the host already has these gems.
+        host_inject_gem("rspec-rails", "~> 7.1", group: :test)
       end
 
       private
