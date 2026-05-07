@@ -1,0 +1,16 @@
+<h1>Notifications</h1>
+
+<%% if @notifications.unread.exists? %>
+  <%%= button_to "Mark all as read", mark_all_as_read_notifications_path, method: :patch %>
+<%% end %>
+
+<ul>
+  <%% @notifications.each do |n| %>
+    <li class="<%%= 'unread' unless n.read? %>">
+      <%%= n.title %>
+      <%% if n.body.present? %><p><%%= n.body %></p><%% end %>
+      <%% if n.action_url.present? %><%%= link_to "Open", n.action_url %><%% end %>
+      <%%= time_tag n.created_at %>
+    </li>
+  <%% end %>
+</ul>

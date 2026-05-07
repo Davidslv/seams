@@ -1,0 +1,32 @@
+# frozen_string_literal: true
+
+# What: creates the notifications table for the in-app inbox.
+# Why:  every user-visible notification (welcome, billing event,
+#       team invitation, etc.) needs a persistent record so the bell
+#       icon can render unread counts and the user can revisit history.
+# Risk: append-mostly with read_at updates. Indexed by
+#       (recipient, read_at, created_at) for the bell query.
+class CreateNotifications < ActiveRecord::Migration[7.1]
+  def change
+    create_table :notifications do |t|
+      t.bigint  :recipient_id,   null: false
+      t.string  :recipient_type, null: false
+      t.string  :notification_type, null: false  # e.g. "welcome", "invoice_paid"
+      t.string  :channel,        null: false, default: "in_app"
+      t.string  :title,          null: false
+      t.text    :body
+      t.string  :action_url
+      t.bigint  :source_id
+      t.string  :source_type
+      t.jsonb   :metadata,       null: false, default: {}
+      t.datetime :read_at
+      t.datetime :delivered_at
+      t.timestamps
+    end
+
+    add_index :notifications, %i[recipient_type recipient_id read_at created_at],
+              name: "index_notifications_on_recipient_and_read"
+    add_index :notifications, %i[source_type source_id]
+    add_index :notifications, :notification_type
+  end
+end

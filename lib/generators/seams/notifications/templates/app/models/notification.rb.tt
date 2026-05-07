@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+module Notifications
+  class Notification < ApplicationRecord
+    self.table_name = "notifications"
+
+    CHANNELS = %w[in_app email sms].freeze
+
+    belongs_to :recipient, polymorphic: true
+    belongs_to :source,    polymorphic: true, optional: true
+
+    validates :notification_type, :title, :channel, presence: true
+    validates :channel, inclusion: { in: CHANNELS }
+
+    scope :unread,  -> { where(read_at: nil) }
+    scope :read,    -> { where.not(read_at: nil) }
+    scope :recent,  -> { order(created_at: :desc) }
+    scope :for,     ->(recipient) {
+      where(recipient_type: recipient.class.name, recipient_id: recipient.id)
+    }
+
+    def read?
+      read_at.present?
+    end
+
+    def mark_as_read!
+      update!(read_at: Time.current) unless read?
+    end
+  end
+end

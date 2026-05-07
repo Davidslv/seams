@@ -1,0 +1,15 @@
+<%%# Notification bell partial. Render in the host layout: %>
+<%%#   <%%= render "notifications/bell", recipient: current_user %> %>
+<%%
+  count = recipient&.notifications&.unread&.count || 0
+%>
+
+<a href="<%%= notifications.notifications_path %>"
+   class="notifications-bell"
+   data-controller="notification-bell"
+   data-notification-bell-count-value="<%%= count %>">
+  <span class="notifications-bell-icon">🔔</span>
+  <%% if count.positive? %>
+    <span class="notifications-bell-count" data-notification-bell-target="count"><%%= count %></span>
+  <%% end %>
+</a>

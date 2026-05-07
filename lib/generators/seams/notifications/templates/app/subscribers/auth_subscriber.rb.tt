@@ -1,12 +1,15 @@
 # frozen_string_literal: true
 
 module Notifications
-  # Consumes Auth events and enqueues outbound notification jobs.
-  # Subscribers always enqueue jobs — they never run side effects
-  # synchronously inside the publisher's transaction.
+  # Consumes Auth events and:
+  #   1. Persists an in-app Notification row (so the bell shows it).
+  #   2. Enqueues an outbound email via DeliverEmailJob if the user
+  #      hasn't opted out via NotificationPreference.
   #
-  # `.attach!` is idempotent — if Rails reloads in development the
-  # subscription is registered exactly once.
+  # Subscribers always enqueue jobs / DB writes; they never run side
+  # effects synchronously inside the publisher's transaction.
+  #
+  # `.attach!` is idempotent — Rails reload won't double-subscribe.
   class AuthSubscriber
     @attached = false
 
@@ -18,14 +21,36 @@ module Notifications
         return if attached?
 
         Seams::Events::Publisher.subscribe("user.signed_up.auth") do |payload|
-          DeliverEmailJob.perform_later(
-            to: payload[:email],
-            subject: "Welcome",
-            body: "Thanks for signing up. Reply to this email if you need anything."
-          )
+          handle_signed_up(payload)
         end
 
         self.attached = true
+      end
+
+      private
+
+      def handle_signed_up(payload)
+        return unless payload[:user_id] && payload[:email]
+
+        Notifications::Notification.create!(
+          recipient_type:    "User",
+          recipient_id:      payload[:user_id],
+          notification_type: "welcome",
+          channel:           "in_app",
+          title:             "Welcome",
+          body:              "Thanks for signing up.",
+          delivered_at:      Time.current
+        )
+
+        return unless Notifications::NotificationPreference.enabled?(
+          user_id: payload[:user_id], channel: "email", notification_type: "welcome"
+        )
+
+        DeliverEmailJob.perform_later(
+          to:      payload[:email],
+          subject: "Welcome",
+          body:    "Thanks for signing up. Reply to this email if you need anything."
+        )
       end
     end
   end

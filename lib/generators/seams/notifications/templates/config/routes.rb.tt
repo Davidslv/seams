@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+Notifications::Engine.routes.draw do
+  resources :notifications, only: %i[index show] do
+    member do
+      patch :mark_as_read
+    end
+    collection do
+      patch :mark_all_as_read
+    end
+  end
+
+  resource :preferences, only: %i[show update]
+end

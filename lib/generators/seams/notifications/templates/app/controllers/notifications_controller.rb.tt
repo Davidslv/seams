@@ -1,0 +1,38 @@
+# frozen_string_literal: true
+
+module Notifications
+  class NotificationsController < ApplicationController
+    before_action :set_notification, only: %i[show mark_as_read]
+
+    def index
+      @notifications = current_recipient.notifications.recent.limit(50)
+    end
+
+    def show
+      @notification.mark_as_read!
+    end
+
+    def mark_as_read
+      @notification.mark_as_read!
+      respond_to do |format|
+        format.html { redirect_to notifications_path }
+        format.turbo_stream
+      end
+    end
+
+    def mark_all_as_read
+      current_recipient.notifications.unread.update_all(read_at: Time.current)
+      redirect_to notifications_path, notice: "All caught up"
+    end
+
+    private
+
+    def set_notification
+      @notification = current_recipient.notifications.find(params[:id])
+    end
+
+    def current_recipient
+      respond_to?(:current_user) ? current_user : nil
+    end
+  end
+end

@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+module Notifications
+  class PreferencesController < ApplicationController
+    def show
+      @preferences = Notifications::NotificationPreference.where(user_id: current_user_id)
+    end
+
+    def update
+      params[:preferences].to_h.each do |key, enabled|
+        channel, type = key.split(":", 2)
+        type = nil if type == "any"
+
+        pref = Notifications::NotificationPreference.find_or_initialize_by(
+          user_id:           current_user_id,
+          channel:           channel,
+          notification_type: type
+        )
+        pref.update!(enabled: enabled == "1")
+      end
+      redirect_to preferences_path, notice: "Preferences saved"
+    end
+
+    private
+
+    def current_user_id
+      respond_to?(:current_user) && current_user&.id
+    end
+  end
+end

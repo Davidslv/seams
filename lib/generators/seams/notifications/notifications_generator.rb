@@ -58,6 +58,36 @@ module Seams
                  engine_path("app/subscribers/notifications/auth_subscriber.rb")
       end
 
+      def create_models
+        template "app/models/application_record.rb.tt",
+                 engine_path("app/models/notifications/application_record.rb")
+        template "app/models/notification.rb.tt",
+                 engine_path("app/models/notifications/notification.rb")
+        template "app/models/notification_preference.rb.tt",
+                 engine_path("app/models/notifications/notification_preference.rb")
+      end
+
+      def create_controllers
+        template "app/controllers/notifications_controller.rb.tt",
+                 engine_path("app/controllers/notifications/notifications_controller.rb")
+        template "app/controllers/preferences_controller.rb.tt",
+                 engine_path("app/controllers/notifications/preferences_controller.rb")
+      end
+
+      def create_views
+        template "app/views/notifications/_bell.html.erb.tt",
+                 engine_path("app/views/notifications/notifications/_bell.html.erb")
+        template "app/views/notifications/index.html.erb.tt",
+                 engine_path("app/views/notifications/notifications/index.html.erb")
+      end
+
+      def create_channel_and_stimulus
+        template "app/channels/notification_channel.rb.tt",
+                 engine_path("app/channels/notifications/notification_channel.rb")
+        template "app/javascript/controllers/notification_bell_controller.js.tt",
+                 engine_path("app/javascript/notifications/controllers/notification_bell_controller.js")
+      end
+
       def create_mailer
         template "app/mailers/application_mailer.rb.tt",
                  engine_path("app/mailers/notifications/application_mailer.rb")
@@ -70,8 +100,12 @@ module Seams
       end
 
       def create_migrations
+        template "db/migrate/create_notifications.rb.tt",
+                 engine_path("db/migrate/#{timestamp(0)}_create_notifications.rb")
+        template "db/migrate/create_notification_preferences.rb.tt",
+                 engine_path("db/migrate/#{timestamp(1)}_create_notification_preferences.rb")
         template "db/migrate/create_notification_deliveries.rb.tt",
-                 engine_path("db/migrate/#{timestamp}_create_notification_deliveries.rb")
+                 engine_path("db/migrate/#{timestamp(2)}_create_notification_deliveries.rb")
       end
 
       def create_specs
@@ -119,12 +153,12 @@ module Seams
         File.join(destination_root, "engines", ENGINE_NAME, relative)
       end
 
-      # Add 100 to the unix-style packed timestamp so this engine's
+      # Add 100+offset to the packed timestamp so this engine's
       # migrations don't collide with another engine generated in the
-      # same second (e.g. by the same script).
-      def timestamp
+      # same second.
+      def timestamp(offset = 0)
         base = Time.now.utc.strftime("%Y%m%d%H%M%S").to_i
-        (base + 100).to_s
+        (base + 100 + offset).to_s
       end
     end
   end

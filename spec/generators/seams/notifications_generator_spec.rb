@@ -132,6 +132,68 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
         expect(content).to include("return if attached?")
       end
     end
+
+    it "writes a Notification row + checks NotificationPreference before email" do
+      assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
+        expect(content).to include("Notifications::Notification.create!")
+        expect(content).to include("NotificationPreference.enabled?")
+      end
+    end
+  end
+
+  describe "models" do
+    it "creates Notification with channel + recipient associations" do
+      assert_file "engines/notifications/app/models/notifications/notification.rb" do |content|
+        expect(content).to include("CHANNELS")
+        expect(content).to include("belongs_to :recipient, polymorphic: true")
+        expect(content).to include("scope :unread")
+        expect(content).to include("def mark_as_read!")
+      end
+    end
+
+    it "creates NotificationPreference with .enabled? lookup helper" do
+      assert_file "engines/notifications/app/models/notifications/notification_preference.rb" do |content|
+        expect(content).to include("class NotificationPreference")
+        expect(content).to include("def self.enabled?")
+      end
+    end
+  end
+
+  describe "read-side controllers" do
+    it "creates NotificationsController with the four actions" do
+      assert_file "engines/notifications/app/controllers/notifications/notifications_controller.rb" do |content|
+        expect(content).to include("def index")
+        expect(content).to include("def mark_as_read")
+        expect(content).to include("def mark_all_as_read")
+      end
+    end
+
+    it "creates PreferencesController with show + update" do
+      assert_file "engines/notifications/app/controllers/notifications/preferences_controller.rb" do |content|
+        expect(content).to include("def show")
+        expect(content).to include("def update")
+      end
+    end
+  end
+
+  describe "views + ActionCable + Stimulus" do
+    it "creates the bell partial + index view" do
+      assert_file "engines/notifications/app/views/notifications/notifications/_bell.html.erb"
+      assert_file "engines/notifications/app/views/notifications/notifications/index.html.erb"
+    end
+
+    it "creates the per-recipient ActionCable channel" do
+      assert_file "engines/notifications/app/channels/notifications/notification_channel.rb" do |content|
+        expect(content).to include("class NotificationChannel")
+        expect(content).to include("stream_for current_user")
+      end
+    end
+
+    it "creates the notification-bell Stimulus controller" do
+      assert_file "engines/notifications/app/javascript/notifications/controllers/notification_bell_controller.js" do |content|
+        expect(content).to include("@hotwired/stimulus")
+      end
+    end
   end
 
   describe "mailer" do
@@ -156,7 +218,27 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
     end
   end
 
-  describe "migration" do
+  describe "migrations" do
+    it "creates create_notifications with the recipient + read index" do
+      pattern = File.join(destination_root,
+                          "engines/notifications/db/migrate",
+                          "*_create_notifications.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+
+      content = File.read(file)
+      expect(content).to include("create_table :notifications")
+      expect(content).to include("recipient_type")
+    end
+
+    it "creates create_notification_preferences" do
+      pattern = File.join(destination_root,
+                          "engines/notifications/db/migrate",
+                          "*_create_notification_preferences.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+    end
+
     it "creates create_notification_deliveries with What/Why/Risk comment block" do
       pattern = File.join(destination_root,
                           "engines/notifications/db/migrate",
