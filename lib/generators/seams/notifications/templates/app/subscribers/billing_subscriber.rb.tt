@@ -4,15 +4,12 @@ module Notifications
   # Consumes Billing events and creates an in-app Notification for the
   # host User who owns the subscription/invoice. Mirrors AuthSubscriber.
   #
-  # Subscribed events + payload shapes:
-  #   subscription.created.billing  : { customer_ref:, plan_ref:, gateway_ref: }
-  #   subscription.canceled.billing : { gateway_ref:, status: }
-  #   invoice.paid.billing          : { gateway:, livemode:, object_id:, object: }  (webhook envelope)
-  #   invoice.failed.billing        : same as invoice.paid
+  # Every subscribed event publishes the same canonical payload shape:
+  #   { gateway:, livemode:, customer_ref:, ref:, object_id:, object: }
   #
-  # The host User is resolved via stripe_customer_id (matches
-  # Billing::Subscription#customer_ref) — that column is the contract
-  # the Billing::Billable concern documents on the host's User model.
+  # `customer_ref` is the gateway-side customer id (e.g. cus_xxx). The
+  # host User is resolved via `stripe_customer_id` — that column is the
+  # contract `Billing::Billable` documents on the host's User model.
   #
   # +.attach!+ is idempotent — Rails reload won't double-subscribe.
   class BillingSubscriber
@@ -34,7 +31,7 @@ module Notifications
 
         EVENT_TEMPLATES.each do |event, template|
           Seams::Events::Publisher.subscribe(event) do |payload|
-            handle(event: event, payload: payload, template: template)
+            handle(payload: payload, template: template)
           end
         end
 
@@ -43,9 +40,8 @@ module Notifications
 
       private
 
-      def handle(event:, payload:, template:)
-        customer_ref = customer_ref_for(event, payload)
-        owner = resolve_owner(customer_ref)
+      def handle(payload:, template:)
+        owner = resolve_owner(payload[:customer_ref])
         return unless owner
 
         notif = Notifications::Strategies::InApp.new(owner: owner, template: template)
@@ -54,34 +50,11 @@ module Notifications
         notif.send_async
       end
 
-      def customer_ref_for(event, payload)
-        case event
-        when "subscription.created.billing"
-          payload[:customer_ref]
-        when "subscription.canceled.billing"
-          subscription_for(gateway_ref: payload[:gateway_ref])&.customer_ref
-        when "invoice.paid.billing", "invoice.failed.billing"
-          invoice_for(gateway_ref: payload[:object_id])&.subscription&.customer_ref
-        end
-      end
-
       def resolve_owner(customer_ref)
-        return nil if customer_ref.nil?
+        return nil if customer_ref.nil? || customer_ref.to_s.empty?
         return nil unless defined?(::User) && ::User.column_names.include?("stripe_customer_id")
 
         ::User.find_by(stripe_customer_id: customer_ref)
-      end
-
-      def subscription_for(gateway_ref:)
-        return nil unless defined?(Billing::Subscription)
-
-        Billing::Subscription.find_by(gateway_ref: gateway_ref)
-      end
-
-      def invoice_for(gateway_ref:)
-        return nil unless defined?(Billing::Invoice)
-
-        Billing::Invoice.find_by(gateway_ref: gateway_ref)
       end
     end
   end

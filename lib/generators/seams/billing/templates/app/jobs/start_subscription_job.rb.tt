@@ -14,9 +14,16 @@ module Billing
         status:       result[:status]
       )
 
+      # Canonical event payload — same shape as WebhooksController emits:
+      #   { gateway:, livemode:, customer_ref:, ref:, object_id:, object: }
       Seams::Events::Publisher.publish(
         "subscription.created.billing",
-        customer_ref: customer_ref, plan_ref: plan_ref, gateway_ref: result[:id]
+        gateway:      Billing.configuration.gateway_name,
+        livemode:     false,
+        customer_ref: customer_ref,
+        ref:          result[:id],
+        object_id:    result[:id],
+        object:       { id: result[:id], plan: { id: plan_ref }, status: result[:status] }
       )
     end
   end

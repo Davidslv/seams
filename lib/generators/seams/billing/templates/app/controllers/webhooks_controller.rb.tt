@@ -66,12 +66,28 @@ module Billing
       seams_name = EVENT_MAP[event[:type]]
       return unless seams_name
 
+      object       = event[:object]
+      object_hash  = object.respond_to?(:to_hash) ? object.to_hash : object
+      object_id    = object_id_for(object)
+      customer_ref = customer_ref_for(seams_name, object_hash)
+      ref          = ref_for(seams_name, object_hash, object_id)
+
+      # Upsert the local Billing::Subscription / Billing::Invoice row
+      # so downstream subscribers can resolve from the local DB rather
+      # than from the webhook payload alone.
+      upsert_local_record(seams_name, object_hash, customer_ref: customer_ref, ref: ref)
+
+      # Canonical payload shape — every emit of these events from any
+      # publisher (webhook or host-initiated job) MUST match. Subscribers
+      # rely on `customer_ref` to resolve the host User.
       Seams::Events::Publisher.publish(
         seams_name,
-        gateway:   gateway,
-        livemode:  event[:livemode],
-        object_id: object_id_for(event[:object]),
-        object:    event[:object].respond_to?(:to_hash) ? event[:object].to_hash : event[:object]
+        gateway:      gateway,
+        livemode:     event[:livemode],
+        customer_ref: customer_ref,
+        ref:          ref,
+        object_id:    object_id,
+        object:       object_hash
       )
     end
 
@@ -79,6 +95,65 @@ module Billing
       return nil if object.nil?
 
       object.respond_to?(:id) ? object.id : object["id"]
+    end
+
+    # `customer_ref` is the gateway-side customer id (e.g. cus_xxx).
+    # All four canonical billing events publish it so notifications can
+    # resolve the host User by stripe_customer_id.
+    def customer_ref_for(seams_name, object_hash)
+      return nil unless object_hash.is_a?(Hash)
+
+      case seams_name
+      when /\Asubscription\./, /\Ainvoice\./
+        object_hash[:customer] || object_hash["customer"]
+      end
+    end
+
+    # `ref` is the engine-side identifier for whatever the event is
+    # about — gateway_ref of a Subscription for subscription.* events,
+    # gateway_ref of an Invoice for invoice.* events.
+    def ref_for(seams_name, _object_hash, object_id)
+      case seams_name
+      when /\Asubscription\./, /\Ainvoice\./
+        object_id
+      end
+    end
+
+    def upsert_local_record(seams_name, object_hash, customer_ref:, ref:)
+      return unless ref && customer_ref && object_hash.is_a?(Hash)
+
+      case seams_name
+      when "subscription.created.billing", "subscription.updated.billing", "subscription.canceled.billing"
+        Billing::Subscription
+          .find_or_initialize_by(gateway_ref: ref)
+          .tap { |s|
+            s.customer_ref = customer_ref
+            s.plan_ref     = (object_hash[:plan] || object_hash["plan"] || {}).then { |p|
+              p.is_a?(Hash) ? (p[:id] || p["id"]) : nil
+            }
+            s.status       = object_hash[:status] || object_hash["status"] || s.status || "incomplete"
+            s.save!
+          }
+      when "invoice.paid.billing", "invoice.failed.billing"
+        sub_ref = object_hash[:subscription] || object_hash["subscription"]
+        sub     = sub_ref && Billing::Subscription.find_by(gateway_ref: sub_ref)
+        Billing::Invoice
+          .find_or_initialize_by(gateway_ref: ref)
+          .tap { |inv|
+            inv.subscription = sub if sub
+            inv.amount_cents = object_hash[:amount_paid] || object_hash["amount_paid"] ||
+                               object_hash[:amount_due]  || object_hash["amount_due"]  || 0
+            inv.currency     = object_hash[:currency] || object_hash["currency"] || "usd"
+            inv.status       = (seams_name == "invoice.paid.billing") ? "paid" : "open"
+            inv.paid_at      = Time.current if seams_name == "invoice.paid.billing"
+            inv.save!
+          }
+      end
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
+      Seams::Observability.adapter.warn(
+        "billing.webhook.upsert_failed",
+        engine: "billing", event: seams_name, error: e.message
+      )
     end
   end
 end

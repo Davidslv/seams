@@ -8,6 +8,13 @@ module Auth
   class RegisterUser
     Result = Struct.new(:ok?, :user, :session, :error, keyword_init: true)
 
+    # Whitelist of extra attributes a caller can hand in via
+    # `attributes:`. Anything outside this list is dropped — closes the
+    # mass-assignment hole where `host_user_id`, `password_reset_token`
+    # etc. could be set from forwarded params. Add to the list as the
+    # auth_users schema grows.
+    PERMITTED_EXTRA_ATTRIBUTES = %i[host_user_id].freeze
+
     def self.call(...)
       new(...).call
     end
@@ -16,7 +23,7 @@ module Auth
       @email                 = email
       @password              = password
       @password_confirmation = password_confirmation
-      @attributes            = attributes
+      @attributes            = sanitize(attributes)
     end
 
     def call
@@ -41,6 +48,14 @@ module Auth
       Result.new(ok?: true, user: user, session: session)
     rescue ActiveRecord::RecordInvalid => e
       Result.new(ok?: false, error: e.message)
+    end
+
+    private
+
+    def sanitize(attrs)
+      return {} if attrs.nil? || attrs.empty?
+
+      attrs.to_h.transform_keys(&:to_sym).slice(*PERMITTED_EXTRA_ATTRIBUTES)
     end
   end
 end

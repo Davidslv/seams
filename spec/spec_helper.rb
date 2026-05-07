@@ -1,11 +1,17 @@
 # frozen_string_literal: true
 
-require "simplecov"
+# COVERAGE=false (set in the integration_full CI job) skips SimpleCov
+# entirely. The integration suite shells out to a tmp host app, so
+# very little of the gem's own code runs under coverage and the 90%
+# minimum would fail spuriously.
+unless ENV["COVERAGE"] == "false"
+  require "simplecov"
 
-SimpleCov.start do
-  add_filter "/spec/"
-  add_filter "/lib/generators/seams/" # generator templates have their own coverage strategy
-  minimum_coverage 90 if ENV["CI"]
+  SimpleCov.start do
+    add_filter "/spec/"
+    add_filter "/lib/generators/seams/" # generator templates have their own coverage strategy
+    minimum_coverage 90 if ENV["CI"]
+  end
 end
 
 require "seams"

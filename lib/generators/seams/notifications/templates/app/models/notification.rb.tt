@@ -29,8 +29,16 @@ module Notifications
 
     FREQUENCIES = %w[once daily weekly monthly].freeze
 
+    # Templates resolve to file reads via ERB. Lock the value down so a
+    # row can't reach outside the templates dir or evaluate arbitrary
+    # files. Allowed: lowercase letters, digits, underscores, dashes,
+    # forward slashes (so subdirs like "billing/invoice_paid" work).
+    # No leading slash, no `..`, no consecutive slashes.
+    TEMPLATE_NAME_PATTERN = %r{\A[a-z0-9_\-]+(?:/[a-z0-9_\-]+)*\z}
+
     validates :type,     inclusion: { in: PERMITTED_TYPES }
-    validates :template, presence: true
+    validates :template, presence: true,
+                         format: { with: TEMPLATE_NAME_PATTERN, message: "must be a slash-separated lowercase identifier" }
 
     scope :due,        -> { where(next_delivery_at: ..Time.current) }
     scope :pending,    -> { where.not(next_delivery_at: nil) }
@@ -167,10 +175,21 @@ module Notifications
     end
 
     def find_template_path
-      host = Rails.root.join("app/views/notifications/templates/#{template}.erb")
-      return host if host.exist?
+      # Realpath check — even though TEMPLATE_NAME_PATTERN already
+      # rejects "..", a defence-in-depth `realpath` confirms the
+      # resolved file lives under one of the two whitelisted roots.
+      host_root   = Rails.root.join("app/views/notifications/templates")
+      engine_root = Notifications::Engine.root.join("app/views/notifications/templates")
 
-      Notifications::Engine.root.join("app/views/notifications/templates/#{template}.erb")
+      [host_root, engine_root].each do |root|
+        candidate = root.join("#{template}.erb")
+        next unless candidate.exist?
+
+        resolved = candidate.realpath
+        return resolved if resolved.to_s.start_with?(root.realpath.to_s)
+      end
+
+      raise Notifications::Error, "Template #{template.inspect} not found under any allowed root"
     end
   end
 end

@@ -71,10 +71,16 @@ jobs:
       PGPORT:     "5432"
       PGUSER:     "postgres"
       PGPASSWORD: "postgres"
+      # The integration suite shells out to `rails new` — barely any of
+      # the gem's own code runs under coverage, so the 90% minimum
+      # configured in spec_helper would fail spuriously. Skip simplecov.
+      COVERAGE:   "false"
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
           bundler-cache: true
+      - name: Install Rails CLI globally so `rails new` is on PATH
+        run: gem install rails -v "~> 8.1" --no-document
       - run: bundle exec rspec spec/integration_full/ --tag type:integration_full

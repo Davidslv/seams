@@ -7,8 +7,12 @@ module Notifications
   class NotificationPreference < ApplicationRecord
     self.table_name = "notification_preferences"
 
+    # Mirrors the keys of Notifications::Notifiable::STRATEGY_CLASSES
+    # but kept as plain strings here because the column stores strings.
+    CHANNELS = %w[in_app email sms].freeze
+
     validates :user_id, :channel, presence: true
-    validates :channel, inclusion: { in: Notification::CHANNELS }
+    validates :channel, inclusion: { in: CHANNELS }
     validates :user_id, uniqueness: { scope: %i[channel notification_type] }
 
     def self.enabled?(user_id:, channel:, notification_type: nil)

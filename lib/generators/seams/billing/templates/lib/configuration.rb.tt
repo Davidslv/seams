@@ -18,5 +18,15 @@ module Billing
       @webhook_secret   = ENV.fetch("STRIPE_WEBHOOK_SECRET", nil)
       @default_currency = "usd"
     end
+
+    # Short identifier used as the `gateway:` field in canonical event
+    # payloads. Derived from `gateway` (e.g. "Billing::Gateways::Stripe"
+    # → "stripe"). Override directly if your class name doesn't follow
+    # the convention.
+    def gateway_name
+      @gateway_name ||= gateway.to_s.split("::").last.to_s.downcase
+    end
+
+    attr_writer :gateway_name
   end
 end

@@ -212,10 +212,10 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
-    it "BillingSubscriber resolves invoices via subscription→customer_ref" do
+    it "BillingSubscriber reads customer_ref from the canonical payload (not from a local Invoice lookup)" do
       assert_file "engines/notifications/app/subscribers/notifications/billing_subscriber.rb" do |content|
-        expect(content).to include("Billing::Invoice")
-        expect(content).to include("subscription&.customer_ref")
+        expect(content).to include("payload[:customer_ref]")
+        expect(content).not_to include("Billing::Invoice")
       end
     end
 

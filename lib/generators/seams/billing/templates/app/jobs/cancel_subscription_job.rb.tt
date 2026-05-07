@@ -10,9 +10,17 @@ module Billing
       sub = Billing::Subscription.find_by(gateway_ref: subscription_ref)
       sub&.update!(status: result[:status])
 
+      # Canonical event payload — must match what WebhooksController
+      # emits for the same event so subscribers can read one shape:
+      #   { gateway:, livemode:, customer_ref:, ref:, object_id:, object: }
       Seams::Events::Publisher.publish(
         "subscription.canceled.billing",
-        gateway_ref: subscription_ref, status: result[:status]
+        gateway:      Billing.configuration.gateway_name,
+        livemode:     false,
+        customer_ref: sub&.customer_ref,
+        ref:          subscription_ref,
+        object_id:    subscription_ref,
+        object:       { id: subscription_ref, status: result[:status] }
       )
     end
   end

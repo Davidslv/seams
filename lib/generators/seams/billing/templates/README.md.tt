@@ -6,13 +6,30 @@
 
 ## Events emitted
 
-| Event name                          | Payload                                              | Emitted when |
-| ---                                 | ---                                                  | --- |
-| `subscription.created.billing`      | `{ customer_ref:, plan_ref:, gateway_ref: }`         | StartSubscriptionJob succeeds, or `customer.subscription.created` webhook fires |
-| `subscription.updated.billing`      | `{ object_id:, object: }`                            | `customer.subscription.updated` webhook fires |
-| `subscription.canceled.billing`     | `{ gateway_ref:, status: }`                          | CancelSubscriptionJob succeeds, or `customer.subscription.deleted` webhook fires |
-| `invoice.paid.billing`              | `{ object_id:, object: }`                            | `invoice.paid` webhook fires |
-| `invoice.failed.billing`            | `{ object_id:, object: }`                            | `invoice.payment_failed` webhook fires |
+All five canonical billing events publish the **same canonical payload
+shape** so subscribers can read one format regardless of source:
+
+```
+{ gateway:      "stripe",      # which adapter emitted it
+  livemode:     true | false,  # Stripe's livemode flag (false for host-initiated)
+  customer_ref: "cus_xxx",     # gateway customer id, matches Subscription#customer_ref
+  ref:          "sub_xxx",     # canonical id of the subject (subscription / invoice)
+  object_id:    "sub_xxx",     # raw object id from the gateway (== ref for now)
+  object:       { ... } }      # the gateway object as a hash
+```
+
+| Event name                          | Subject     | Emitted when |
+| ---                                 | ---         | --- |
+| `subscription.created.billing`      | Subscription | StartSubscriptionJob succeeds, or `customer.subscription.created` webhook fires |
+| `subscription.updated.billing`      | Subscription | `customer.subscription.updated` webhook fires |
+| `subscription.canceled.billing`     | Subscription | CancelSubscriptionJob succeeds, or `customer.subscription.deleted` webhook fires |
+| `invoice.paid.billing`              | Invoice      | `invoice.paid` webhook fires |
+| `invoice.failed.billing`            | Invoice      | `invoice.payment_failed` webhook fires |
+
+The webhook controller upserts a local `Billing::Subscription` /
+`Billing::Invoice` row before publishing, so subscribers can resolve
+either from `payload[:customer_ref]` directly or by querying the
+local DB with `payload[:ref]`.
 
 ## Events consumed
 

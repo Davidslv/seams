@@ -12,9 +12,15 @@ module Auth
 
     normalizes :email, with: ->(value) { value.to_s.strip.downcase }
 
+    # Returns the User on success, nil on failure (no such user OR
+    # wrong password). bcrypt's `#authenticate` returns `false` on
+    # failure; we coerce to `nil` so callers can use a uniform
+    # `if user = User.authenticate(...)` idiom.
     def self.authenticate(email:, password:)
       user = find_by(email: email.to_s.strip.downcase)
-      user&.authenticate(password) || nil
+      return nil unless user&.authenticate(password)
+
+      user
     end
 
     def password_reset_token_valid?
