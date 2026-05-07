@@ -120,6 +120,7 @@ module Seams
                  engine_path("app/views/notifications/templates/welcome.erb")
         %w[
           subscription_started
+          subscription_updated
           subscription_canceled
           invoice_paid
           invoice_failed

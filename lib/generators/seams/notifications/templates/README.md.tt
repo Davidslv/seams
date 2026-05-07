@@ -101,6 +101,7 @@ production:
 | --- | --- | --- |
 | `user.signed_up.auth` | `Notifications::AuthSubscriber` | Creates an InApp + Email welcome notification (subject to NotificationPreference). |
 | `subscription.created.billing`  | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_started`. |
+| `subscription.updated.billing`  | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_updated`. |
 | `subscription.canceled.billing` | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_canceled`. |
 | `invoice.paid.billing`          | `Notifications::BillingSubscriber` | InApp notification, template `billing/invoice_paid`. |
 | `invoice.failed.billing`        | `Notifications::BillingSubscriber` | InApp notification, template `billing/invoice_failed`. |

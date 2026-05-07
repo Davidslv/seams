@@ -199,7 +199,7 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
 
     it "BillingSubscriber subscribes to all four billing lifecycle events" do
       assert_file "engines/notifications/app/subscribers/notifications/billing_subscriber.rb" do |content|
-        %w[subscription.created.billing subscription.canceled.billing invoice.paid.billing invoice.failed.billing].each do |event|
+        %w[subscription.created.billing subscription.updated.billing subscription.canceled.billing invoice.paid.billing invoice.failed.billing].each do |event|
           expect(content).to include(%("#{event}"))
         end
       end
@@ -225,8 +225,8 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
-    it "ships default ERB templates for all four billing notifications" do
-      %w[subscription_started subscription_canceled invoice_paid invoice_failed].each do |name|
+    it "ships default ERB templates for all five billing notifications" do
+      %w[subscription_started subscription_updated subscription_canceled invoice_paid invoice_failed].each do |name|
         assert_file "engines/notifications/app/views/notifications/templates/billing/#{name}.erb"
       end
     end

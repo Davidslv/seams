@@ -22,9 +22,10 @@ module Billing
     # Short identifier used as the `gateway:` field in canonical event
     # payloads. Derived from `gateway` (e.g. "Billing::Gateways::Stripe"
     # → "stripe"). Override directly if your class name doesn't follow
-    # the convention.
+    # the convention. NOT memoized — `gateway` is mutable, so
+    # gateway_name re-derives on every read.
     def gateway_name
-      @gateway_name ||= gateway.to_s.split("::").last.to_s.downcase
+      @gateway_name || gateway.to_s.split("::").last.to_s.downcase
     end
 
     attr_writer :gateway_name

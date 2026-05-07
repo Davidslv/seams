@@ -52,12 +52,17 @@ module Seams
         # (key, event_name) are no-ops, preventing the "welcome email
         # fires N times after N reloads" bug.
         #
+        # Synchronized so concurrent boot threads (e.g. Puma cluster
+        # pre-fork) can't race-attach the same subscriber twice.
+        #
         # Use a per-subscriber-class symbol as the key:
         #
         #   Publisher.attach_once(:notifications_auth_subscriber,
         #     "user.signed_up.auth") { |payload| ... }
         def attach_once(key, event_name, &)
-          attached_keys[[key, event_name.to_s]] ||= subscribe(event_name, &)
+          attach_once_mutex.synchronize do
+            attached_keys[[key, event_name.to_s]] ||= subscribe(event_name, &)
+          end
         end
 
         def unsubscribe(subscriber)
@@ -67,6 +72,10 @@ module Seams
         # Internal — exposed for spec teardown only.
         def attached_keys
           @attached_keys ||= {}
+        end
+
+        def attach_once_mutex
+          @attach_once_mutex ||= Mutex.new
         end
 
         # Returns the list of event names that engines have subscribed

@@ -20,6 +20,7 @@ module Notifications
 
     EVENT_TEMPLATES = {
       "subscription.created.billing"  => "billing/subscription_started",
+      "subscription.updated.billing"  => "billing/subscription_updated",
       "subscription.canceled.billing" => "billing/subscription_canceled",
       "invoice.paid.billing"          => "billing/invoice_paid",
       "invoice.failed.billing"        => "billing/invoice_failed"

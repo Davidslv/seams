@@ -1,8 +1,12 @@
-# Host application RuboCop config. Engine-specific configs at
-# engines/<name>/.rubocop.yml inherit from this file.
+# Host application RuboCop config.
+#
+# Engines under engines/<name>/ ship their own self-contained
+# .rubocop.yml — they do NOT inherit from this file (this is
+# intentional so a host using rubocop-rails-omakase doesn't force
+# engine code through application-style rules).
 #
 # Add your own host rules here; the engine boundary cops are loaded
-# per-engine, not globally, so they don't fire on host code.
+# per-engine via engines/<name>/.rubocop.yml, not globally.
 
 AllCops:
   TargetRubyVersion: 4.0
@@ -13,7 +17,8 @@ AllCops:
     - "db/schema.rb"
     - "tmp/**/*"
     - "vendor/**/*"
-    - "engines/**/*"   # engines have their own .rubocop.yml that inherit from this file
+    - "engines/**/*"          # engines lint themselves
+    - "lib/tasks/seams.rake"  # gem-generated; uses default rubocop array style
 
 Style/Documentation:
   Enabled: false

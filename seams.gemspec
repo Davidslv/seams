@@ -29,7 +29,9 @@ Gem::Specification.new do |spec|
   end
 
   spec.bindir       = "exe"
-  spec.executables  = Dir["exe/*"].map { |f| File.basename(f) }
+  spec.executables  = Dir.chdir(File.expand_path(__dir__)) do
+    Dir["exe/*"].map { |f| File.basename(f) }
+  end
   spec.require_paths = ["lib"]
 
   spec.add_dependency "rails", ">= 7.1", "< 9.0"

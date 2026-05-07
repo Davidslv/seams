@@ -64,9 +64,11 @@ RSpec.describe Seams::Generators::DummyAppWriter do
       expect(content).to include('mount Example::Engine, at: "/example"')
     end
 
-    it "wraps the supplied schema body inside ActiveRecord::Schema.define" do
+    it "wraps the supplied schema body inside ActiveRecord::Schema.define using the host's Rails version" do
       content = File.read(File.join(engine_path, "spec/dummy/db/schema.rb"))
-      expect(content).to include("ActiveRecord::Schema[7.1].define")
+      # Major.minor of whatever Rails is loaded — defaults to 8.1 when
+      # called outside a Rails context (e.g. seams gem unit specs).
+      expect(content).to match(/ActiveRecord::Schema\[\d+\.\d+\]\.define/)
       expect(content).to include("create_table :examples")
     end
 

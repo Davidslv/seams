@@ -56,15 +56,23 @@ module Billing
     }.freeze
 
     def record_and_dispatch(gateway, event)
-      Billing::WebhookEvent.create!(
-        gateway:          gateway,
-        gateway_event_id: event[:id] || object_id_for(event[:object]),
-        event_type:       event[:type],
-        livemode:         event[:livemode]
-      )
+      # Order matters: insert WebhookEvent FIRST inside a transaction
+      # that ALSO runs dispatch. If dispatch raises (a subscriber
+      # blew up, a model is in an unexpected state), the WebhookEvent
+      # row rolls back — Stripe retries, we get another chance to
+      # publish. Otherwise a transient subscriber bug would
+      # permanently drop one event behind the unique-index guard.
+      Billing::WebhookEvent.transaction do
+        Billing::WebhookEvent.create!(
+          gateway:          gateway,
+          gateway_event_id: event[:id] || object_id_for(event[:object]),
+          event_type:       event[:type],
+          livemode:         event[:livemode]
+        )
 
-      dispatch(event, gateway: gateway)
-    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+        dispatch(event, gateway: gateway)
+      end
+    rescue ActiveRecord::RecordNotUnique
       # Duplicate retry — Stripe will keep retrying; replying 200 stops
       # the storm without re-publishing to subscribers.
       Seams::Observability.adapter.info(

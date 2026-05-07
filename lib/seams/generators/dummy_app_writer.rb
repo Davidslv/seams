@@ -160,10 +160,21 @@ module Seams
       end
 
       def schema_rb(schema_body)
+        # Match Rails::VERSION at write-time so schema-format defaults
+        # match the host's Rails. A 7.1 schema declared on Rails 8.x
+        # still loads, but column-default semantics drift. defined?
+        # check guards a Rails-loaded-but-VERSION-not-yet-required boot
+        # window the generator specs hit.
+        rails_version =
+          if defined?(Rails::VERSION::STRING)
+            Rails::VERSION::STRING.split(".")[0, 2].join(".")
+          else
+            "8.1"
+          end
         <<~RB
           # frozen_string_literal: true
 
-          ActiveRecord::Schema[7.1].define(version: 0) do
+          ActiveRecord::Schema[#{rails_version}].define(version: 0) do
           #{schema_body.lines.map { |l| "  #{l}" }.join.rstrip}
           end
         RB

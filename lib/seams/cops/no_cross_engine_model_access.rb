@@ -79,9 +79,18 @@ module RuboCop
         # constant is not actually accessed for value, just probed for
         # presence. Skip the cop in that case so guards like
         # `Teams::Team if defined?(Teams::Team)` don't false-fire.
+        # Walks parents up to a few levels so `defined?(Teams::Team.foo)`
+        # (where the const's parent is a `send` node, not the `defined?`)
+        # is also exempted.
         def inside_defined_check?(node)
-          parent = node.parent
-          parent&.defined_type?
+          ancestor = node.parent
+          5.times do
+            return false unless ancestor
+            return true  if ancestor.defined_type?
+
+            ancestor = ancestor.parent
+          end
+          false
         end
 
         # Returns the segments of the constant if `node` is the
