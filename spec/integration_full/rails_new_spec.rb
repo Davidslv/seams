@@ -140,6 +140,15 @@ RSpec.describe "rails new integration", type: :integration_full do
     bundle_install
     create_test_database
 
+    # Generate the host User model BEFORE the canonical engines run,
+    # so each engine's host_inject_include_in_user(...) call lands on
+    # the right file (Auth::Authenticatable, Notifications::Notifiable,
+    # Billing::Billable, Teams::Teamable). Without this, the engines
+    # skip with a "User model not found" notice and the cross-engine
+    # wiring assertion at the bottom of this example would have to
+    # patch Notifiable in by hand.
+    shell(%w[bin/rails generate model User email:string])
+
     %w[install core auth notifications billing teams].each { |g| generate(g) }
 
     %w[core auth notifications billing teams].each do |engine|
@@ -165,6 +174,32 @@ RSpec.describe "rails new integration", type: :integration_full do
     actual = tables.lines.last.to_s.strip.split(",")
     missing = expected - actual
     expect(missing).to be_empty, "host db is missing engine tables: #{missing.join(", ")} (got: #{actual.inspect})"
+
+    # Phase 2C — verify Auth + Notifications wiring end-to-end.
+    # Publish the canonical user.signed_up.auth event from a runner
+    # process and assert the Notifications::AuthSubscriber actually
+    # creates a Notification row. Exercises Publisher.attach_once +
+    # the CreateNotificationJob inline path the engine boots with.
+    # The host User model was generated above (before the engines)
+    # so Notifications::Notifiable was injected into it by the
+    # notifications generator's wire_into_host.
+    notification_count = boot_probe(<<~RUBY)
+      ActiveJob::Base.queue_adapter = :inline
+      user = User.create!(email: "phase2c-\#{Process.pid}@example.com")
+
+      Seams::Events::Publisher.publish(
+        "user.signed_up.auth",
+        auth_user_id: 0,
+        host_user_id: user.id,
+        email: user.email
+      )
+
+      puts Notifications::Notification.where(owner: user).count
+    RUBY
+
+    expect(notification_count).to eq("1").or(eq("2")),
+                                  "expected at least one Notifications::Notification to be created " \
+                                  "by the AuthSubscriber, got #{notification_count.inspect}"
   end
 
   # Phase 1.9 round-trip: the generic engine generator + the remove
