@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+module Billing
+  class CancelSubscriptionJob < ApplicationJob
+    queue_as :billing
+
+    def perform(subscription_ref:)
+      result = Billing.gateway.cancel_subscription(subscription_ref: subscription_ref)
+
+      sub = Billing::Subscription.find_by(gateway_ref: subscription_ref)
+      sub&.update!(status: result[:status])
+
+      Seams::Events::Publisher.publish(
+        "subscription.canceled.billing",
+        gateway_ref: subscription_ref, status: result[:status]
+      )
+    end
+  end
+end

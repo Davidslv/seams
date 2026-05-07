@@ -1,0 +1,5 @@
+# frozen_string_literal: true
+
+Billing::Engine.routes.draw do
+  post "/webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
+end

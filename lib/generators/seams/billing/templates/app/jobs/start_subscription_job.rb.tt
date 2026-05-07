@@ -1,0 +1,23 @@
+# frozen_string_literal: true
+
+module Billing
+  class StartSubscriptionJob < ApplicationJob
+    queue_as :billing
+
+    def perform(customer_ref:, plan_ref:)
+      result = Billing.gateway.create_subscription(customer_ref: customer_ref, plan_ref: plan_ref)
+
+      Billing::Subscription.create!(
+        customer_ref: customer_ref,
+        plan_ref:     result[:plan_ref] || plan_ref,
+        gateway_ref:  result[:id],
+        status:       result[:status]
+      )
+
+      Seams::Events::Publisher.publish(
+        "subscription.created.billing",
+        customer_ref: customer_ref, plan_ref: plan_ref, gateway_ref: result[:id]
+      )
+    end
+  end
+end

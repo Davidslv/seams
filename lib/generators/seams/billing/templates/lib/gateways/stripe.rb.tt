@@ -1,0 +1,82 @@
+# frozen_string_literal: true
+
+require "billing/gateways/abstract"
+
+module Billing
+  module Gateways
+    # Stripe billing gateway. Wraps the official `stripe` gem with the
+    # narrow contract defined in Billing::Gateways::Abstract.
+    #
+    # API surface used (verified against the docs cited above each
+    # method). All Stripe.api_key reads come from
+    # Billing.configuration.api_key, so the host can swap test/live
+    # keys without touching this class.
+    class Stripe < Abstract
+      def initialize
+        super
+        require "stripe"
+        ::Stripe.api_key = Billing.configuration.api_key
+      end
+
+      # Docs: https://docs.stripe.com/api/subscriptions/create
+      # Required params: `customer`, `items[].price` (a price id).
+      # Returns: a Subscription object with id, status, current_period_end.
+      def create_subscription(customer_ref:, plan_ref:, **opts)
+        sub = ::Stripe::Subscription.create(
+          customer: customer_ref,
+          items:    [{ price: plan_ref }],
+          **opts
+        )
+        normalise_subscription(sub)
+      rescue ::Stripe::StripeError => e
+        raise Billing::GatewayError, "Stripe.create_subscription failed: #{e.message}"
+      end
+
+      # Docs: https://docs.stripe.com/api/subscriptions/cancel
+      # Performs an immediate cancel; pass `cancel_at_period_end: true`
+      # via opts to schedule the cancellation instead.
+      def cancel_subscription(subscription_ref:, **opts)
+        sub = ::Stripe::Subscription.cancel(subscription_ref, **opts)
+        normalise_subscription(sub)
+      rescue ::Stripe::StripeError => e
+        raise Billing::GatewayError, "Stripe.cancel_subscription failed: #{e.message}"
+      end
+
+      # Docs: https://docs.stripe.com/api/subscriptions/retrieve
+      def fetch_subscription(subscription_ref:)
+        sub = ::Stripe::Subscription.retrieve(subscription_ref)
+        normalise_subscription(sub)
+      rescue ::Stripe::StripeError => e
+        raise Billing::GatewayError, "Stripe.fetch_subscription failed: #{e.message}"
+      end
+
+      # Docs: https://docs.stripe.com/webhooks/signatures
+      # Stripe::Webhook.construct_event verifies the timestamped HMAC
+      # signature in the `Stripe-Signature` header against `secret`,
+      # returning a Stripe::Event when valid and raising
+      # Stripe::SignatureVerificationError otherwise.
+      def verify_webhook(payload:, signature:, secret:)
+        event = ::Stripe::Webhook.construct_event(payload, signature, secret)
+        {
+          type:     event.type,
+          livemode: event.livemode,
+          object:   event.data.object,
+          raw:      payload
+        }
+      rescue ::Stripe::SignatureVerificationError => e
+        raise Billing::WebhookError, "Stripe webhook signature verification failed: #{e.message}"
+      end
+
+      private
+
+      def normalise_subscription(sub)
+        {
+          id:                  sub.id,
+          status:              sub.status,
+          current_period_end:  sub.respond_to?(:current_period_end) ? sub.current_period_end : nil,
+          plan_ref:            sub.items.data.first&.price&.id
+        }
+      end
+    end
+  end
+end

@@ -1,0 +1,70 @@
+# Billing
+
+> Subscription billing for a Seams-powered host. Stripe by default,
+> swap-able to any gateway via the `Billing::Gateways::Abstract`
+> contract.
+
+## Events emitted
+
+| Event name                          | Payload                                              | Emitted when |
+| ---                                 | ---                                                  | --- |
+| `subscription.created.billing`      | `{ customer_ref:, plan_ref:, gateway_ref: }`         | StartSubscriptionJob succeeds, or `customer.subscription.created` webhook fires |
+| `subscription.updated.billing`      | `{ object_id:, object: }`                            | `customer.subscription.updated` webhook fires |
+| `subscription.canceled.billing`     | `{ gateway_ref:, status: }`                          | CancelSubscriptionJob succeeds, or `customer.subscription.deleted` webhook fires |
+| `invoice.paid.billing`              | `{ object_id:, object: }`                            | `invoice.paid` webhook fires |
+| `invoice.failed.billing`            | `{ object_id:, object: }`                            | `invoice.payment_failed` webhook fires |
+
+## Events consumed
+
+This engine does not subscribe to any other engine's events by default.
+Hosts often subscribe to `user.signed_up.auth` to create a Stripe
+customer at signup.
+
+## Exposed concerns
+
+| Concern              | Purpose                                                                        |
+| ---                  | ---                                                                            |
+| `Billing::Billable`  | Mix into the host's user model for `start_subscription!` / `cancel_subscription!` helpers. Requires a `stripe_customer_id` attribute on the host. |
+
+## Gateways
+
+| Gateway                       | Default | Configure via                                                                    |
+| ---                           | ---     | ---                                                                              |
+| `Billing::Gateways::Stripe`   | yes     | `Billing.configure { \|c\| c.gateway = "Billing::Gateways::Stripe" }`            |
+
+To add a gateway, subclass `Billing::Gateways::Abstract` and implement
+`#create_subscription`, `#cancel_subscription`, `#fetch_subscription`,
+`#verify_webhook`. Then point `Billing.configuration.gateway` at the
+new class.
+
+## Webhook setup
+
+Stripe will POST events to `/billing/webhooks/stripe`. The engine
+verifies signatures using `Stripe::Webhook.construct_event`. Set:
+
+```bash
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+In your Stripe dashboard, configure the webhook endpoint to send the
+following events: `customer.subscription.*`, `invoice.paid`,
+`invoice.payment_failed`.
+
+## Stripe API surface used
+
+Every Stripe call below has a doc URL cited inline in
+`lib/billing/gateways/stripe.rb`:
+
+| Stripe call                              | Docs URL                                          |
+| ---                                      | ---                                               |
+| `Stripe::Subscription.create`            | https://docs.stripe.com/api/subscriptions/create  |
+| `Stripe::Subscription.cancel`            | https://docs.stripe.com/api/subscriptions/cancel  |
+| `Stripe::Subscription.retrieve`          | https://docs.stripe.com/api/subscriptions/retrieve|
+| `Stripe::Webhook.construct_event`        | https://docs.stripe.com/webhooks/signatures       |
+
+## Running the specs
+
+```bash
+bin/rails seams:test[billing]
+```

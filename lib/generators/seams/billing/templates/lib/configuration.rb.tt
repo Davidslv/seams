@@ -1,0 +1,22 @@
+# frozen_string_literal: true
+
+module Billing
+  # Engine-scoped configuration. Override in
+  # config/initializers/billing.rb of the host application:
+  #
+  #   Billing.configure do |c|
+  #     c.gateway        = "Billing::Gateways::Stripe"
+  #     c.api_key        = ENV.fetch("STRIPE_SECRET_KEY")
+  #     c.webhook_secret = ENV.fetch("STRIPE_WEBHOOK_SECRET")
+  #   end
+  class Configuration
+    attr_accessor :gateway, :api_key, :webhook_secret, :default_currency
+
+    def initialize
+      @gateway          = "Billing::Gateways::Stripe"
+      @api_key          = ENV.fetch("STRIPE_SECRET_KEY",     nil)
+      @webhook_secret   = ENV.fetch("STRIPE_WEBHOOK_SECRET", nil)
+      @default_currency = "usd"
+    end
+  end
+end

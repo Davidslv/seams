@@ -1,0 +1,55 @@
+# frozen_string_literal: true
+
+module Billing
+  # Receives webhook callbacks from the configured payment gateway.
+  # The gateway adapter does the signature verification — we just
+  # dispatch the resulting normalised event to event-bus subscribers.
+  class WebhooksController < ApplicationController
+    skip_before_action :verify_authenticity_token
+
+    # POST /billing/webhooks/stripe
+    def stripe
+      payload   = request.body.read
+      signature = request.headers["Stripe-Signature"]
+
+      event = Billing.gateway.verify_webhook(
+        payload:   payload,
+        signature: signature,
+        secret:    Billing.configuration.webhook_secret
+      )
+
+      dispatch(event)
+      head :ok
+    rescue Billing::WebhookError => e
+      Seams::Observability.adapter.warn(
+        "billing.webhook.invalid", engine: "billing", error: e.message
+      )
+      head :bad_request
+    end
+
+    private
+
+    # Stripe event types we care about. Full catalogue:
+    # https://docs.stripe.com/api/events/types
+    EVENT_MAP = {
+      "customer.subscription.created"  => "subscription.created.billing",
+      "customer.subscription.updated"  => "subscription.updated.billing",
+      "customer.subscription.deleted"  => "subscription.canceled.billing",
+      "invoice.paid"                   => "invoice.paid.billing",
+      "invoice.payment_failed"         => "invoice.failed.billing"
+    }.freeze
+
+    def dispatch(event)
+      seams_name = EVENT_MAP[event[:type]]
+      return unless seams_name
+
+      Seams::Events::Publisher.publish(
+        seams_name,
+        gateway:   "stripe",
+        livemode:  event[:livemode],
+        object_id: event.dig(:object, "id"),
+        object:    event[:object].respond_to?(:to_hash) ? event[:object].to_hash : event[:object]
+      )
+    end
+  end
+end

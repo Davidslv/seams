@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+module Billing
+  module Gateways
+    # Contract every billing gateway must implement. Subclass this
+    # in the host application to wire Paddle, Adyen, Lemon Squeezy,
+    # then point Billing.configuration.gateway at the subclass name.
+    class Abstract
+      # Create or fetch a recurring subscription for the host's
+      # customer. `customer_ref` is whatever opaque identifier the
+      # host stores on its user (typically a Stripe customer id).
+      def create_subscription(customer_ref:, plan_ref:, **)
+        raise NotImplementedError, "#{self.class} must implement #create_subscription"
+      end
+
+      def cancel_subscription(subscription_ref:, **)
+        raise NotImplementedError, "#{self.class} must implement #cancel_subscription"
+      end
+
+      # Retrieve a subscription as a normalised hash:
+      #   { id:, status:, current_period_end:, plan_ref: }
+      def fetch_subscription(subscription_ref:)
+        raise NotImplementedError, "#{self.class} must implement #fetch_subscription"
+      end
+
+      # Verify a webhook payload + signature and return a normalised
+      # event hash:
+      #   { type:, livemode:, object: <provider's raw object>, raw: <payload> }
+      # Implementations MUST raise Billing::WebhookError on any
+      # signature mismatch.
+      def verify_webhook(payload:, signature:, secret:)
+        raise NotImplementedError, "#{self.class} must implement #verify_webhook"
+      end
+    end
+  end
+end

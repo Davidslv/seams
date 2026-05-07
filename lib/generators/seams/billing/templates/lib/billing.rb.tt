@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+require "billing/version"
+require "billing/configuration"
+require "billing/engine"
+
+module Billing
+  class Error           < StandardError; end
+  class GatewayError    < Error; end
+  class WebhookError    < Error; end
+
+  class << self
+    def configuration
+      @configuration ||= Configuration.new
+    end
+
+    def configure
+      yield configuration
+    end
+
+    def gateway
+      configuration.gateway.constantize.new
+    end
+  end
+end

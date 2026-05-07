@@ -1,0 +1,40 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+
+RSpec.describe Billing::Gateways::Stripe do
+  let(:gateway) { described_class.new }
+
+  describe "#create_subscription" do
+    let(:stripe_sub) do
+      double(id: "sub_x", status: "active", current_period_end: 1_700_000_000,
+             items: double(data: [double(price: double(id: "price_x"))]))
+    end
+
+    it "delegates to Stripe::Subscription.create with the documented param shape" do
+      expect(::Stripe::Subscription).to receive(:create).with(
+        hash_including(customer: "cus_x", items: [{ price: "price_x" }])
+      ).and_return(stripe_sub)
+
+      result = gateway.create_subscription(customer_ref: "cus_x", plan_ref: "price_x")
+      expect(result).to include(id: "sub_x", status: "active", plan_ref: "price_x")
+    end
+
+    it "wraps Stripe::StripeError as Billing::GatewayError" do
+      allow(::Stripe::Subscription).to receive(:create).and_raise(::Stripe::StripeError, "bad")
+      expect { gateway.create_subscription(customer_ref: "x", plan_ref: "y") }
+        .to raise_error(Billing::GatewayError, /Stripe.create_subscription failed/)
+    end
+  end
+
+  describe "#verify_webhook" do
+    it "wraps Stripe::SignatureVerificationError as Billing::WebhookError" do
+      allow(::Stripe::Webhook).to receive(:construct_event)
+        .and_raise(::Stripe::SignatureVerificationError.new("sig", "header"))
+
+      expect do
+        gateway.verify_webhook(payload: "p", signature: "s", secret: "wh")
+      end.to raise_error(Billing::WebhookError, /signature verification failed/)
+    end
+  end
+end

@@ -1,0 +1,41 @@
+# frozen_string_literal: true
+
+require "active_support/concern"
+
+module Billing
+  # Mix into the host's user-facing model to gain `subscriptions` +
+  # `start_subscription!(plan_ref:)` helpers backed by the Billing
+  # engine's gateway.
+  #
+  #   class User < ApplicationRecord
+  #     include Billing::Billable
+  #   end
+  module Billable
+    extend ActiveSupport::Concern
+
+    included do
+      has_many :billing_subscriptions, class_name: "Billing::Subscription",
+                                       foreign_key: :customer_ref, primary_key: :stripe_customer_id
+    end
+
+    def start_subscription!(plan_ref:)
+      Billing::StartSubscriptionJob.perform_later(
+        customer_ref: stripe_customer_id_or_raise!, plan_ref: plan_ref
+      )
+    end
+
+    def cancel_subscription!(subscription_ref:)
+      Billing::CancelSubscriptionJob.perform_later(subscription_ref: subscription_ref)
+    end
+
+    private
+
+    def stripe_customer_id_or_raise!
+      return stripe_customer_id if respond_to?(:stripe_customer_id) && stripe_customer_id.present?
+
+      raise Billing::Error,
+            "Host model #{self.class.name} must define a stripe_customer_id attribute " \
+            "before calling Billable methods."
+    end
+  end
+end

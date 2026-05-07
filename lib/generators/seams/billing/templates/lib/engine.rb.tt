@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+module Billing
+  class Engine < ::Rails::Engine
+    isolate_namespace Billing
+
+    config.generators do |g|
+      g.test_framework :rspec
+    end
+
+    initializer "billing.register_events" do
+      Seams::EventRegistry.register("subscription.created.billing",  emitted_by: "Billing")
+      Seams::EventRegistry.register("subscription.updated.billing",  emitted_by: "Billing")
+      Seams::EventRegistry.register("subscription.canceled.billing", emitted_by: "Billing")
+      Seams::EventRegistry.register("invoice.paid.billing",          emitted_by: "Billing")
+      Seams::EventRegistry.register("invoice.failed.billing",        emitted_by: "Billing")
+    end
+  end
+end

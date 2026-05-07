@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+module Billing
+  class Invoice < ApplicationRecord
+    self.table_name = "billing_invoices"
+
+    belongs_to :subscription, class_name: "Billing::Subscription",
+                              foreign_key: :subscription_id, optional: true
+
+    validates :gateway_ref, presence: true, uniqueness: true
+    validates :amount_cents, numericality: { greater_than_or_equal_to: 0 }
+    validates :currency, presence: true
+    validates :status, inclusion: { in: %w[open paid void uncollectible] }
+
+    def paid?
+      status == "paid"
+    end
+  end
+end
