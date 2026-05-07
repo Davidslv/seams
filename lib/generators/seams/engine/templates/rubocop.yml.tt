@@ -1,7 +1,7 @@
 inherit_from:
   - ../../.rubocop.yml
 
-plugins:
+require:
   - seams/cops
 
 # Engine-scoped boundary enforcement. List every other engine in your

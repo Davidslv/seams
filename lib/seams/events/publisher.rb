@@ -37,7 +37,7 @@ module Seams
         def subscribe(event_name, &)
           Events.assert_valid_name!(event_name)
           name = event_name.to_s
-          subscriptions << name
+          subscriptions << name unless subscriptions.include?(name)
 
           adapter.subscribe(name) do |*args|
             yield(args.last)

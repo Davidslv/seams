@@ -93,7 +93,7 @@ RSpec.describe "Phase 1 integration", type: :integration do
     config_path = File.join(host_root, "engines/billing/.rubocop.yml")
     parsed = YAML.safe_load_file(config_path, aliases: true, permitted_classes: [Symbol])
 
-    expect(parsed["plugins"]).to include("seams/cops")
+    expect(parsed["require"]).to include("seams/cops")
     expect(parsed.dig("Seams/NoCrossEngineModelAccess", "OwnEngine")).to eq("Billing")
     expect(parsed.dig("Seams/NoCrossEngineDependency", "OwnEngine")).to eq("billing")
   end

@@ -39,6 +39,36 @@ RSpec.describe Seams::Generators::RemoveGenerator do
       run_generator(["billing", "--force"])
       expect(Dir.exist?(File.join(destination_root, "engines"))).to be(true)
     end
+
+    it "prunes removed engine from surviving siblings' OtherEngines lists" do
+      auth_path = File.join(destination_root, "engines", "auth")
+      seed_sibling_with_billing_listed(auth_path)
+
+      run_generator(["billing", "--force"])
+
+      content = File.read(File.join(auth_path, ".rubocop.yml"))
+      expect(content).not_to include("- Billing")
+      expect(content).not_to include("- billing")
+      expect(content).to include("OtherEngines: []")
+    end
+
+    def seed_sibling_with_billing_listed(auth_path)
+      FileUtils.mkdir_p(auth_path)
+      File.write(File.join(auth_path, ".rubocop.yml"), <<~YML)
+        Seams/NoCrossEngineModelAccess:
+          Enabled: true
+          OwnEngine: Auth
+          OtherEngines:
+            - Billing
+          ExposedConcerns: []
+
+        Seams/NoCrossEngineDependency:
+          Enabled: true
+          OwnEngine: auth
+          OtherEngines:
+            - billing
+      YML
+    end
   end
 
   describe "without --force" do

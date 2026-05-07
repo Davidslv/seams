@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "rails/generators"
 require "seams"
+require "seams/generators/sibling_rubocop_writer"
 
 module Seams
   module Generators
@@ -68,12 +70,12 @@ module Seams
 
       def update_sibling_engines
         sibling_dirs = sibling_engine_dirs
-        all_dirs     = (sibling_dirs + [name]).sort
         return if sibling_dirs.empty?
 
-        all_dirs.each do |engine_dir|
-          rewrite_other_engines_for(engine_dir, all_dirs - [engine_dir])
-        end
+        Seams::Generators::SiblingRubocopWriter.rewrite!(
+          engines_root: engines_root,
+          dirs: (sibling_dirs + [name]).sort
+        )
 
         say "  update  .rubocop.yml of #{sibling_dirs.size} sibling engine(s)", :green
       end
@@ -102,35 +104,6 @@ module Seams
            .select { |child| File.directory?(File.join(engines_root, child)) }
            .reject { |child| child.start_with?(".") || child == name }
            .sort
-      end
-
-      def rewrite_other_engines_for(sibling, others)
-        rubocop_path = File.join(engines_root, sibling, ".rubocop.yml")
-        return unless File.exist?(rubocop_path)
-
-        sibling_module  = others.map { |o| o.split("_").map(&:capitalize).join }
-        content         = File.read(rubocop_path)
-        content         = replace_other_engines_block(content, sibling_module, others)
-        File.write(rubocop_path, content)
-      end
-
-      # Replaces the `OtherEngines:` lists under both
-      # `Seams/NoCrossEngineModelAccess` and `Seams/NoCrossEngineDependency`.
-      # Module-name list goes under ModelAccess (CamelCase); directory
-      # name list goes under Dependency (snake_case).
-      def replace_other_engines_block(content, modules_list, dirs_list)
-        content = replace_block(content, "Seams/NoCrossEngineModelAccess", modules_list)
-        replace_block(content, "Seams/NoCrossEngineDependency", dirs_list)
-      end
-
-      def replace_block(content, cop_name, values)
-        formatted = values.map { |v| "    - #{v}" }.join("\n")
-        formatted = formatted.empty? ? "  OtherEngines: []" : "  OtherEngines:\n#{formatted}"
-
-        content.sub(
-          /(#{Regexp.escape(cop_name)}:.*?\n)(  OtherEngines:.*?(?=\n[A-Z]|\Z))/m,
-          "\\1#{formatted}"
-        )
       end
     end
   end

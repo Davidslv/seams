@@ -38,6 +38,19 @@ RSpec.describe RuboCop::Cop::Seams::MigrationComments, :config do
     RUBY
   end
 
+  it "fires when only a magic comment is present (no real doc block)" do
+    expect_offense(<<~RUBY)
+      # frozen_string_literal: true
+
+      class CreateSubscriptions < ActiveRecord::Migration[7.1]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Migration `CreateSubscriptions` must be preceded by a comment block explaining what changes and why (data implications, downtime risk, rollback notes).
+        def change
+          create_table :subscriptions
+        end
+      end
+    RUBY
+  end
+
   it "treats a frozen_string_literal magic comment + blank line as still leading" do
     expect_no_offenses(<<~RUBY)
       # frozen_string_literal: true

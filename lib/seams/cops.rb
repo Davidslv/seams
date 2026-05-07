@@ -3,10 +3,12 @@
 # Entry point for the Seams custom RuboCop cops. Add this line to your
 # host application's .rubocop.yml to enable boundary enforcement:
 #
-#   plugins:
+#   require:
 #     - seams/cops
 #
-# All cops live under the RuboCop::Cop::Seams namespace.
+# `require:` (not `plugins:`) is the correct form here because Seams
+# registers its cops via plain `require`, not via the formal RuboCop
+# plugin API. All cops live under the RuboCop::Cop::Seams namespace.
 
 require "rubocop"
 
