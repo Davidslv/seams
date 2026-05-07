@@ -72,13 +72,17 @@ module Teams
       @team = Teams::Team.find(params[:team_id])
     end
 
+    # `permit` deliberately omits `:role` — Brakeman flags it as
+    # mass-assignment, and even with server-side coercion the
+    # permit-list reads as "we accept whatever role the form posts".
+    # Role is extracted separately via `safe_role` and merged in.
     def invitation_params
-      # Coerce :role to a known value (default "member") so a request
-      # parameter cannot smuggle through arbitrary strings. require_team_admin!
-      # has already gated the action; this is defence in depth.
-      raw = params.require(:invitation).permit(:email, :role)
-      raw[:role] = "member" unless Teams::Membership::ROLES.include?(raw[:role])
-      raw
+      params.require(:invitation).permit(:email).merge(role: safe_role)
+    end
+
+    def safe_role
+      candidate = params.dig(:invitation, :role).to_s
+      Teams::Membership::ROLES.include?(candidate) ? candidate : "member"
     end
   end
 end
