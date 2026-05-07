@@ -48,7 +48,7 @@ module Seams
         write(File.join(engine_path, "spec/dummy/Rakefile"),               rakefile_rb)
         write(File.join(engine_path, "spec/dummy/config.ru"),              config_ru)
 
-        write(File.join(engine_path, "spec/spec_helper.rb"),               spec_helper_rb)
+        write(File.join(engine_path, "spec/spec_helper.rb"),               spec_helper_rb(engine_path))
         write(File.join(engine_path, "spec/rails_helper.rb"),              rails_helper_rb)
       end
 
@@ -199,9 +199,21 @@ module Seams
         RB
       end
 
-      def spec_helper_rb
+      def spec_helper_rb(engine_path)
+        engine_name = File.basename(engine_path)
         <<~RB
           # frozen_string_literal: true
+
+          ENV["RAILS_ENV"] ||= "test"
+
+          # Rails has to load before the engine's lib/<name>.rb runs,
+          # because engine.rb references Rails::Engine. Specs that need
+          # ActiveRecord should `require "rails_helper"` instead — that
+          # ALSO boots the dummy app, defines the schema, and connects
+          # to the test DB.
+          require "rails"
+          $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+          require "#{engine_name}"
 
           RSpec.configure do |config|
             config.expect_with :rspec do |expectations|

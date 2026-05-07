@@ -1,14 +1,20 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require "rails_helper"
 
 RSpec.describe Core::Auditable do
-  let(:model_class) do
-    Class.new(ActiveRecord::Base) do
+  # Stub a named ActiveRecord class. The polymorphic `auditable_type`
+  # column needs `self.class.name` to be non-nil; `Class.new(...)`
+  # returns an anonymous class whose `.name` is nil, which breaks the
+  # `dependent: :nullify` cleanup on destroy.
+  before do
+    stub_const("Article", Class.new(ActiveRecord::Base) {
       self.table_name = "articles"
       include Core::Auditable
-    end
+    })
   end
+
+  let(:model_class) { Article }
 
   it "creates an audit log on create" do
     expect { model_class.create!(title: "Hi") }

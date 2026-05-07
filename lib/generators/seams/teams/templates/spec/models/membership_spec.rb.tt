@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require "rails_helper"
 
 RSpec.describe Teams::Membership do
   let(:team) { Teams::Team.create!(name: "Acme") }

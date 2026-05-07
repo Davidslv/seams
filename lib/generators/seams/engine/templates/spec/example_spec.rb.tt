@@ -3,6 +3,9 @@
 # Force-load this engine's lib/ so the constant resolves whether rspec
 # is run from the host root (`bundle exec rspec engines/<%= name %>/spec`)
 # or from inside the engine. The host's spec_helper does not require us.
+# Rails must load before lib/<%= name %>.rb because engine.rb references
+# Rails::Engine.
+require "rails"
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "<%= name %>"
 

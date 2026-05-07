@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require "rails_helper"
 
 RSpec.describe Auth::Session do
   let(:user) { Auth::User.create!(email: "x@y.com", password: "secret123") }

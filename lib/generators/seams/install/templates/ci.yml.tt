@@ -92,7 +92,7 @@ jobs:
         with:
           ruby-version: ".ruby-version"
           bundler-cache: true
-      - run: bundle exec rspec engines/${{ matrix.engine }}/spec
+      - run: bundle exec rspec --default-path engines/${{ matrix.engine }}/spec engines/${{ matrix.engine }}/spec
 
   test_app:
     name: Test host app

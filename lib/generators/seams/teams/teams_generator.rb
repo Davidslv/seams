@@ -176,6 +176,8 @@ module Seams
             t.timestamps
           end
           add_index :team_invitations, :token, unique: true
+          add_index :team_invitations, %i[team_id email], unique: true,
+                                                          where: "accepted_at IS NULL"
 
           create_table :users do |t|
             t.string :email

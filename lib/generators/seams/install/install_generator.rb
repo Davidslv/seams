@@ -70,15 +70,18 @@ module Seams
 
         return if File.read(host_path).include?("engines/**/*")
 
-        say "  inject  .rubocop.yml (Exclude engines/**/*)", :green
+        say "  inject  .rubocop.yml (Exclude engines + seams.rake)", :green
         append_to_file(host_path, <<~YML)
 
           # Engines have their own self-contained .rubocop.yml. Linting them
           # from the host runs gem-style code under whatever flavor of rules
           # the host uses (omakase / etc.) and produces noisy false positives.
+          # The gem-generated lib/tasks/seams.rake is excluded for the same
+          # reason.
           AllCops:
             Exclude:
               - "engines/**/*"
+              - "lib/tasks/seams.rake"
         YML
       end
 
