@@ -1,0 +1,16 @@
+#!/bin/bash
+# bin/docker-entrypoint
+#
+# Runs db:prepare on every container boot (idempotent — Rails
+# tolerates an already-migrated DB) so engine migrations land
+# automatically on first deploy. Comment the migrate line out and
+# run migrations from a one-off task if you'd rather control them
+# manually.
+
+set -e
+
+if [ "${1}" = "./bin/rails" ] || [ "${1}" = "bundle" ]; then
+  bundle exec rails db:prepare
+fi
+
+exec "$@"

@@ -44,11 +44,36 @@ module Seams
         template "ci.yml.tt", ".github/workflows/ci.yml"
       end
 
+      def create_deployment_templates
+        # Skip any file the host already has — Rails 8 ships its own
+        # Dockerfile and bin/docker-entrypoint.
+        template_if_missing "Dockerfile.tt",         "Dockerfile"
+        template_if_missing "docker-entrypoint.tt",  "bin/docker-entrypoint"
+        template_if_missing "Procfile.tt",           "Procfile"
+        template_if_missing "deploy.yml.tt",         "config/deploy.yml"
+
+        full = File.join(destination_root, "bin/docker-entrypoint")
+        File.chmod(0o755, full) if File.exist?(full)
+      end
+
       def create_bin_seams
         template "bin_seams.tt", "bin/seams"
         full_path = File.join(destination_root, "bin/seams")
         File.chmod(0o755, full_path) if File.exist?(full_path)
       end
+
+      private
+
+      def template_if_missing(source, destination_relative)
+        full = File.join(destination_root, destination_relative)
+        if File.exist?(full)
+          say "  exist   #{destination_relative} (kept)", :blue
+        else
+          template source, destination_relative
+        end
+      end
+
+      public
 
       def post_install_message
         say ""

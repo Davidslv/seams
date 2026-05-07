@@ -112,4 +112,53 @@ RSpec.describe Seams::Generators::InstallGenerator do
       expect(content).to eq("# host's own config\n")
     end
   end
+
+  describe "#create_deployment_templates" do
+    before { run_generator }
+
+    it "creates a Dockerfile that references engines/" do
+      assert_file "Dockerfile" do |content|
+        expect(content).to include("FROM ruby:")
+        expect(content).to include("engines/")
+      end
+    end
+
+    it "creates bin/docker-entrypoint that runs db:prepare" do
+      assert_file "bin/docker-entrypoint" do |content|
+        expect(content).to include("db:prepare")
+      end
+    end
+
+    it "creates a Procfile with web + worker entries" do
+      assert_file "Procfile" do |content|
+        expect(content).to include("web:")
+        expect(content).to include("worker:")
+      end
+    end
+
+    it "creates a Kamal deploy.yml skeleton" do
+      assert_file "config/deploy.yml" do |content|
+        expect(content).to include("service:")
+        expect(content).to include("STRIPE_SECRET_KEY")
+      end
+    end
+
+    it "marks bin/docker-entrypoint as executable" do
+      full = File.join(destination_root, "bin/docker-entrypoint")
+      expect(File.executable?(full)).to be(true)
+    end
+  end
+
+  describe "#create_deployment_templates idempotence" do
+    it "skips files the host already has (Rails 8 ships its own)" do
+      FileUtils.mkdir_p(File.join(destination_root, "bin"))
+      File.write(File.join(destination_root, "Dockerfile"), "# my Dockerfile\n")
+      File.write(File.join(destination_root, "bin/docker-entrypoint"), "# my entrypoint\n")
+
+      run_generator
+
+      expect(File.read(File.join(destination_root, "Dockerfile"))).to eq("# my Dockerfile\n")
+      expect(File.read(File.join(destination_root, "bin/docker-entrypoint"))).to eq("# my entrypoint\n")
+    end
+  end
 end

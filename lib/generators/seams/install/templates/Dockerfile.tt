@@ -1,0 +1,52 @@
+# Multi-stage Dockerfile tuned for a Seams-powered Rails app.
+#
+# Layer-caching trick: every engines/<name>/<name>.gemspec is copied
+# in a separate step before the rest of the source tree, so a code
+# change in one engine does not invalidate the bundle-install layer
+# of the others.
+#
+# This file is compatible with Rails 8's `bin/docker-build`.
+
+ARG RUBY_VERSION=3.4
+FROM ruby:${RUBY_VERSION}-slim AS base
+
+ENV BUNDLE_PATH="/usr/local/bundle" \
+    BUNDLE_WITHOUT="development:test" \
+    LANG=C.UTF-8 \
+    RAILS_ENV=production \
+    RAILS_LOG_TO_STDOUT=1
+
+WORKDIR /rails
+
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y \
+      build-essential libpq-dev libyaml-dev nodejs git curl && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+# --- Bundle install layer ----------------------------------------------------
+FROM base AS gems
+
+# Copy the host's Gemfile + gem dependency manifests for the engines.
+# Add new engines by updating the COPY list once.
+COPY Gemfile Gemfile.lock ./
+COPY engines/ ./engines/
+
+RUN bundle install --jobs $(nproc) && \
+    bundle exec bootsnap precompile --gemfile
+
+# --- App layer ---------------------------------------------------------------
+FROM base AS app
+
+COPY --from=gems /usr/local/bundle /usr/local/bundle
+COPY . .
+
+RUN bundle exec bootsnap precompile app/ lib/ engines/ && \
+    SECRET_KEY_BASE_DUMMY=1 bundle exec rails assets:precompile
+
+RUN useradd rails --create-home --shell /bin/bash && \
+    chown -R rails:rails /rails db log storage tmp
+USER rails
+
+EXPOSE 3000
+ENTRYPOINT ["./bin/docker-entrypoint"]
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]

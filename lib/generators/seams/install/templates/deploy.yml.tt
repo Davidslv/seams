@@ -1,0 +1,36 @@
+# Kamal deploy config — skeleton. Fill in the host names and
+# secrets, then `kamal setup`.
+#
+# https://kamal-deploy.org for the full options reference.
+
+service: my-app
+image: my-org/my-app
+
+servers:
+  web:
+    - 1.2.3.4
+  worker:
+    cmd: bundle exec rails solid_queue:start
+    hosts:
+      - 1.2.3.5
+
+registry:
+  username: my-registry-user
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+env:
+  clear:
+    RAILS_LOG_TO_STDOUT: "1"
+    RAILS_SERVE_STATIC_FILES: "1"
+  secret:
+    - RAILS_MASTER_KEY
+    - DATABASE_URL
+    - REDIS_URL
+    - STRIPE_SECRET_KEY
+    - STRIPE_WEBHOOK_SECRET
+
+asset_path: /rails/public/assets
+
+# Engines run in the same container — no per-engine deployment.
+# Migrations apply automatically via bin/docker-entrypoint.
