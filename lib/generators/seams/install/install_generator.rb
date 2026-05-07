@@ -32,7 +32,26 @@ module Seams
       end
 
       def append_engines_to_eager_load
-        template "seams_engines.rb.tt", "config/initializers/seams_engines.rb"
+        template "seams_engines.rb.tt", "config/seams_engines.rb"
+      end
+
+      def wire_engines_into_application_rb
+        # Each engine under engines/ must be required BEFORE
+        # Rails.application.initialize! so its Railtie registers paths
+        # (db/migrate, app/*) and initializers with the host. The
+        # `require_relative` is injected directly after Bundler.require.
+        application_rb = File.join(destination_root, "config/application.rb")
+        return unless File.exist?(application_rb)
+
+        snippet = %(require_relative "seams_engines")
+        return if File.read(application_rb).include?(snippet)
+
+        say "  inject  config/application.rb (require_relative \"seams_engines\")", :green
+        inject_into_file(
+          application_rb,
+          "\n#{snippet}\n",
+          after: /Bundler\.require\(\*Rails\.groups\)\n/
+        )
       end
 
       def create_host_rubocop

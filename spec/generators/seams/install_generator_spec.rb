@@ -60,10 +60,39 @@ RSpec.describe Seams::Generators::InstallGenerator do
   describe "#append_engines_to_eager_load" do
     before { run_generator }
 
-    it "creates config/initializers/seams_engines.rb that adds engines/* to autoload" do
-      assert_file "config/initializers/seams_engines.rb" do |content|
-        expect(content).to include("Rails.autoloaders.main.push_dir")
+    it "creates config/seams_engines.rb that requires every engine" do
+      assert_file "config/seams_engines.rb" do |content|
+        expect(content).to include("$LOAD_PATH.unshift")
+        expect(content).to include('require engine_name')
         expect(content).to include("engines/")
+      end
+    end
+  end
+
+  describe "#wire_engines_into_application_rb" do
+    let(:application_rb) do
+      <<~RB
+        require_relative "boot"
+
+        require "rails"
+        Bundler.require(*Rails.groups)
+
+        module Host
+          class Application < Rails::Application
+          end
+        end
+      RB
+    end
+
+    before do
+      FileUtils.mkdir_p(File.join(destination_root, "config"))
+      File.write(File.join(destination_root, "config/application.rb"), application_rb)
+      run_generator
+    end
+
+    it "injects require_relative \"seams_engines\" after Bundler.require" do
+      assert_file "config/application.rb" do |content|
+        expect(content).to match(/Bundler\.require\(\*Rails\.groups\)\n+require_relative "seams_engines"/)
       end
     end
   end
