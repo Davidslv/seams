@@ -4,7 +4,7 @@
 # specs — they describe a workflow, not an object. The example length
 # rule isn't useful here either; a single end-to-end run has many
 # steps by design.
-# rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength
+# rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleExpectations
 
 require "fileutils"
 require "tmpdir"
@@ -180,13 +180,19 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(boot_probe("puts defined?(Reporting::Engine)")).to eq("constant")
     expect(File.directory?(File.join(host_path, "engines/reporting"))).to be(true)
 
+    # Host edits the generic generator now performs (1.6 in #2):
+    expect(File.read(File.join(host_path, "config/routes.rb"))).to include("mount Reporting::Engine")
+    expect(File.exist?(File.join(host_path, "config/initializers/reporting.rb"))).to be(true)
+
     shell(%w[bin/rails generate seams:remove reporting --force])
 
     expect(File.directory?(File.join(host_path, "engines/reporting"))).to be(false)
     # Host still boots — `bin/rails runner` returns 0 and `Reporting::Engine`
     # is no longer defined.
     expect(boot_probe("puts defined?(Reporting::Engine).inspect")).to eq("nil")
+    expect(File.read(File.join(host_path, "config/routes.rb"))).not_to include("mount Reporting::Engine")
+    expect(File.exist?(File.join(host_path, "config/initializers/reporting.rb"))).to be(false)
   end
 end
 
-# rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength
+# rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleExpectations

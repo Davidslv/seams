@@ -117,6 +117,40 @@ RSpec.describe Seams::Generators::EngineGenerator do
     end
   end
 
+  describe "wire_into_host" do
+    let(:routes_path)      { File.join(destination_root, "config/routes.rb") }
+    let(:initializer_path) { File.join(destination_root, "config/initializers/reporting.rb") }
+
+    it "mounts the engine into config/routes.rb when present" do
+      FileUtils.mkdir_p(File.join(destination_root, "config"))
+      File.write(routes_path, "Rails.application.routes.draw do\nend\n")
+      run_generator(["reporting"])
+
+      expect(File.read(routes_path)).to include('mount Reporting::Engine, at: "/reporting"')
+    end
+
+    it "creates a host-side config/initializers/<name>.rb stub when initializers/ exists" do
+      FileUtils.mkdir_p(File.join(destination_root, "config/initializers"))
+      run_generator(["reporting"])
+
+      expect(File.exist?(initializer_path)).to be(true)
+      expect(File.read(initializer_path)).to include("Reporting")
+    end
+
+    it "leaves an existing initializer untouched (idempotent)" do
+      FileUtils.mkdir_p(File.join(destination_root, "config/initializers"))
+      File.write(initializer_path, "# host's own config\n")
+      run_generator(["reporting"])
+
+      expect(File.read(initializer_path)).to eq("# host's own config\n")
+    end
+
+    it "skips silently when the host has no config/initializers directory" do
+      run_generator(["reporting"])
+      expect(File.exist?(initializer_path)).to be(false)
+    end
+  end
+
   describe "engine name validation" do
     it "rejects names that aren't valid Ruby module names" do
       expect { run_generator(["123billing"]) }

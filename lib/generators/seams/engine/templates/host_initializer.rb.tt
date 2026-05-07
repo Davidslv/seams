@@ -1,0 +1,11 @@
+# frozen_string_literal: true
+
+# Configuration for the <%= module_name %> engine. Add your own settings
+# here — for example:
+#
+#   <%= module_name %>.configure do |config|
+#     config.something = "value"
+#   end
+#
+# This file is created by `bin/rails generate seams:engine <%= name %>`
+# and only on first run; subsequent runs leave it alone.

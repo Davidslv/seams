@@ -3,6 +3,7 @@
 require "fileutils"
 require "rails/generators"
 require "seams"
+require "seams/generators/host_injector"
 require "seams/generators/sibling_rubocop_writer"
 
 module Seams
@@ -15,6 +16,8 @@ module Seams
     #
     # Run with: bin/rails generate seams:engine billing
     class EngineGenerator < Rails::Generators::NamedBase
+      include Seams::Generators::HostInjector
+
       source_root File.expand_path("templates", __dir__)
 
       NAME_PATTERN = /\A[a-z][a-z0-9_]*\z/
@@ -66,6 +69,23 @@ module Seams
 
       def create_readme
         template "README.md.tt", "engines/#{name}/README.md"
+      end
+
+      def wire_into_host
+        # Mount the engine into the host's routes (idempotent — skips
+        # if the line already exists, so canonical generators that
+        # call this and ALSO mount themselves are safe).
+        host_inject_mount(engine_class: "#{module_name}::Engine", at: "/#{name}")
+
+        # Drop a host-side initializer stub the user can fill in.
+        # Skipped if a canonical generator (or the host) has already
+        # created one.
+        initializer_path = File.join(destination_root, "config/initializers/#{name}.rb")
+        if File.exist?(initializer_path)
+          say "  exist   config/initializers/#{name}.rb (kept)", :blue
+        elsif File.directory?(File.join(destination_root, "config/initializers"))
+          template "host_initializer.rb.tt", "config/initializers/#{name}.rb"
+        end
       end
 
       def update_sibling_engines

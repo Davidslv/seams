@@ -81,7 +81,20 @@ module Seams
       def unwire_from_host
         return unless @engine_was_present
 
-        edits = CANONICAL_HOST_EDITS[name]
+        unwire_generic_host_edits
+        unwire_canonical_host_edits(CANONICAL_HOST_EDITS[name])
+      end
+
+      private
+
+      def unwire_generic_host_edits
+        # Generic uninject — applies to every engine. The mount line +
+        # initializer were created by the generic engine generator.
+        host_uninject_mount(engine_class: "#{generic_module_name}::Engine")
+        host_remove_initializer
+      end
+
+      def unwire_canonical_host_edits(edits)
         return unless edits
 
         host_uninject_mount(engine_class: edits[:mount]) if edits[:mount]
@@ -93,10 +106,20 @@ module Seams
         end
       end
 
-      private
-
       def confirm_removal?
         yes?("Remove engine `#{name}` and everything under engines/#{name}? [y/N]")
+      end
+
+      def generic_module_name
+        name.split("_").map(&:capitalize).join
+      end
+
+      def host_remove_initializer
+        path = File.join(destination_root, "config/initializers/#{name}.rb")
+        return unless File.exist?(path)
+
+        FileUtils.rm(path)
+        say "  remove  config/initializers/#{name}.rb", :red
       end
     end
   end
