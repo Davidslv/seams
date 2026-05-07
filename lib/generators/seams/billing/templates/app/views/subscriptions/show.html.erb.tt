@@ -1,0 +1,25 @@
+<%%# Single subscription view with cancel / reactivate / change_plan %>
+<%%# controls. Override in your host to brand it. %>
+<h1>Subscription <%%= @subscription.gateway_ref %></h1>
+
+<dl>
+  <dt>Status</dt>       <dd><%%= @subscription.status.titleize %></dd>
+  <dt>Plan</dt>         <dd><%%= @subscription.plan_ref %></dd>
+  <dt>Customer</dt>     <dd><%%= @subscription.customer_ref %></dd>
+  <dt>Period ends</dt>  <dd><%%= @subscription.current_period_end %></dd>
+</dl>
+
+<%% if @subscription.active? %>
+  <%%= button_to "Cancel at period end", subscription_path(@subscription),
+                method: :delete,
+                data:   { confirm: "Cancel this subscription at the end of the billing period?" } %>
+
+  <h2>Change plan</h2>
+  <%%= form_with url: change_plan_subscription_path(@subscription), method: :post do |form| %>
+    <%%= form.label     :price_ref, "New plan id" %>
+    <%%= form.text_field :price_ref %>
+    <%%= form.submit "Change plan" %>
+  <%% end %>
+<%% else %>
+  <%%= button_to "Reactivate", reactivate_subscription_path(@subscription), method: :post %>
+<%% end %>

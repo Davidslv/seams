@@ -1,0 +1,16 @@
+<%%# Lists the signed-in user's subscriptions. Override at %>
+<%%# app/views/billing/subscriptions/index.html.erb in your host. %>
+<h1>Your subscriptions</h1>
+
+<%% if @subscriptions.empty? %>
+  <p>You do not have any subscriptions yet. <%%= link_to "View plans", plans_path %>.</p>
+<%% else %>
+  <ul>
+    <%% @subscriptions.each do |subscription| %>
+      <li>
+        <%%= link_to subscription.plan_ref, subscription_path(subscription) %>
+        — <%%= subscription.status.titleize %>
+      </li>
+    <%% end %>
+  </ul>
+<%% end %>

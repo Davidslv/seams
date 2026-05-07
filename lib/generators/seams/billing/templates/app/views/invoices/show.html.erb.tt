@@ -1,0 +1,14 @@
+<%%# Single invoice view. The Stripe-hosted PDF lives off the gateway %>
+<%%# (we do not proxy it); add a `hosted_invoice_url` link in your host %>
+<%%# override if you want one. %>
+<h1>Invoice <%%= @invoice.gateway_ref %></h1>
+
+<dl>
+  <dt>Amount</dt>      <dd><%%= Billing::CurrencyHelper.format_money(@invoice.amount_cents, @invoice.currency) %></dd>
+  <dt>Status</dt>      <dd><%%= @invoice.status.titleize %></dd>
+  <dt>Customer</dt>    <dd><%%= @invoice.customer_ref %></dd>
+  <dt>Subscription</dt><dd><%%= @invoice.subscription_ref %></dd>
+  <dt>Paid at</dt>     <dd><%%= @invoice.paid_at %></dd>
+</dl>
+
+<%%= link_to "Back to billing history", invoices_path %>

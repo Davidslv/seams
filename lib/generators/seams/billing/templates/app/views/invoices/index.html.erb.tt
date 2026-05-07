@@ -1,0 +1,22 @@
+<%%# Read-only invoice history for the signed-in user. %>
+<h1>Billing history</h1>
+
+<%% if @invoices.empty? %>
+  <p>No invoices yet.</p>
+<%% else %>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Amount</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      <%% @invoices.each do |invoice| %>
+        <tr>
+          <td><%%= invoice.created_at.to_date %></td>
+          <td><%%= Billing::CurrencyHelper.format_money(invoice.amount_cents, invoice.currency) %></td>
+          <td><%%= invoice.status.titleize %></td>
+          <td><%%= link_to "View", invoice_path(invoice) %></td>
+        </tr>
+      <%% end %>
+    </tbody>
+  </table>
+<%% end %>

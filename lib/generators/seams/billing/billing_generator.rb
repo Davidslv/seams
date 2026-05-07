@@ -177,6 +177,23 @@ module Seams
                  engine_path("app/views/billing/plans/index.html.erb")
       end
 
+      # Phase 3 (4/4) — self-service subscription management +
+      # read-only billing history. Routes live in config/routes.rb.tt.
+      def create_subscriptions_and_invoices_ui
+        template "app/controllers/subscriptions_controller.rb.tt",
+                 engine_path("app/controllers/billing/subscriptions_controller.rb")
+        template "app/controllers/invoices_controller.rb.tt",
+                 engine_path("app/controllers/billing/invoices_controller.rb")
+        template "app/views/subscriptions/index.html.erb.tt",
+                 engine_path("app/views/billing/subscriptions/index.html.erb")
+        template "app/views/subscriptions/show.html.erb.tt",
+                 engine_path("app/views/billing/subscriptions/show.html.erb")
+        template "app/views/invoices/index.html.erb.tt",
+                 engine_path("app/views/billing/invoices/index.html.erb")
+        template "app/views/invoices/show.html.erb.tt",
+                 engine_path("app/views/billing/invoices/show.html.erb")
+      end
+
       # LTD admin controller + views (issue #2 section 3A.LTD). Kept
       # in its own generator method so create_controllers_and_views
       # stays under the AbcSize lint threshold.
@@ -212,6 +229,11 @@ module Seams
                  engine_path("spec/factories/billing.rb")
         template "spec/support/stripe_helpers.rb.tt",
                  engine_path("spec/support/stripe_helpers.rb")
+        # Phase 3 (4/4) — gateway contract shared_examples.
+        template "spec/support/shared_examples/a_billing_gateway.rb.tt",
+                 engine_path("spec/support/shared_examples/a_billing_gateway.rb")
+        template "spec/gateways/contract_spec.rb.tt",
+                 engine_path("spec/gateways/billing/contract_spec.rb")
         create_stripe_event_fixtures
       end
 

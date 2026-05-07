@@ -779,4 +779,129 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
   end
+
+  describe "Phase 3 (4/4) — self-service controllers + views + routes" do
+    it "ships SubscriptionsController with index/show/cancel/reactivate/change_plan" do
+      assert_file "engines/billing/app/controllers/billing/subscriptions_controller.rb" do |content|
+        [
+          "class SubscriptionsController",
+          "def index",
+          "def show",
+          "def cancel",
+          "def reactivate",
+          "def change_plan",
+          "Billing::Subscriptions::CancelService.call",
+          "Billing::Subscriptions::ReactivateService.call",
+          "Billing::Subscriptions::ChangePlanService.call",
+          "current_billing_customer_ref"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships InvoicesController with read-only index/show" do
+      assert_file "engines/billing/app/controllers/billing/invoices_controller.rb" do |content|
+        [
+          "class InvoicesController",
+          "def index",
+          "def show",
+          "Billing::Invoice.where",
+          "current_billing_customer_ref"
+        ].each { |needle| expect(content).to include(needle) }
+        ["def create", "def update", "def destroy", "def download"].each do |needle|
+          expect(content).not_to include(needle.tr("\\", ""))
+        end
+      end
+    end
+
+    it "ships index + show views for both controllers" do
+      %w[
+        engines/billing/app/views/billing/subscriptions/index.html.erb
+        engines/billing/app/views/billing/subscriptions/show.html.erb
+        engines/billing/app/views/billing/invoices/index.html.erb
+        engines/billing/app/views/billing/invoices/show.html.erb
+      ].each { |path| assert_file path }
+    end
+
+    it "registers the new routes (subscriptions + invoices) on Billing::Engine" do
+      assert_file "engines/billing/config/routes.rb" do |content|
+        [
+          "resources :subscriptions",
+          "resources :invoices",
+          "delete :cancel",
+          "post   :reactivate",
+          "post   :change_plan"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
+
+  describe "Phase 3 (4/4) — gateway contract shared_examples" do
+    it 'ships the "a billing gateway" shared example covering the full Abstract contract' do
+      assert_file "engines/billing/spec/support/shared_examples/a_billing_gateway.rb" do |content|
+        [
+          'RSpec.shared_examples "a billing gateway"',
+          "#create_subscription",
+          "#cancel_subscription",
+          "#fetch_subscription",
+          "#create_checkout_session",
+          "#create_billing_portal_session",
+          "#create_lifetime_checkout_session",
+          "#verify_webhook",
+          "Billing::WebhookError"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "Stripe gateway runs the contract spec via it_behaves_like" do
+      assert_file "engines/billing/spec/gateways/billing/contract_spec.rb" do |content|
+        expect(content).to include("RSpec.describe Billing::Gateways::Stripe")
+        expect(content).to include('it_behaves_like "a billing gateway"')
+      end
+    end
+  end
+
+  describe "Phase 3 (4/4) — README updates" do
+    it "documents handler routing + the EventRouter.register extension point" do
+      assert_file "engines/billing/README.md" do |content|
+        [
+          "Billing::Webhooks::EventRouter.register",
+          "process_webhooks_async",
+          "SubscriptionCreatedHandler",
+          "InvoicePaidHandler",
+          "CheckoutSessionCompletedHandler"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "documents the self-service controllers" do
+      assert_file "engines/billing/README.md" do |content|
+        [
+          "Billing::SubscriptionsController",
+          "Billing::InvoicesController",
+          "current_billing_customer_ref",
+          "Self-service controllers"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "documents the Stripe Checkout test-mode walkthrough" do
+      assert_file "engines/billing/README.md" do |content|
+        [
+          "Verifying the Stripe Checkout flow against test mode",
+          "stripe listen --forward-to",
+          "4242 4242 4242 4242",
+          "Billing::WebhookEvent.where"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "documents the gateway contract shared_examples usage" do
+      assert_file "engines/billing/README.md" do |content|
+        [
+          "Gateway contract specs",
+          'it_behaves_like "a billing gateway"'
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+  end
 end

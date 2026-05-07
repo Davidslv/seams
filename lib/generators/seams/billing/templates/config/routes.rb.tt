@@ -3,6 +3,21 @@
 Billing::Engine.routes.draw do
   resources :plans, only: %i[index]
 
+  # Self-service subscription management — Phase 3 (4/4). Backed by
+  # the Phase 3 (2/4) service objects; member actions map onto
+  # CancelService / ReactivateService / ChangePlanService.
+  resources :subscriptions, only: %i[index show] do
+    member do
+      delete :cancel
+      post   :reactivate
+      post   :change_plan
+    end
+  end
+
+  # Read-only billing history. Stripe hosts the PDF; the show view
+  # links to hosted_invoice_url if your host wires it up.
+  resources :invoices, only: %i[index show]
+
   post "/checkout",          to: "checkout#create",   as: :checkout
   get  "/checkout/success",  to: "checkout#success",  as: :checkout_success
   # Lifetime Deal purchase — Stripe Checkout `mode: "payment"`.
