@@ -299,4 +299,85 @@ RSpec.describe Seams::Generators::InstallGenerator do
       end
     end
   end
+
+  describe "Phase 5A — generated CI YAML is structurally valid" do
+    before { run_generator }
+
+    let(:ci_yaml) do
+      require "yaml"
+      YAML.safe_load_file(File.join(destination_root, ".github/workflows/ci.yml"), aliases: true,
+                                                                                   permitted_classes: [Symbol])
+    end
+
+    it "parses as YAML without raising" do
+      expect { ci_yaml }.not_to raise_error
+    end
+
+    it "sets the workflow name" do
+      expect(ci_yaml["name"]).to eq("CI")
+    end
+
+    it "wires push + pull_request triggers" do
+      raw = File.read(File.join(destination_root, ".github/workflows/ci.yml"))
+      expect(raw).to match(/^on:\s*$/)
+      expect(raw).to include("push:")
+      expect(raw).to include("pull_request:")
+    end
+
+    it "ships the four required jobs (lint, security, discover, test_engine)" do
+      jobs = ci_yaml.fetch("jobs")
+      %w[lint security discover test_engine].each do |job|
+        expect(jobs).to have_key(job), "expected job #{job.inspect} in CI YAML"
+      end
+    end
+
+    it "every job that has steps declares runs-on Ubuntu" do
+      ci_yaml.fetch("jobs").each_value do |job|
+        next unless job.is_a?(Hash) && job.key?("steps")
+
+        expect(job["runs-on"]).to be_a(String).and(satisfy { |runner| runner.start_with?("ubuntu") })
+      end
+    end
+
+    it "uses pinned major versions for the GitHub Actions it depends on" do
+      raw = File.read(File.join(destination_root, ".github/workflows/ci.yml"))
+      expect(raw).to include("actions/checkout@v")
+      expect(raw).to include("ruby/setup-ruby@v")
+      expect(raw).not_to include("@latest")
+      expect(raw).not_to include("@main")
+    end
+  end
+
+  describe "Phase 5B — generated Dockerfile is structurally valid" do
+    before { run_generator }
+
+    let(:dockerfile) { File.read(File.join(destination_root, "Dockerfile")) }
+
+    it "ships a Dockerfile" do
+      expect(File.exist?(File.join(destination_root, "Dockerfile"))).to be(true)
+    end
+
+    it "starts with at least one FROM line" do
+      expect(dockerfile).to match(/^FROM \S+/)
+    end
+
+    it "declares a WORKDIR" do
+      expect(dockerfile).to match(%r{^WORKDIR /\S+})
+    end
+
+    it "every multi-stage `COPY --from=` reference is a defined stage or a registry image" do
+      defined_stages = dockerfile.scan(/^FROM\s+\S+\s+AS\s+(\S+)/i).flatten
+      copy_targets   = dockerfile.scan(/^COPY\s+--from=(\S+)/i).flatten
+
+      registry_image_pattern = %r{\A[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*:[A-Za-z0-9_.-]+\z}
+      missing = copy_targets.reject do |target|
+        defined_stages.include?(target) || target.match?(registry_image_pattern)
+      end
+      expect(missing).to be_empty, "Dockerfile COPY --from references unresolved stages: #{missing.inspect}"
+    end
+
+    it "exposes a port that the entrypoint listens on" do
+      expect(dockerfile).to match(/^EXPOSE \d+/)
+    end
+  end
 end
