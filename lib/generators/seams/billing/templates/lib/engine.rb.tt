@@ -14,6 +14,10 @@ module Billing
       Seams::EventRegistry.register("subscription.canceled.billing", emitted_by: "Billing")
       Seams::EventRegistry.register("invoice.paid.billing",          emitted_by: "Billing")
       Seams::EventRegistry.register("invoice.failed.billing",        emitted_by: "Billing")
+      # Lifetime Deal events — see issue #2 section 3A.LTD.
+      Seams::EventRegistry.register("lifetime.granted.billing",      emitted_by: "Billing")
+      Seams::EventRegistry.register("lifetime.purchased.billing",    emitted_by: "Billing")
+      Seams::EventRegistry.register("lifetime.revoked.billing",      emitted_by: "Billing")
     end
 
     initializer "billing.append_migrations" do |app|

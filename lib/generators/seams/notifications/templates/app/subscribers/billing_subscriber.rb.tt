@@ -23,7 +23,10 @@ module Notifications
       "subscription.updated.billing"  => "billing/subscription_updated",
       "subscription.canceled.billing" => "billing/subscription_canceled",
       "invoice.paid.billing"          => "billing/invoice_paid",
-      "invoice.failed.billing"        => "billing/invoice_failed"
+      "invoice.failed.billing"        => "billing/invoice_failed",
+      # Lifetime Deal events (issue #2 section 3A.LTD)
+      "lifetime.granted.billing"      => "billing/lifetime_granted",
+      "lifetime.purchased.billing"    => "billing/lifetime_purchased"
     }.freeze
 
     class << self

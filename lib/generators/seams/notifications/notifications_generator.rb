@@ -124,6 +124,8 @@ module Seams
           subscription_canceled
           invoice_paid
           invoice_failed
+          lifetime_granted
+          lifetime_purchased
         ].each do |name|
           template "app/views/templates/billing/#{name}.erb.tt",
                    engine_path("app/views/notifications/templates/billing/#{name}.erb")
