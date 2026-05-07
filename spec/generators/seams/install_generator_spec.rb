@@ -267,4 +267,36 @@ RSpec.describe Seams::Generators::InstallGenerator do
       expect(gemfile.scan(/gem ["']seams["']/).size).to eq(1)
     end
   end
+
+  describe "Phase 1.8 — CLI rake tasks (test:changed + quality:all)" do
+    before { run_generator }
+
+    it "ships a seams:test:changed rake task that delegates to Seams::CLI.test_changed" do
+      assert_file "lib/tasks/seams.rake" do |content|
+        [
+          "namespace :test do",
+          "task changed:",
+          "Seams::CLI.test_changed",
+          'ENV.fetch("BASE", "main")'
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships a seams:quality:all rake task that delegates to Seams::CLI.quality" do
+      assert_file "lib/tasks/seams.rake" do |content|
+        [
+          "namespace :quality do",
+          "task all:",
+          "Seams::CLI.quality"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "keeps the existing per-engine seams:test[engine] + seams:quality[engine] tasks" do
+      assert_file "lib/tasks/seams.rake" do |content|
+        expect(content).to include("task :test, [:engine]")
+        expect(content).to include("task :quality, [:engine]")
+      end
+    end
+  end
 end

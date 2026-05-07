@@ -42,13 +42,41 @@ module Seams
 
       def print_engine(name)
         @output.puts("  - #{name}")
-        events_for(name).each { |event| @output.puts("      emits: #{event}") }
+        events_for(name).each        { |event| @output.puts("      emits:      #{event}") }
+        subscriptions_for(name).each { |event| @output.puts("      subscribes: #{event}") }
+        depends_on(name).each        { |dep|   @output.puts("      depends on: #{dep}") }
       end
 
       def events_for(name)
         module_name = module_name_for(name)
         events      = Seams::EventRegistry.all.select { |_, owner| owner.to_s == module_name }.keys
         events.empty? ? ["(no events)"] : events
+      end
+
+      # Reads the engine's lib/<name>/engine.rb for
+      # Publisher.subscribe("event.name.other_engine") calls and
+      # returns the event names. Phase 1.8 — gives `seams:list` a
+      # cross-engine view, not just an emitter list.
+      def subscriptions_for(name)
+        engine_rb = File.join(@engines_root, name, "lib", name, "engine.rb")
+        return [] unless File.exist?(engine_rb)
+
+        File.read(engine_rb)
+            .scan(/Publisher\.subscribe\(\s*["']([^"']+)["']/)
+            .flatten
+            .uniq
+      end
+
+      # Walks the subscribe-list and resolves each event back to the
+      # engine that emits it (via the canonical "name.action.<engine>"
+      # naming convention). Returns the set of distinct engine names
+      # this one depends on.
+      def depends_on(name)
+        subscriptions_for(name)
+          .map { |event| event.split(".").last }
+          .reject { |dep| dep.nil? || dep == name }
+          .uniq
+          .sort
       end
 
       # Tries to find the engine's actual Ruby module name by reading

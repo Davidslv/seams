@@ -72,4 +72,49 @@ RSpec.describe Seams::CLI::List do
       expect(io.string).to include("token.granted.oauth2")
     end
   end
+
+  describe "Phase 1.8 — inter-engine subscription + dependency reporting" do
+    before do
+      FileUtils.mkdir_p(File.join(engines_root, "notifications", "lib", "notifications"))
+      File.write(
+        File.join(engines_root, "notifications", "lib", "notifications", "engine.rb"),
+        <<~RUBY
+          module Notifications
+            class Engine
+              # Cross-engine subscriptions wired in initializer blocks.
+              Publisher.subscribe("user.signed_up.auth")          { |payload| }
+              Publisher.subscribe("subscription.created.billing") { |payload| }
+            end
+          end
+        RUBY
+      )
+    end
+
+    it "prints `subscribes:` lines for each Publisher.subscribe call in the engine.rb" do
+      list.call
+      expect(io.string).to include("subscribes: user.signed_up.auth")
+      expect(io.string).to include("subscribes: subscription.created.billing")
+    end
+
+    it "prints `depends on:` lines naming the engines this one consumes from" do
+      list.call
+      expect(io.string).to include("depends on: auth")
+      expect(io.string).to include("depends on: billing")
+    end
+
+    it "deduplicates dependencies and excludes self-references" do
+      File.write(
+        File.join(engines_root, "notifications", "lib", "notifications", "engine.rb"),
+        <<~RUBY
+          Publisher.subscribe("user.signed_up.auth")    { |p| }
+          Publisher.subscribe("user.signed_in.auth")    { |p| }
+          Publisher.subscribe("notification.queued.notifications") { |p| }
+        RUBY
+      )
+
+      list.call
+      expect(io.string.scan("depends on: auth").size).to eq(1)
+      expect(io.string).not_to match(/depends on: notifications/)
+    end
+  end
 end

@@ -73,21 +73,6 @@ module Seams
         template "Rakefile.tt", "engines/#{name}/Rakefile"
       end
 
-      # Phase 1.6 — per-engine dummy app via the shared DummyAppWriter.
-      # Generic engines start with an empty schema; canonical
-      # generators (auth/billing/etc) overwrite this with their own
-      # schema by calling DummyAppWriter.write! again with the right
-      # SCHEMA body. Keeping this here means even a vanilla
-      # `seams:engine reporting` ships a bootable spec/dummy.
-      def create_dummy_app
-        Seams::Generators::DummyAppWriter.write!(
-          engine_path: File.join(destination_root, "engines", name),
-          engine_module: module_name,
-          mount_at: "/#{name}",
-          schema: "# generic engine — no schema yet"
-        )
-      end
-
       def create_rubocop_config
         template "rubocop.yml.tt", "engines/#{name}/.rubocop.yml"
       end
@@ -103,6 +88,22 @@ module Seams
 
       def create_readme
         template "README.md.tt", "engines/#{name}/README.md"
+      end
+
+      # Phase 1.6 — per-engine dummy app via the shared DummyAppWriter.
+      # Generic engines start with an empty schema; canonical
+      # generators (auth/billing/etc) overwrite this with their own
+      # schema by calling DummyAppWriter.write! again with the right
+      # SCHEMA body. Runs AFTER create_spec_helper so DummyAppWriter's
+      # File.write silently overwrites the lightweight Thor template
+      # rather than tripping a Thor "conflict" prompt.
+      def create_dummy_app
+        Seams::Generators::DummyAppWriter.write!(
+          engine_path: File.join(destination_root, "engines", name),
+          engine_module: module_name,
+          mount_at: "/#{name}",
+          schema: "# generic engine — no schema yet"
+        )
       end
 
       def wire_into_host

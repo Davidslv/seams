@@ -24,6 +24,23 @@ namespace :seams do
     sh "bundle", "exec", "rubocop", "engines/#{name}"
   end
 
+  namespace :test do
+    desc "Run specs only for engines changed vs $BASE (default: main)"
+    task changed: :environment do
+      require "seams/cli"
+      base = ENV.fetch("BASE", "main")
+      abort("seams:test:changed failed.") unless Seams::CLI.test_changed(base: base)
+    end
+  end
+
+  namespace :quality do
+    desc "Aggregate RuboCop + Brakeman + bundle-audit + SimpleCov collation across the host"
+    task all: :environment do
+      require "seams/cli"
+      abort("seams:quality:all reported failures.") unless Seams::CLI.quality
+    end
+  end
+
   desc "Pre-push verification: rubocop, host + per-engine specs, brakeman, bundle-audit, orphan-event check"
   task audit: :environment do
     Rake::Task["environment"].invoke
