@@ -63,6 +63,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       f.puts %(gem "seams",    path: "#{seams_gem_path}")
       f.puts %(gem "bcrypt",   "~> 3.1")
       f.puts %(gem "faraday",  "~> 2.0")
+      f.puts %(gem "stripe",   "~> 13.0")
       f.puts %(gem "ice_cube", ">= 0.16")
       f.puts
       f.puts "group :test do"

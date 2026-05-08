@@ -1,76 +1,42 @@
 # frozen_string_literal: true
 
-require "openssl"
+require "stripe"
 
 module Billing
   module Stripe
-    # Verifies the Stripe-Signature header on incoming webhooks.
+    # Verifies the Stripe-Signature header on incoming webhooks via
+    # the official `stripe` gem's first-party helper.
     #
-    # Header format:
-    #   t=<unix_ts>,v1=<hmac_sha256>,v1=<hmac_sha256>,v0=<...>
+    # Stripe maintains the verification logic — HMAC-SHA256 over
+    # `<timestamp>.<payload>`, 5-minute tolerance window, multiple
+    # v1= entries for key rotation, constant-time comparison. We used
+    # to reimplement this against https://docs.stripe.com/webhooks/signatures
+    # in a hand-rolled HMAC module; that decision was reversed in
+    # 2026-05 because Stripe ships breaking changes to the signing
+    # scheme over time and the gem tracks them as a first-class
+    # commitment.
     #
-    # Signed payload: "<timestamp>.<raw_request_body>"
-    # Algorithm:      HMAC-SHA256, key = endpoint signing secret
-    # Tolerance:      5 minutes by default (rejects replays)
-    # Multiple v1=:   key rotation; ANY one matching is sufficient
-    #
-    # Verified against https://docs.stripe.com/webhooks/signatures.
-    # Comparison is constant-time to prevent timing attacks.
+    # Public surface preserved (verify!) so callers (Billing::Gateways::Stripe)
+    # don't need to change. Stripe::SignatureVerificationError is
+    # rethrown as Billing::WebhookError to keep the engine's error
+    # boundary intact.
     module WebhookSignature
-      DEFAULT_TOLERANCE = 300  # seconds (Stripe's default)
+      DEFAULT_TOLERANCE = 300  # seconds — matches Stripe's default
 
       module_function
 
-      # Returns true if signature is valid; raises Billing::WebhookError
-      # on any failure mode (no header, malformed header, no v1, no
-      # matching v1, timestamp outside tolerance).
-      def verify!(payload:, signature_header:, secret:, tolerance: DEFAULT_TOLERANCE, now: Time.now.to_i)
+      # Returns the parsed Stripe::Event on success; raises
+      # Billing::WebhookError on any failure mode (no header,
+      # malformed header, no v1, no matching v1, timestamp outside
+      # tolerance, malformed JSON).
+      def verify!(payload:, signature_header:, secret:, tolerance: DEFAULT_TOLERANCE)
         raise Billing::WebhookError, "Stripe-Signature header missing" if signature_header.nil? || signature_header.empty?
 
-        parsed = parse_header(signature_header)
-        timestamp = parsed[:timestamp]
-        raise Billing::WebhookError, "Stripe-Signature missing timestamp" unless timestamp
-        raise Billing::WebhookError, "Stripe-Signature has no v1 entries" if parsed[:signatures].empty?
-
-        if (now - timestamp).abs > tolerance
-          raise Billing::WebhookError,
-                "Stripe-Signature timestamp #{timestamp} outside #{tolerance}s tolerance (now=#{now})"
-        end
-
-        expected = compute_signature(secret: secret, timestamp: timestamp, payload: payload)
-        return true if parsed[:signatures].any? { |sig| secure_compare(sig, expected) }
-
-        raise Billing::WebhookError, "Stripe-Signature: no v1 entry matched the computed HMAC"
-      end
-
-      def parse_header(header)
-        timestamp  = nil
-        signatures = []
-        header.split(",").each do |part|
-          k, v = part.strip.split("=", 2)
-          next if k.nil? || v.nil?
-
-          case k
-          when "t"  then timestamp = Integer(v, 10) rescue nil
-          when "v1" then signatures << v
-          end
-        end
-        { timestamp: timestamp, signatures: signatures }
-      end
-
-      def compute_signature(secret:, timestamp:, payload:)
-        signed_payload = "#{timestamp}.#{payload}"
-        OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new("sha256"), secret, signed_payload)
-      end
-
-      # Length-checked, constant-time string comparison. OpenSSL's
-      # `OpenSSL.fixed_length_secure_compare` requires equal lengths;
-      # different lengths short-circuit to false BEFORE the constant-time
-      # check (the leak is "lengths differ", which is fine).
-      def secure_compare(a, b)
-        return false unless a.bytesize == b.bytesize
-
-        OpenSSL.fixed_length_secure_compare(a, b)
+        ::Stripe::Webhook.construct_event(payload, signature_header, secret, tolerance)
+      rescue ::Stripe::SignatureVerificationError => e
+        raise Billing::WebhookError, "Stripe signature invalid: #{e.message}"
+      rescue JSON::ParserError => e
+        raise Billing::WebhookError, "Stripe payload not JSON: #{e.message}"
       end
     end
   end

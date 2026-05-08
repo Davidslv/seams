@@ -7,21 +7,24 @@ require "billing/stripe/webhook_signature"
 module Billing
   module Gateways
     # Stripe billing gateway. Implements the Billing::Gateways::Abstract
-    # contract on top of Billing::Stripe::Client (a Faraday-based REST
-    # client we own — see lib/billing/stripe/client.rb) and
-    # Billing::Stripe::WebhookSignature (HMAC-SHA256 verification, no
-    # HTTP).
-    #
-    # Why Faraday and not the official `stripe` gem: the gem's HTTP
-    # backend is Net::HTTP, which is forbidden by the Faraday-only
-    # rule (see memory feedback_external_apis.md). The five endpoints
-    # we use are stable enough that owning a thin client is cheaper
-    # than carrying the SDK's HTTP layer.
+    # contract on top of the official `stripe` Ruby gem
+    # (https://github.com/stripe/stripe-ruby), wrapped in a thin
+    # facade at Billing::Stripe::Client so the rest of the engine
+    # has one place to call. Webhook signature verification uses
+    # Stripe::Webhook.construct_event from the same gem rather than
+    # a hand-rolled HMAC. Wave 8's earlier decision to roll a Faraday
+    # client was reversed in 2026-05 — the gem is actively maintained
+    # by Stripe and tracking their API ourselves wasn't worth the
+    # centralisation benefit Faraday alone provided.
     #
     # API surface used (verified against current Stripe docs):
+    #   POST   /v1/customers                   https://docs.stripe.com/api/customers/create
+    #   GET    /v1/customers/search            https://docs.stripe.com/api/customers/search
     #   POST   /v1/subscriptions               https://docs.stripe.com/api/subscriptions/create
+    #   POST   /v1/subscriptions/{id}          https://docs.stripe.com/api/subscriptions/update
     #   DELETE /v1/subscriptions/{id}          https://docs.stripe.com/api/subscriptions/cancel
     #   GET    /v1/subscriptions/{id}          https://docs.stripe.com/api/subscriptions/retrieve
+    #   GET    /v1/invoices/{id}               https://docs.stripe.com/api/invoices/retrieve
     #   POST   /v1/checkout/sessions           https://docs.stripe.com/api/checkout/sessions/create
     #   POST   /v1/billing_portal/sessions     https://docs.stripe.com/api/customer_portal/sessions/create
     #   Webhook signature                      https://docs.stripe.com/webhooks/signatures
@@ -92,26 +95,24 @@ module Billing
       end
 
       # https://docs.stripe.com/webhooks/signatures
-      # Verifies the Stripe-Signature header against `secret`. Raises
-      # Billing::WebhookError on any failure (no header / no v1 / no
-      # matching v1 / timestamp outside the 5-minute tolerance window).
+      # Verifies the Stripe-Signature header against `secret` via the
+      # official Stripe::Webhook helper. Raises Billing::WebhookError
+      # on any failure (no header / signature mismatch / timestamp
+      # outside the 5-minute tolerance window / non-JSON payload).
       # Returns the normalised event hash on success.
       def verify_webhook(payload:, signature:, secret:)
-        Billing::Stripe::WebhookSignature.verify!(
+        event = Billing::Stripe::WebhookSignature.verify!(
           payload:          payload,
           signature_header: signature,
           secret:           secret
         )
-        event = JSON.parse(payload)
         {
-          id:       event["id"],          # evt_* — controller dedupes via Billing::WebhookEvent
+          id:       event["id"],            # evt_* — controller dedupes via Billing::WebhookEvent
           type:     event["type"],
           livemode: event["livemode"],
-          object:   event.dig("data", "object"),
+          object:   event.data["object"],   # Stripe::Event#data is a StripeObject; both [] and . accessors work
           raw:      payload
         }
-      rescue JSON::ParserError => e
-        raise Billing::WebhookError, "Stripe webhook payload is not valid JSON: #{e.message}"
       end
 
       private

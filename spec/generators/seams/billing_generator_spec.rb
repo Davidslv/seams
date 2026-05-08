@@ -36,6 +36,21 @@ BILLING_REGISTERED_EVENTS = %w[
   lifetime.granted.billing lifetime.purchased.billing lifetime.revoked.billing
 ].freeze
 
+BILLING_STRIPE_CLIENT_NEEDLES = [
+  'require "stripe"',
+  "::Stripe::StripeClient.new(api_key)",
+  "sdk.v1.customers.create",
+  "sdk.v1.customers.search",
+  "sdk.v1.subscriptions.create",
+  "sdk.v1.subscriptions.cancel",
+  "sdk.v1.subscriptions.retrieve",
+  "sdk.v1.subscriptions.update",
+  "sdk.v1.invoices.retrieve",
+  "sdk.v1.checkout.sessions.create",
+  "sdk.v1.billing_portal.sessions.create",
+  "idempotency_key:"
+].freeze
+
 BILLING_HANDLER_RUNTIME_NEEDLES = %w[
   Billing::Webhooks::Handlers::SubscriptionCreatedHandler
   Billing::Webhooks::Handlers::SubscriptionUpdatedHandler
@@ -114,13 +129,13 @@ RSpec.describe Seams::Generators::BillingGenerator do
       %w[
         Billing::Stripe::Client
         Billing::Stripe::WebhookSignature
+        docs.stripe.com/api/customers/create
         docs.stripe.com/api/subscriptions/create
         docs.stripe.com/api/subscriptions/cancel
         docs.stripe.com/api/subscriptions/retrieve
         docs.stripe.com/api/checkout/sessions/create
         docs.stripe.com/api/customer_portal/sessions/create
         docs.stripe.com/webhooks/signatures
-        Billing::WebhookError
       ]
     end
 
@@ -133,7 +148,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
-    it "creates the Stripe gateway that delegates to the Faraday client + WebhookSignature" do
+    it "creates the Stripe gateway that delegates to the Stripe SDK Client + WebhookSignature" do
       assert_file "engines/billing/lib/billing/gateways/stripe.rb" do |content|
         gateway_needles.each do |needle|
           expect(content).to include(needle), "expected gateway to include #{needle}"
@@ -141,37 +156,29 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
-    it "ships the Faraday-based Stripe REST client (no stripe gem dependency)" do
+    it "ships the Stripe::StripeClient-backed Client facade" do
       assert_file "engines/billing/lib/billing/stripe/client.rb" do |content|
-        [
-          'require "faraday"',
-          "Faraday.new",
-          "https://api.stripe.com",
-          "def create_subscription",
-          "def cancel_subscription",
-          "def create_checkout_session",
-          "flatten_params"
-        ].each { |needle| expect(content).to include(needle.tr("\\", "")) }
+        BILLING_STRIPE_CLIENT_NEEDLES.each { |needle| expect(content).to include(needle) }
       end
     end
 
-    it "ships the HMAC-SHA256 WebhookSignature module (no SDK dependency)" do
+    it "ships the SDK-backed WebhookSignature wrapper" do
       assert_file "engines/billing/lib/billing/stripe/webhook_signature.rb" do |content|
-        expect(content).to include("OpenSSL::HMAC.hexdigest")
-        expect(content).to include('OpenSSL::Digest.new("sha256")')
-        expect(content).to include("DEFAULT_TOLERANCE = 300")
-        expect(content).to include("fixed_length_secure_compare")
+        [
+          'require "stripe"',
+          "::Stripe::Webhook.construct_event",
+          "::Stripe::SignatureVerificationError",
+          "DEFAULT_TOLERANCE = 300",
+          "Billing::WebhookError"
+        ].each { |needle| expect(content).to include(needle) }
       end
     end
 
-    it "host_inject_gem adds faraday (not stripe) to the host Gemfile" do
-      # The generator's wire_into_host runs against destination_root
-      # rather than producing a generated file, so we read its source
-      # to assert what it injects.
+    it "host_inject_gem adds the official `stripe` gem (not faraday for Stripe)" do
       gen_path = File.expand_path("../../../lib/generators/seams/billing/billing_generator.rb", __dir__)
       content  = File.read(gen_path)
-      expect(content).to include('host_inject_gem("faraday"')
-      expect(content).not_to match(/host_inject_gem\("stripe"/)
+      expect(content).to include('host_inject_gem("stripe"')
+      expect(content).not_to match(/host_inject_gem\("faraday"/)
     end
   end
 
@@ -685,12 +692,12 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
-    it "Stripe::Client#create_customer accepts idempotency_key + sends it as the Idempotency-Key header" do
+    it "Stripe::Client#create_customer accepts idempotency_key + forwards it to the SDK opts hash" do
       assert_file "engines/billing/lib/billing/stripe/client.rb" do |content|
         [
           "def create_customer(email:, idempotency_key: nil, **extra)",
-          '"Idempotency-Key" => idempotency_key',
-          "headers: headers",
+          "{ idempotency_key: idempotency_key }",
+          "sdk.v1.customers.create(body, opts)",
           "docs.stripe.com/api/idempotent_requests"
         ].each { |needle| expect(content).to include(needle) }
       end

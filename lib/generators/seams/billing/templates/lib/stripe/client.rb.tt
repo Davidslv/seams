@@ -1,160 +1,101 @@
 # frozen_string_literal: true
 
-require "faraday"
-require "json"
-require "cgi"
+require "stripe"
 
 module Billing
   module Stripe
-    # Thin Faraday-based REST client for the five Stripe endpoints the
-    # Billing engine uses. Owned in-tree so the gem doesn't depend on
-    # Stripe's official SDK (which uses Net::HTTP under the hood and
-    # violates the Faraday-only rule documented in
-    # feedback_external_apis.md).
+    # Thin facade over the official `stripe` Ruby gem so the engine's
+    # service objects + gateway have one shape to call. The previous
+    # version of this file was a hand-rolled Faraday REST client we
+    # owned; that decision was reversed in 2026-05 (Wave 8 → reversed
+    # Wave 6) because Stripe maintains the gem as a first-class
+    # deliverable and keeping our own client current with their API
+    # was strictly more work than the centralisation benefit Faraday
+    # alone gave us.
+    #
+    # The public method surface is unchanged — every service object
+    # and the gateway adapter call this Client without knowing
+    # whether the implementation is Faraday or the gem.
+    #
+    # Stripe gem version pinned to ~> 13 in the host Gemfile by the
+    # Billing generator. The StripeClient API
+    # (`client.v1.<resource>.<action>`) is what Stripe documents at
+    # https://docs.stripe.com/api?lang=ruby for every endpoint we use.
     #
     # Verified against:
+    #   https://docs.stripe.com/api/customers/create
+    #   https://docs.stripe.com/api/customers/search
     #   https://docs.stripe.com/api/subscriptions/create
+    #   https://docs.stripe.com/api/subscriptions/update
     #   https://docs.stripe.com/api/subscriptions/cancel
     #   https://docs.stripe.com/api/subscriptions/retrieve
+    #   https://docs.stripe.com/api/invoices/retrieve
     #   https://docs.stripe.com/api/checkout/sessions/create
     #   https://docs.stripe.com/api/customer_portal/sessions/create
-    #
-    # Stripe REST API uses HTTP Basic Auth with the secret key as the
-    # username (no password). Form-encoded bodies for POST. Response
-    # is JSON. Errors come back as 4xx with { "error": { "message": ... } }.
+    #   https://docs.stripe.com/api/idempotent_requests
     class Client
-      BASE_URL        = "https://api.stripe.com"
-      DEFAULT_TIMEOUT = 30  # seconds — Stripe's 99th percentile is well under this
-
-      def initialize(api_key:, base_url: BASE_URL, timeout: DEFAULT_TIMEOUT)
-        @api_key = api_key
-        @conn = Faraday.new(url: base_url) do |f|
-          f.request  :url_encoded
-          f.request  :authorization, :basic, api_key, ""
-          f.options.timeout      = timeout
-          f.options.open_timeout = 5
-          f.adapter Faraday.default_adapter
-        end
+      def initialize(api_key:)
+        @sdk = ::Stripe::StripeClient.new(api_key)
       end
 
       # POST /v1/subscriptions
       def create_subscription(customer:, items:, **extra)
-        post("/v1/subscriptions", flatten_params({ customer: customer, items: items }.merge(extra)))
+        sdk.v1.subscriptions.create({ customer: customer, items: items }.merge(extra))
       end
 
       # DELETE /v1/subscriptions/{id}
       def cancel_subscription(subscription_id, **extra)
-        delete("/v1/subscriptions/#{subscription_id}", flatten_params(extra))
+        sdk.v1.subscriptions.cancel(subscription_id, extra)
       end
 
       # GET /v1/subscriptions/{id}
       def retrieve_subscription(subscription_id)
-        get("/v1/subscriptions/#{subscription_id}")
+        sdk.v1.subscriptions.retrieve(subscription_id)
       end
 
-      # POST /v1/checkout/sessions
+      # POST /v1/subscriptions/{id} — used by ChangePlanService (items[])
+      # and ReactivateService (cancel_at_period_end: false).
+      def update_subscription(subscription_id, **fields)
+        sdk.v1.subscriptions.update(subscription_id, fields)
+      end
+
+      # POST /v1/checkout/sessions — params is a Hash (subscription
+      # mode for recurring; payment mode for LTDs).
       def create_checkout_session(params)
-        post("/v1/checkout/sessions", flatten_params(params))
+        sdk.v1.checkout.sessions.create(params)
       end
 
       # POST /v1/billing_portal/sessions
       def create_billing_portal_session(customer:, return_url: nil)
         body = { customer: customer }
         body[:return_url] = return_url if return_url
-        post("/v1/billing_portal/sessions", flatten_params(body))
+        sdk.v1.billing_portal.sessions.create(body)
       end
 
-      # POST /v1/customers — verified against
-      # https://docs.stripe.com/api/customers/create. The optional
-      # `idempotency_key:` becomes a per-request `Idempotency-Key`
-      # HTTP header (https://docs.stripe.com/api/idempotent_requests):
-      # Stripe holds the response for ~24h and replays it for the same
-      # key, so concurrent FindOrCreate calls during a signup burst
-      # produce one customer instead of two. A mismatched body for the
-      # same key returns a 400 — keep the key deterministic from the
-      # request shape.
+      # POST /v1/customers. The optional `idempotency_key:` is the gem's
+      # standard per-request opts hash (Stripe holds the response for
+      # ~24h and replays it for the same key, so concurrent
+      # FindOrCreate calls during a signup burst produce one customer
+      # instead of two — see https://docs.stripe.com/api/idempotent_requests).
       def create_customer(email:, idempotency_key: nil, **extra)
-        body    = flatten_params({ email: email }.merge(extra))
-        headers = idempotency_key ? { "Idempotency-Key" => idempotency_key } : {}
-        post("/v1/customers", body, headers: headers)
+        body = { email: email }.merge(extra)
+        opts = idempotency_key ? { idempotency_key: idempotency_key } : {}
+        sdk.v1.customers.create(body, opts)
       end
 
-      # GET /v1/customers/search — verified against
-      # https://docs.stripe.com/api/customers/search. Returns at most
-      # `limit` matches; FindOrCreateService picks the first.
+      # GET /v1/customers/search
       def search_customers(query:, limit: 1)
-        get("/v1/customers/search?query=#{CGI.escape(query)}&limit=#{limit}")
+        sdk.v1.customers.search(query: query, limit: limit)
       end
 
-      # POST /v1/subscriptions/{id} — verified against
-      # https://docs.stripe.com/api/subscriptions/update. Used by
-      # both ChangePlanService (items[]) and ReactivateService
-      # (cancel_at_period_end: false).
-      def update_subscription(subscription_id, **fields)
-        post("/v1/subscriptions/#{subscription_id}", flatten_params(fields))
-      end
-
-      # GET /v1/invoices/{id} — verified against
-      # https://docs.stripe.com/api/invoices/retrieve
+      # GET /v1/invoices/{id}
       def retrieve_invoice(invoice_id)
-        get("/v1/invoices/#{invoice_id}")
+        sdk.v1.invoices.retrieve(invoice_id)
       end
 
       private
 
-      attr_reader :conn
-
-      def get(path)
-        handle(conn.get(path))
-      end
-
-      def post(path, body, headers: {})
-        handle(conn.post(path, body) { |req| headers.each { |k, v| req.headers[k] = v } })
-      end
-
-      def delete(path, body, headers: {})
-        handle(conn.delete(path) do |req|
-          req.body = URI.encode_www_form(body) unless body.empty?
-          headers.each { |k, v| req.headers[k] = v }
-        end)
-      end
-
-      def handle(response)
-        body = response.body.to_s.empty? ? {} : JSON.parse(response.body)
-        return body if response.success?
-
-        message = body.dig("error", "message") || "HTTP #{response.status}"
-        raise Billing::GatewayError, "Stripe API error (#{response.status}): #{message}"
-      rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
-        raise Billing::GatewayError, "Stripe connection error: #{e.class} #{e.message}"
-      end
-
-      # Stripe's REST API uses bracket-notation for nested params:
-      #   items[0][price]=price_xxx
-      #   payment_intent_data[metadata][access_type]=lifetime
-      # Faraday's :url_encoded middleware handles flat hashes; nested
-      # ones need explicit flattening so we control the bracket layout.
-      def flatten_params(params, parent = nil)
-        params.each_with_object({}) do |(k, v), acc|
-          key = parent ? "#{parent}[#{k}]" : k.to_s
-          case v
-          when Hash
-            acc.merge!(flatten_params(v, key))
-          when Array
-            v.each_with_index do |item, i|
-              if item.is_a?(Hash)
-                acc.merge!(flatten_params(item, "#{key}[#{i}]"))
-              else
-                acc["#{key}[#{i}]"] = item
-              end
-            end
-          when nil
-            # skip
-          else
-            acc[key] = v
-          end
-        end
-      end
+      attr_reader :sdk
     end
   end
 end

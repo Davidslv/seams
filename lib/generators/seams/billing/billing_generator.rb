@@ -299,12 +299,14 @@ module Seams
       end
 
       def wire_into_host
-        # The Billing engine speaks Stripe via its own Faraday-based
-        # client (lib/billing/stripe/client.rb) — the official `stripe`
-        # gem uses Net::HTTP and is forbidden by the Faraday-only rule
-        # (memory feedback_external_apis.md).
-        host_inject_gem("faraday", "~> 2.0")
-        host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
+        # The Billing engine speaks Stripe via the official `stripe`
+        # gem (https://github.com/stripe/stripe-ruby). Wave 8's earlier
+        # decision to roll a Faraday client was reversed — Stripe
+        # maintains the gem as a first-class deliverable; tracking
+        # their API ourselves wasn't worth the centralisation
+        # benefit. See feedback_external_apis.md.
+        host_inject_gem("stripe", "~> 13.0")
+        host_inject_gem("factory_bot_rails", "~> 6.4",  group: :test)
         host_inject_gem("webmock",           "~> 3.23", group: :test)
         host_inject_mount(engine_class: "Billing::Engine", at: "/billing")
         host_inject_include_in_user("Billing::Billable")
