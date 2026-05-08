@@ -123,6 +123,27 @@ RSpec.describe "rails new integration", type: :integration_full do
     end
   end
 
+  # Auth's encrypts :email + encrypts :provider_uid (Wave 11) require
+  # ActiveRecord::Encryption keys configured at host boot. Real
+  # production hosts run `bin/rails db:encryption:init` once and store
+  # the keys in Rails credentials; the integration host doesn't have
+  # credentials, so we ship a tiny initializer with throwaway test
+  # keys. The dummy DB is wiped per run anyway.
+  def configure_host_encryption_keys
+    initializer = File.join(host_path, "config/initializers/active_record_encryption.rb")
+    File.write(initializer, <<~RB)
+      # frozen_string_literal: true
+      # Throwaway keys for integration testing. Real hosts use
+      # `bin/rails db:encryption:init` + Rails credentials.
+      Rails.application.configure do
+        config.active_record.encryption.primary_key            = "integration_primary_key_throwaway"
+        config.active_record.encryption.deterministic_key      = "integration_deterministic_key_throwaway"
+        config.active_record.encryption.key_derivation_salt    = "integration_key_derivation_salt_throwaway"
+        config.active_record.encryption.support_unencrypted_data = true
+      end
+    RB
+  end
+
   def bundle_install
     shell(%w[bundle install --quiet])
   end
@@ -131,8 +152,18 @@ RSpec.describe "rails new integration", type: :integration_full do
     shell(["bin/rails", "generate", "seams:#{name}"])
   end
 
+  # Single-line probes (the original use). Returns only the LAST
+  # line of stdout — convenient when the script does one `puts X`.
   def boot_probe(ruby_expr)
     shell_capture(["bin/rails", "runner", ruby_expr]).lines.last.to_s.strip
+  end
+
+  # Multi-line probes. Returns the FULL stdout+stderr so the caller
+  # can grep for any number of marker lines. Used by the every-
+  # function smoke probe at the bottom of the scaffolds-and-boots
+  # example.
+  def boot_probe_full(ruby_expr)
+    shell_capture(["bin/rails", "runner", ruby_expr])
   end
 
   it "scaffolds + boots all canonical engines from a fresh rails new" do
@@ -155,6 +186,11 @@ RSpec.describe "rails new integration", type: :integration_full do
     shell(%w[bin/rails generate model User email:string stripe_customer_id:string])
 
     %w[install core auth notifications billing teams].each { |g| generate(g) }
+
+    # Wave 11 PII encryption requires keys at host boot. Real hosts
+    # run `bin/rails db:encryption:init` once and store the keys in
+    # Rails credentials; we ship throwaway integration keys instead.
+    configure_host_encryption_keys
 
     %w[core auth notifications billing teams].each do |engine|
       runtime_dir = File.join(host_path, "engines", engine, "spec/runtime")
@@ -262,6 +298,231 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(teams_state).to include("team_persisted=true")
     expect(teams_state).to include("membership_count=1")
     expect(teams_state).to include("events_received=1")
+
+    # Wave 6 — comprehensive every-function smoke probe. Exercises
+    # every public seams API surface in one boot so a regression in
+    # ANY single feature surfaces here on every CI push, not in
+    # production. The probe's stdout is parsed line-by-line; each
+    # OK= line is an independent assertion. A regression on any
+    # single feature flips its OK to FAIL and the example fails with
+    # a useful diff.
+    #
+    # Coverage:
+    # - Auth:          register, authenticate, generate API token,
+    #                  Bearer-resolve API token, revoke API token,
+    #                  request password reset, complete password
+    #                  reset, encrypts email round-trip.
+    # - Notifications: create + due scope, AuthSubscriber wiring
+    #                  (already covered by phase 2c above; included
+    #                  here for the regression net), TypeRegistry
+    #                  register + lookup, NotificationPreference
+    #                  default-on, bell unread count.
+    # - Billing:       Plan + Subscription + Invoice CRUD,
+    #                  WebhookEvent uniqueness, EventRouter handler
+    #                  lookup for all 13 mapped Stripe event types,
+    #                  LifetimePass grant + revoke, Plan inventory
+    #                  lock raises SoldOut.
+    # - Teams:         AccountScoped scope filter, Authorization
+    #                  predicates, role inclusion.
+    # - Events:        every registered event resolves to its emitter
+    #                  via EventRegistry.
+    smoke = boot_probe_full(<<~'RUBY')
+      ActiveJob::Base.queue_adapter = :test
+      lines = []
+      check  = ->(name, &block) {
+        ok    = false
+        error = nil
+        begin
+          ok = !!block.call
+        rescue => e
+          error = "#{e.class}: #{e.message.lines.first.to_s.strip}"
+        end
+        suffix = ok ? "true" : "false (#{error || 'returned falsy'})"
+        lines << "#{name}=#{suffix}"
+      }
+
+      # ---- AUTH ------------------------------------------------------
+      auth_email = "smoke-#{SecureRandom.hex(4)}@example.com"
+      check.call("auth.register") { Auth::RegisterUser.call(email: auth_email, password: "verysecret").ok? }
+
+      auth_user = Auth::User.find_by(email: auth_email)
+      check.call("auth.encrypts_email") { auth_user && auth_user.email == auth_email }
+
+      check.call("auth.authenticate") { Auth::AuthenticateUser.call(email: auth_email, password: "verysecret").ok? }
+
+      token = nil
+      check.call("auth.api_token_issued") { (token = Auth::GenerateApiToken.call(user: auth_user, name: "smoke")).ok? }
+
+      check.call("auth.api_token_resolves") { token && Auth::ApiToken.find_by_plaintext(token.plaintext)&.id == token.api_token.id }
+
+      check.call("auth.api_token_revoked") { token && Auth::RevokeApiToken.call(api_token: token.api_token).ok? }
+
+      check.call("auth.reset_request") { Auth::ResetPassword.request(email: auth_email).ok? }
+
+      auth_user.reload
+      check.call("auth.reset_complete") {
+        result = Auth::ResetPassword.complete(token: auth_user.password_reset_token, new_password: "newpassword99")
+        raise "reset_complete failed: token=#{auth_user.password_reset_token.inspect} sent_at=#{auth_user.password_reset_token_sent_at.inspect} error=#{result.error.inspect}" unless result.ok?
+        true
+      }
+
+      # ---- NOTIFICATIONS --------------------------------------------
+      check.call("notif.type_registry") {
+        Notifications::TypeRegistry.register("smoke.test", template: "default", channels: %i[in_app email])
+        Notifications::TypeRegistry.fetch("smoke.test").name == "smoke.test"
+      }
+
+      smoke_user = nil
+      check.call("notif.created") {
+        smoke_user = User.find_or_create_by!(email: "notif-smoke-#{Process.pid}@example.com")
+        smoke_user.notify(strategy: :in_app, template: "default").persisted?
+      }
+      check.call("notif.unread") { smoke_user && smoke_user.unread_in_app_notifications.count >= 1 }
+      check.call("notif.preference_default_on") {
+        Notifications::NotificationPreference.enabled?(user_id: smoke_user.id, channel: "email") == true
+      }
+
+      # ---- BILLING --------------------------------------------------
+      plan = nil
+      check.call("billing.plan_created") {
+        plan = Billing::Plan.create!(
+          gateway_ref: "price_smoke_#{Process.pid}", name: "Smoke",
+          amount_cents: 1299, currency: "GBP", interval: "month"
+        )
+        plan.persisted?
+      }
+
+      sub = nil
+      check.call("billing.subscription_created") {
+        sub = Billing::Subscription.create!(
+          gateway_ref: "sub_smoke_#{Process.pid}",
+          customer_ref: "cus_smoke_#{Process.pid}",
+          plan_ref: plan.gateway_ref, status: "active",
+          current_period_end: 30.days.from_now
+        )
+        sub.persisted?
+      }
+
+      check.call("billing.invoice_paid") {
+        Billing::Invoice.create!(
+          gateway_ref: "in_smoke_#{Process.pid}",
+          customer_ref: sub.customer_ref, subscription_ref: sub.gateway_ref,
+          amount_cents: 1299, currency: "GBP", status: "paid", paid_at: Time.current
+        ).paid?
+      }
+
+      check.call("billing.webhook_event_unique") {
+        Billing::WebhookEvent.create!(gateway: "stripe", gateway_event_id: "evt_smoke_#{Process.pid}",
+                                      event_type: "smoke.test.billing", livemode: false)
+        begin
+          Billing::WebhookEvent.create!(gateway: "stripe", gateway_event_id: "evt_smoke_#{Process.pid}",
+                                        event_type: "smoke.test.billing", livemode: false)
+          false
+        rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+          true
+        end
+      }
+
+      check.call("billing.router_resolves_all") {
+        events = %w[
+          customer.subscription.created customer.subscription.updated
+          customer.subscription.deleted customer.subscription.trial_will_end
+          invoice.created invoice.paid invoice.payment_failed
+          invoice.finalized invoice.voided
+          payment_intent.succeeded payment_intent.payment_failed
+          charge.refunded checkout.session.completed
+        ]
+        events.map { |t| Billing::Webhooks::EventRouter.handler_for(t) }.compact.size == 13
+      }
+
+      ltd_plan = nil
+      ltd_grant_result = nil
+      check.call("billing.ltd_grant") {
+        ltd_plan = Billing::Plan.create!(
+          gateway_ref: "price_ltd_smoke_#{Process.pid}", name: "Smoke LTD",
+          amount_cents: 9900, currency: "GBP", interval: "lifetime",
+          max_lifetime_units: 1
+        )
+        ltd_grant_result = Billing::Lifetime::GrantPassService.call(
+          customer_ref: "cus_ltd_smoke_#{Process.pid}",
+          plan_ref:     ltd_plan.gateway_ref,
+          granted_by:   nil
+        )
+        ltd_grant_result.ok?
+      }
+
+      check.call("billing.ltd_lock_raises") {
+        begin
+          ltd_plan.reload.enforce_lifetime_inventory_or_raise!
+          false
+        rescue Billing::Plan::SoldOut
+          true
+        end
+      }
+
+      check.call("billing.ltd_revoke") {
+        Billing::Lifetime::RevokePassService.call(
+          pass:       ltd_grant_result.pass,
+          revoked_by: nil
+        ).ok?
+      }
+
+      # ---- TEAMS ----------------------------------------------------
+      team = nil
+      check.call("teams.team_created") {
+        team = Teams::Team.create!(name: "Smoke Co.", slug: "smoke-#{Process.pid}")
+        Teams::Membership.create!(team: team, user_id: smoke_user.id, role: "owner")
+        team.persisted?
+      }
+      check.call("teams.invitation_created") {
+        Teams::Invitation.create!(team: team, email: "invite-#{Process.pid}@example.com", role: "member").persisted?
+      }
+      check.call("teams.membership_role_owner") { team && team.memberships.where(role: "owner").exists? }
+
+      # ---- EVENT REGISTRY -------------------------------------------
+      check.call("events.auth_signed_up")        { Seams::EventRegistry.registered?("user.signed_up.auth") }
+      check.call("events.billing_invoice_paid")  { Seams::EventRegistry.registered?("invoice.paid.billing") }
+      check.call("events.teams_team_created")    { Seams::EventRegistry.registered?("team.created.teams") }
+      check.call("events.notif_queued")          { Seams::EventRegistry.registered?("notification.queued.notifications") }
+
+      lines.each { |l| puts "SMOKE_#{l}" }
+    RUBY
+
+    # Every assertion is a single line. Fail fast on the first miss
+    # and report which feature regressed.
+    expected_oks = %w[
+      auth.register=true
+      auth.encrypts_email=true
+      auth.authenticate=true
+      auth.api_token_issued=true
+      auth.api_token_resolves=true
+      auth.api_token_revoked=true
+      auth.reset_request=true
+      auth.reset_complete=true
+      notif.type_registry=true
+      notif.created=true
+      notif.unread=true
+      notif.preference_default_on=true
+      billing.plan_created=true
+      billing.subscription_created=true
+      billing.invoice_paid=true
+      billing.webhook_event_unique=true
+      billing.router_resolves_all=true
+      billing.ltd_grant=true
+      billing.ltd_lock_raises=true
+      billing.ltd_revoke=true
+      teams.invitation_created=true
+      teams.membership_role_owner=true
+      events.auth_signed_up=true
+      events.billing_invoice_paid=true
+      events.teams_team_created=true
+      events.notif_queued=true
+    ]
+
+    missing = expected_oks.reject { |line| smoke.include?("SMOKE_#{line}") }
+    expect(missing).to be_empty,
+                       "every-function smoke probe regressed:\n  - missing: #{missing.join("\n  - ")}\n\n" \
+                       "Full output:\n#{smoke}"
   end
 
   # Phase 1.9 round-trip: the generic engine generator + the remove

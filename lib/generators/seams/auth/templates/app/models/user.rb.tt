@@ -4,7 +4,17 @@ module Auth
   class User < ApplicationRecord
     self.table_name = "auth_users"
 
-    has_secure_password
+    # Rails 8 has_secure_password defines a `password_reset_token` instance
+    # method that returns a signed_id, which would shadow our column-based
+    # reset flow (Auth::ResetPassword.request stores SecureRandom into the
+    # column, the mailer sends that, complete looks it up via find_by).
+    # Opt out of Rails 8's variant; the reset_token kwarg is unknown on
+    # Rails 7.x so only pass it when supported.
+    if ActiveModel::SecurePassword::ClassMethods.instance_method(:has_secure_password).parameters.any? { |_, n| n == :reset_token }
+      has_secure_password reset_token: false
+    else
+      has_secure_password
+    end
     has_many :sessions,        class_name: "Auth::Session",        dependent: :destroy
     has_many :api_tokens,      class_name: "Auth::ApiToken",       dependent: :destroy
     has_many :oauth_providers, class_name: "Auth::OAuthProvider",  dependent: :destroy
