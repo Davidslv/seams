@@ -492,9 +492,16 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
-    it "wires runtime specs into the engine output (boot + schedule round-trip)" do
+    it "wires runtime specs into the engine output (boot + schedule round-trip + billing skip)" do
       assert_file "engines/notifications/spec/runtime/notifications_boot_spec.rb"
       assert_file "engines/notifications/spec/runtime/notifications_schedule_round_trip_spec.rb"
+      assert_file "engines/notifications/spec/runtime/notifications_billing_subscriber_skip_spec.rb" do |content|
+        # The skip spec must assert against the actual warn key the
+        # subscriber emits — drift on either side is the bug we're
+        # gating against.
+        expect(content).to include("notifications.billing_subscriber.skip")
+        expect(content).to include("Seams::Observability.adapter")
+      end
     end
 
     it "ships FactoryBot factories covering all 3 strategies + delivery + preference" do

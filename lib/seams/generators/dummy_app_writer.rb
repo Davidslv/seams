@@ -47,6 +47,7 @@ module Seams
           spec/dummy/app/models
           spec/dummy/app/controllers
           spec/dummy/app/mailers
+          spec/dummy/app/jobs
           spec/dummy/log
           spec/dummy/tmp
           spec/runtime
@@ -67,6 +68,7 @@ module Seams
         write(File.join(engine_path, "spec/dummy/app/models/application_record.rb"), application_record_rb)
         write(File.join(engine_path, "spec/dummy/app/controllers/application_controller.rb"), application_controller_rb)
         write(File.join(engine_path, "spec/dummy/app/mailers/application_mailer.rb"),         application_mailer_rb)
+        write(File.join(engine_path, "spec/dummy/app/jobs/application_job.rb"),               application_job_rb)
         return unless host_user
 
         full_user_path = File.join(engine_path, "spec/dummy", host_user_path)
@@ -268,6 +270,21 @@ module Seams
 
           class ApplicationMailer < ActionMailer::Base
             default from: "from@example.com"
+          end
+        RB
+      end
+
+      def application_job_rb
+        # Minimal host ApplicationJob so engine jobs that inherit from
+        # ::ApplicationJob (notifications' ApplicationJob, billing's
+        # ApplicationJob) can be autoloaded inside the dummy. Without
+        # this, the engine's spec suite raises NameError the moment a
+        # spec touches CreateNotificationJob / StartSubscriptionJob /
+        # any other job class.
+        <<~RB
+          # frozen_string_literal: true
+
+          class ApplicationJob < ActiveJob::Base
           end
         RB
       end

@@ -1,0 +1,87 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+# Verifies the deliberately-loud diagnostic that
+# Notifications::BillingSubscriber emits when a billing event arrives
+# without an `account_id`. That warn line is operationally important:
+# without it, "no notification fired" looks identical to "subscriber
+# never matched", and a tenant whose billing notifications silently
+# fail is the worst class of seams bug to debug.
+RSpec.describe "Notifications::BillingSubscriber missing-account_id signal", type: :runtime do
+  let(:adapter) { Seams::Observability.adapter }
+
+  before do
+    # The notifications dummy app doesn't host the billing engine, so
+    # billing events aren't registered here. Register them just for
+    # this spec so Publisher.publish accepts the bus call. Real hosts
+    # that mount both engines get the registration from billing's
+    # engine.rb at boot.
+    %w[
+      invoice.paid.billing
+      invoice.payment_failed.billing
+      subscription.activated.billing
+      subscription.cancelled.billing
+      subscription.trial_will_end.billing
+      lifetime.purchased.billing
+    ].each do |event_name|
+      Seams::EventRegistry.register(event_name, emitted_by: "Billing")
+    end
+    Notifications::BillingSubscriber.attach!
+  end
+
+  context "when a billing event arrives with no account_id key at all" do
+    it "logs notifications.billing_subscriber.skip via the observability adapter" do
+      expect(adapter).to receive(:warn).with(
+        "notifications.billing_subscriber.skip",
+        hash_including(engine: "notifications", reason: /missing account_id/i)
+      )
+
+      Seams::Events::Publisher.publish(
+        "invoice.paid.billing",
+        customer_ref: "cus_no_account_id",
+        invoice_ref:  "in_no_account_id"
+      )
+    end
+
+    it "does not enqueue a CreateNotificationJob" do
+      allow(adapter).to receive(:warn) # silence
+      expect(Notifications::CreateNotificationJob).not_to receive(:perform_later)
+
+      Seams::Events::Publisher.publish(
+        "invoice.paid.billing",
+        customer_ref: "cus_no_account_id"
+      )
+    end
+  end
+
+  context "when account_id is present but blank" do
+    it "treats blank string as missing and logs the same warn line" do
+      expect(adapter).to receive(:warn).with(
+        "notifications.billing_subscriber.skip",
+        hash_including(reason: /missing account_id/i)
+      )
+
+      Seams::Events::Publisher.publish(
+        "invoice.paid.billing",
+        account_id:   "",
+        customer_ref: "cus_blank"
+      )
+    end
+  end
+
+  context "when account_id is a valid UUID string" do
+    it "does NOT emit the skip warning and DOES enqueue the job" do
+      expect(adapter).not_to receive(:warn).with("notifications.billing_subscriber.skip", any_args)
+      expect(Notifications::CreateNotificationJob).to receive(:perform_later).with(
+        hash_including(owner_id: "00000000-0000-0000-0000-000000000abc")
+      )
+
+      Seams::Events::Publisher.publish(
+        "invoice.paid.billing",
+        account_id:   "00000000-0000-0000-0000-000000000abc",
+        customer_ref: "cus_with_account"
+      )
+    end
+  end
+end

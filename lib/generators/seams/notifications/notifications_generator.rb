@@ -198,6 +198,13 @@ module Seams
                  engine_path("spec/runtime/notifications_boot_spec.rb")
         template "spec/runtime/schedule_round_trip_spec.rb.tt",
                  engine_path("spec/runtime/notifications_schedule_round_trip_spec.rb")
+        # The BillingSubscriber emits a deliberately-loud
+        # `notifications.billing_subscriber.skip` warn line when a
+        # billing event arrives without an `account_id` — that's the
+        # only signal a host operator gets that notifications are
+        # silently failing for that tenant. Spec it.
+        template "spec/runtime/billing_subscriber_skip_spec.rb.tt",
+                 engine_path("spec/runtime/notifications_billing_subscriber_skip_spec.rb")
         # Phase 2B (3/3) — bell + ActionCable broadcast verification.
         return unless channels.include?("in_app")
 

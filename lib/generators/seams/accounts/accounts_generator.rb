@@ -185,11 +185,18 @@ module Seams
 
       def timestamp(offset)
         # Microsecond-resolution timestamp so migrations generated
-        # back-to-back don't collide. Offset by 400 to avoid collisions
-        # with sibling canonical generators (auth +0/+1/+2/+3,
-        # notifications +100, billing +200..+204, teams +300..+302).
+        # back-to-back don't collide. Offset by +50 so accounts'
+        # `accounts` + `accounts_memberships` tables migrate AFTER
+        # auth's `auth_identities` (+0..+3, since memberships address
+        # an Identity at the application layer) but BEFORE engines
+        # whose schemas depend on `accounts.id` semantically:
+        # notifications +100, billing +200, teams +300. Without this,
+        # billing's `subscriptions.account_id` would migrate before
+        # the `accounts` table existed — no DB-level FK so it's
+        # silent, but ordering matters if a host ever tightens to a
+        # real foreign-key constraint.
         base = Time.now.utc.strftime("%Y%m%d%H%M%S").to_i
-        (base + 400 + offset).to_s
+        (base + 50 + offset).to_s
       end
 
       # Slim Auth::Identity stub for the dummy app. Stands in for the
