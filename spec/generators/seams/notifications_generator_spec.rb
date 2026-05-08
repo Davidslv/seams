@@ -186,15 +186,24 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
   describe "subscriber" do
     it "AuthSubscriber subscribes to user.signed_up.auth and enqueues CreateNotificationJob (no inline DB writes)" do
       assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
-        expect(content).to include('Seams::Events::Publisher.attach_once(SUBSCRIBER_KEY, "user.signed_up.auth")')
+        expect(content).to include("Seams::Events::Publisher.attach_class(")
+        expect(content).to include('"user.signed_up.auth"')
+        expect(content).to include('class_name:  "Notifications::AuthSubscriber"')
+        expect(content).to include("method_name: :handle_signed_up")
         expect(content).to include("Notifications::CreateNotificationJob.perform_later")
       end
     end
 
-    it "uses Publisher.attach_once so Rails autoreload can't double-subscribe" do
+    it "uses Publisher.attach_class so Rails autoreload can't double-subscribe AND survives reload of the subscriber file" do
       assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
-        expect(content).to include("attach_once(SUBSCRIBER_KEY")
-        expect(content).not_to include("@attached =") # old class-body flag would reset on reload
+        expect(content).to include("attach_class(")
+        expect(content).to include("SUBSCRIBER_KEY")
+        # attach_class re-resolves the class via Object.const_get on every
+        # event, so a reload of the subscriber file picks up handler edits
+        # without a server restart. A captured block (attach_once { ... })
+        # would close over the pre-reload class object — reload-stale.
+        expect(content).not_to include("attach_once(SUBSCRIBER_KEY")
+        expect(content).not_to include("@attached =")
       end
     end
 

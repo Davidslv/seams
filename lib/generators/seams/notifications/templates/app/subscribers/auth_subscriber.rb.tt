@@ -11,17 +11,22 @@ module Notifications
   # boundary.
   #
   # +.attach!+ is idempotent across Rails autoreload via
-  # +Seams::Events::Publisher.attach_once+ — class-body @attached
-  # variables would reset on reload and double-subscribe.
+  # +Seams::Events::Publisher.attach_class+ — registering the class by
+  # NAME (a String) rather than capturing a closure means each dispatch
+  # re-resolves the constant, so edits to +handle_signed_up+ are picked
+  # up without a server restart.
   class AuthSubscriber
     SUBSCRIBER_KEY = :notifications_auth_subscriber
     HOST_USER_CLASS_NAME = "User"
 
     class << self
       def attach!
-        Seams::Events::Publisher.attach_once(SUBSCRIBER_KEY, "user.signed_up.auth") do |payload|
-          handle_signed_up(payload)
-        end
+        Seams::Events::Publisher.attach_class(
+          SUBSCRIBER_KEY,
+          "user.signed_up.auth",
+          class_name:  "Notifications::AuthSubscriber",
+          method_name: :handle_signed_up
+        )
       end
 
       private

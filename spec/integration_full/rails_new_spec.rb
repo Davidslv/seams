@@ -182,7 +182,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     # Phase 2C — verify Auth + Notifications wiring end-to-end.
     # Publish the canonical user.signed_up.auth event from a runner
     # process and assert the Notifications::AuthSubscriber actually
-    # creates a Notification row. Exercises Publisher.attach_once +
+    # creates a Notification row. Exercises Publisher.attach_class +
     # the CreateNotificationJob inline path the engine boots with.
     # The host User model was generated above (before the engines)
     # so Notifications::Notifiable was injected into it by the

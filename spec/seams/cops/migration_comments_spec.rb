@@ -64,4 +64,85 @@ RSpec.describe RuboCop::Cop::Seams::MigrationComments, :config do
       end
     RUBY
   end
+
+  # Regression: the cop previously did line-based comment scanning and
+  # would treat ANY non-magic comment between line 1 and the migration
+  # class as documentation. That made undocumented migrations ship green
+  # whenever a sibling class above them happened to carry comments.
+  it "flags a migration even when a sibling class above carries comments" do
+    expect_offense(<<~RUBY)
+      class Helper
+        # This is a helper utility — long comment block that belongs to Helper.
+        # ...nothing about the migration that follows.
+      end
+
+      class CreateSubscriptions < ActiveRecord::Migration[7.1]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Migration `CreateSubscriptions` must be preceded by a comment block explaining what changes and why (data implications, downtime risk, rollback notes).
+        def change
+          create_table :billing_subscriptions
+        end
+      end
+    RUBY
+  end
+
+  it "flags a migration even when a sibling method's trailing comment precedes it" do
+    expect_offense(<<~RUBY)
+      def helper_method
+        :ok
+        # internal note about helper_method
+      end
+
+      class CreateSubscriptions < ActiveRecord::Migration[7.1]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Migration `CreateSubscriptions` must be preceded by a comment block explaining what changes and why (data implications, downtime risk, rollback notes).
+        def change
+          create_table :billing_subscriptions
+        end
+      end
+    RUBY
+  end
+
+  it "does not flag a migration whose doc block sits above a sibling class" do
+    expect_no_offenses(<<~RUBY)
+      class Helper
+        # Helper's own comment.
+      end
+
+      # What: adds the subscriptions table.
+      # Why:  required by the Billing engine to record paid plans.
+      class CreateSubscriptions < ActiveRecord::Migration[7.1]
+        def change
+          create_table :subscriptions
+        end
+      end
+    RUBY
+  end
+
+  it "does not flag a migration when the file opens with a typed: sigil" do
+    expect_no_offenses(<<~RUBY)
+      # typed: true
+      # frozen_string_literal: true
+
+      # What: adds the subscriptions table.
+      # Why:  required by Billing engine.
+      class CreateSubscriptions < ActiveRecord::Migration[7.1]
+        def change
+          create_table :subscriptions
+        end
+      end
+    RUBY
+  end
+
+  it "still fires when only a typed: sigil precedes the migration" do
+    expect_offense(<<~RUBY)
+      # typed: true
+      # frozen_string_literal: true
+
+      class CreateSubscriptions < ActiveRecord::Migration[7.1]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Migration `CreateSubscriptions` must be preceded by a comment block explaining what changes and why (data implications, downtime risk, rollback notes).
+        def change
+          create_table :subscriptions
+        end
+      end
+    RUBY
+  end
 end

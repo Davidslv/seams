@@ -70,9 +70,17 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       assert_file "engines/teams/app/views/teams/invitation_mailer/invite.text.erb"
     end
 
-    it "InvitationSubscriber consumes invitation.sent.teams via attach_once and enqueues the mailer" do
+    it "InvitationSubscriber consumes invitation.sent.teams via attach_class so reload picks up handler edits" do
       assert_file "engines/teams/app/subscribers/teams/invitation_subscriber.rb" do |content|
-        expect(content).to include('attach_once(SUBSCRIBER_KEY, "invitation.sent.teams")')
+        expect(content).to include("attach_class(")
+        expect(content).to include('"invitation.sent.teams"')
+        expect(content).to include('class_name:  "Teams::InvitationSubscriber"')
+        expect(content).to include("method_name: :handle_invitation_sent")
+      end
+    end
+
+    it "InvitationSubscriber enqueues the mailer asynchronously and avoids legacy @attached flag" do
+      assert_file "engines/teams/app/subscribers/teams/invitation_subscriber.rb" do |content|
         expect(content).to include("Teams::InvitationMailer.invite(invitation_id).deliver_later")
         expect(content).not_to include("@attached =")
       end

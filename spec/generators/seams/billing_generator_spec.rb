@@ -36,6 +36,27 @@ BILLING_REGISTERED_EVENTS = %w[
   lifetime.granted.billing lifetime.purchased.billing lifetime.revoked.billing
 ].freeze
 
+BILLING_HANDLER_RUNTIME_NEEDLES = %w[
+  Billing::Webhooks::Handlers::SubscriptionCreatedHandler
+  Billing::Webhooks::Handlers::SubscriptionUpdatedHandler
+  Billing::Webhooks::Handlers::SubscriptionDeletedHandler
+  Billing::Webhooks::Handlers::SubscriptionTrialWillEndHandler
+  Billing::Webhooks::Handlers::InvoiceCreatedHandler
+  Billing::Webhooks::Handlers::InvoicePaidHandler
+  Billing::Webhooks::Handlers::InvoicePaymentFailedHandler
+  Billing::Webhooks::Handlers::InvoiceFinalizedHandler
+  Billing::Webhooks::Handlers::InvoiceVoidedHandler
+  Billing::Webhooks::Handlers::PaymentSucceededHandler
+  Billing::Webhooks::Handlers::PaymentFailedHandler
+  Billing::Webhooks::Handlers::ChargeRefundedHandler
+  Billing::Webhooks::Handlers::CheckoutSessionCompletedHandler
+  Seams::Events::Publisher.subscribe
+  stripe_event_fixture
+  Billing::Subscription.find_by
+  Billing::Invoice.find_by
+  Billing::LifetimePass
+].freeze
+
 BILLING_EVENT_ROUTER_NEEDLES = %w[
   customer.subscription.created customer.subscription.trial_will_end
   invoice.created invoice.finalized invoice.voided
@@ -468,6 +489,38 @@ RSpec.describe Seams::Generators::BillingGenerator do
         expect(content).to include("max_lifetime_units")
       end
     end
+
+    it "Plan defines SoldOut + enforce_lifetime_inventory_or_raise! with row lock" do
+      assert_file "engines/billing/app/models/billing/plan.rb" do |content|
+        expect(content).to include("class SoldOut < StandardError")
+        expect(content).to include("def enforce_lifetime_inventory_or_raise!")
+        # Pessimistic row lock — without this the count check is racey.
+        expect(content).to include("lock!")
+        expect(content).to include("raise SoldOut")
+      end
+    end
+
+    it "CreateLifetimeSessionService wraps inventory check + Stripe call in a transaction with row lock" do
+      assert_file "engines/billing/app/services/billing/lifetime/create_lifetime_session_service.rb" do |content|
+        # Transaction boundary holds the row lock until commit.
+        expect(content).to include("Billing::Plan.transaction")
+        # Lock-and-check happens INSIDE the transaction.
+        expect(content).to include("enforce_lifetime_inventory_or_raise!")
+        # Stripe Checkout creation happens INSIDE the same transaction
+        # so the lock spans the API call.
+        expect(content).to include("create_lifetime_checkout_session")
+        # Sold-out raise is converted to a Result failure for the caller.
+        expect(content).to include("rescue Billing::Plan::SoldOut")
+      end
+    end
+
+    it "ships a Plan model spec covering the inventory lock" do
+      assert_file "engines/billing/spec/models/billing/plan_spec.rb" do |content|
+        expect(content).to include("RSpec.describe Billing::Plan")
+        expect(content).to include("#enforce_lifetime_inventory_or_raise!")
+        expect(content).to include("Billing::Plan::SoldOut")
+      end
+    end
   end
 
   describe "Phase 3 (1/4) — service foundation" do
@@ -609,6 +662,36 @@ RSpec.describe Seams::Generators::BillingGenerator do
           "client.search_customers",
           "client.create_customer",
           "ServiceResult.ok(value: stripe_response[:id])"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "Customers::FindOrCreateService passes a deterministic Idempotency-Key to create_customer" do
+      # Stripe's customer-search index is eventually consistent
+      # (https://docs.stripe.com/api/customers/search) so two
+      # concurrent signups can both miss + both POST. The fix:
+      # SHA-256(email:scope) → Stripe Idempotency-Key header
+      # (https://docs.stripe.com/api/idempotent_requests).
+      assert_file "engines/billing/app/services/billing/customers/find_or_create_service.rb" do |content|
+        [
+          'require "digest"',
+          "idempotency_key: idempotency_key",
+          "def idempotency_key",
+          "Digest::SHA256.hexdigest",
+          "seams:billing:customer:",
+          "@metadata[:host_user_id]",
+          "docs.stripe.com/api/idempotent_requests"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "Stripe::Client#create_customer accepts idempotency_key + sends it as the Idempotency-Key header" do
+      assert_file "engines/billing/lib/billing/stripe/client.rb" do |content|
+        [
+          "def create_customer(email:, idempotency_key: nil, **extra)",
+          '"Idempotency-Key" => idempotency_key',
+          "headers: headers",
+          "docs.stripe.com/api/idempotent_requests"
         ].each { |needle| expect(content).to include(needle) }
       end
     end
@@ -782,6 +865,14 @@ RSpec.describe Seams::Generators::BillingGenerator do
       assert_file "engines/billing/lib/billing/configuration.rb" do |content|
         expect(content).to include(":process_webhooks_async")
         expect(content).to include("@process_webhooks_async = false")
+      end
+    end
+
+    it "ships a runtime spec that exercises every webhook handler against its fixture" do
+      # Catches regressions in SubscriptionHandlerBase#upsert_subscription
+      # or InvoiceHandlerBase#upsert_invoice; needles are file-scope.
+      assert_file "engines/billing/spec/runtime/webhook_handlers_spec.rb" do |content|
+        BILLING_HANDLER_RUNTIME_NEEDLES.each { |needle| expect(content).to include(needle) }
       end
     end
   end

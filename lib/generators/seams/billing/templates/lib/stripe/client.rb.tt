@@ -65,9 +65,18 @@ module Billing
       end
 
       # POST /v1/customers — verified against
-      # https://docs.stripe.com/api/customers/create
-      def create_customer(email:, **extra)
-        post("/v1/customers", flatten_params({ email: email }.merge(extra)))
+      # https://docs.stripe.com/api/customers/create. The optional
+      # `idempotency_key:` becomes a per-request `Idempotency-Key`
+      # HTTP header (https://docs.stripe.com/api/idempotent_requests):
+      # Stripe holds the response for ~24h and replays it for the same
+      # key, so concurrent FindOrCreate calls during a signup burst
+      # produce one customer instead of two. A mismatched body for the
+      # same key returns a 400 — keep the key deterministic from the
+      # request shape.
+      def create_customer(email:, idempotency_key: nil, **extra)
+        body    = flatten_params({ email: email }.merge(extra))
+        headers = idempotency_key ? { "Idempotency-Key" => idempotency_key } : {}
+        post("/v1/customers", body, headers: headers)
       end
 
       # GET /v1/customers/search — verified against
@@ -99,12 +108,15 @@ module Billing
         handle(conn.get(path))
       end
 
-      def post(path, body)
-        handle(conn.post(path, body))
+      def post(path, body, headers: {})
+        handle(conn.post(path, body) { |req| headers.each { |k, v| req.headers[k] = v } })
       end
 
-      def delete(path, body)
-        handle(conn.delete(path) { |req| req.body = URI.encode_www_form(body) unless body.empty? })
+      def delete(path, body, headers: {})
+        handle(conn.delete(path) do |req|
+          req.body = URI.encode_www_form(body) unless body.empty?
+          headers.each { |k, v| req.headers[k] = v }
+        end)
       end
 
       def handle(response)

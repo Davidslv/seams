@@ -56,17 +56,17 @@ module Seams
       # Returns the event names this engine subscribes to. Looks in
       # both the engine.rb itself AND in `app/subscribers/**/*.rb` —
       # the canonical seams convention, where each subscriber class
-      # calls `Publisher.attach_once(KEY, "event.name") { ... }` from
-      # an `attach!` class method that the engine's
-      # `config.after_initialize` block invokes. Without scanning
-      # `app/subscribers/` this method silently reported zero
+      # calls `Publisher.attach_class(KEY, "event.name", ...)` (or the
+      # legacy `attach_once`) from an `attach!` class method that the
+      # engine's `config.after_initialize` block invokes. Without
+      # scanning `app/subscribers/` this method silently reported zero
       # subscribers for every generated engine, hiding the
       # cross-engine dependency graph this command exists to surface.
       def subscriptions_for(name)
         subscription_sources_for(name)
           .filter_map { |path| File.read(path) if File.exist?(path) }
           .flat_map do |content|
-            content.scan(/Publisher\.(?:subscribe|attach_once)\([^"']*["']([^"']+)["']/)
+            content.scan(/Publisher\.(?:subscribe|attach_once|attach_class)\([^"']*["']([^"']+)["']/m)
                    .flatten
           end
           .uniq

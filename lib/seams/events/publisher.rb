@@ -55,6 +55,16 @@ module Seams
         # Synchronized so concurrent boot threads (e.g. Puma cluster
         # pre-fork) can't race-attach the same subscriber twice.
         #
+        # CAVEAT — Rails autoreload staleness:
+        # The block passed here closes over its lexical binding, which
+        # in practice means the subscriber CLASS object as it existed
+        # when +attach!+ first ran. After Rails reloads the subscriber
+        # file, the constant points at a fresh class object, but THIS
+        # block still calls into the old one — so edits to the
+        # subscriber's methods are invisible until a full server
+        # restart. For new code, prefer #attach_class which re-resolves
+        # the constant on every dispatch and so is reload-safe.
+        #
         # Use a per-subscriber-class symbol as the key:
         #
         #   Publisher.attach_once(:notifications_auth_subscriber,
@@ -62,6 +72,46 @@ module Seams
         def attach_once(key, event_name, &)
           attach_once_mutex.synchronize do
             attached_keys[[key, event_name.to_s]] ||= subscribe(event_name, &)
+          end
+        end
+
+        # Reload-safe alternative to #attach_once. Stores the subscriber
+        # class as a STRING name and re-resolves +Object.const_get+ on
+        # every dispatch — so when Rails autoreload swaps the constant
+        # for a freshly-loaded class object, the next event reaches the
+        # new code without a server restart.
+        #
+        # The +class_name+ MUST be a String (e.g. "Notifications::AuthSubscriber").
+        # Passing the class object itself defeats the fix: it captures a
+        # reference to the pre-reload object and exhibits exactly the
+        # staleness bug this method exists to avoid.
+        #
+        # The named class method is invoked via +send+, so it may be
+        # +private+ — keeping subscribers' handlers out of their public
+        # surface. Idempotent on (key, event_name) like #attach_once.
+        #
+        # Example:
+        #
+        #   Publisher.attach_class(
+        #     :notifications_auth_subscriber,
+        #     "user.signed_up.auth",
+        #     class_name:  "Notifications::AuthSubscriber",
+        #     method_name: :handle_signed_up
+        #   )
+        def attach_class(key, event_name, class_name:, method_name:)
+          unless class_name.is_a?(String)
+            raise ArgumentError,
+                  "attach_class requires class_name as a String (got #{class_name.class}). " \
+                  "Passing the class object captures a stale reference across Rails reloads — " \
+                  "the very bug this method exists to prevent."
+          end
+
+          method_symbol = method_name.to_sym
+
+          attach_once_mutex.synchronize do
+            attached_keys[[key, event_name.to_s]] ||= subscribe(event_name) do |payload|
+              Object.const_get(class_name).send(method_symbol, payload)
+            end
           end
         end
 
@@ -97,7 +147,17 @@ module Seams
           @adapter ||= build_adapter
         end
 
+        # Tears down everything Publisher has registered with the
+        # adapter and clears the bookkeeping. Without the unsubscribe
+        # step, ActiveSupport::Notifications keeps the prior process's
+        # subscribers alive in its global registry — so test runs that
+        # call +reset!+ between examples accumulate stale subscribers
+        # that fire (and may raise on now-gone constants) on every
+        # publish in the next example.
         def reset!
+          @attached_keys&.each_value do |subscriber|
+            adapter.unsubscribe(subscriber) if subscriber
+          end
           @adapter       = nil
           @subscriptions = nil
           @attached_keys = nil

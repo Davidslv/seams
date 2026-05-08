@@ -222,6 +222,8 @@ module Seams
       def create_specs
         template "spec/models/subscription_spec.rb.tt",
                  engine_path("spec/models/billing/subscription_spec.rb")
+        template "spec/models/plan_spec.rb.tt",
+                 engine_path("spec/models/billing/plan_spec.rb")
         template "spec/gateways/stripe_spec.rb.tt",
                  engine_path("spec/gateways/billing/stripe_spec.rb")
         # Phase 3 (1/4) — factories + Stripe webmock helpers + event fixtures.
@@ -289,6 +291,11 @@ module Seams
         )
         template "spec/runtime/boot_spec.rb.tt",
                  engine_path("spec/runtime/billing_boot_spec.rb")
+        # Phase 3 (3/4) coverage gap: a runtime spec that instantiates
+        # each of the 13 webhook handlers with the matching Stripe
+        # fixture and asserts the local DB row + canonical seams event.
+        template "spec/runtime/webhook_handlers_spec.rb.tt",
+                 engine_path("spec/runtime/webhook_handlers_spec.rb")
       end
 
       def wire_into_host

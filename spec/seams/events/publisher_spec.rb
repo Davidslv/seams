@@ -95,4 +95,101 @@ RSpec.describe Seams::Events::Publisher do
       expect(described_class.attached_keys).to include([:test_key, "subscription.created.billing"])
     end
   end
+
+  describe ".attach_class" do
+    # Replaces +AttachClassSubscriberFixture+ with a brand-new class
+    # object whose +handle+ method records the supplied version label.
+    # Used to simulate Rails autoreload — calling it twice rebinds the
+    # constant the way the autoloader would when the file changes.
+    def stub_subscriber_recording(log, version_label:)
+      stub_const("AttachClassSubscriberFixture", Class.new do
+        define_singleton_method(:handle) { |_payload| log << version_label }
+      end)
+    end
+
+    it "rejects a non-String class_name so callers don't accidentally capture a stale reference" do
+      stub_class = Class.new
+      expect do
+        described_class.attach_class(:test_key, "subscription.created.billing",
+                                     class_name: stub_class, method_name: :call)
+      end.to raise_error(ArgumentError, /String/)
+    end
+
+    it "is idempotent on (key, event_name) like attach_once" do
+      stub_const("AttachClassSubscriberFixture", Class.new do
+        @received = []
+        class << self
+          attr_reader :received
+
+          def handle(payload)
+            @received << payload
+          end
+        end
+      end)
+
+      3.times do
+        described_class.attach_class(:test_key, "subscription.created.billing",
+                                     class_name: "AttachClassSubscriberFixture", method_name: :handle)
+      end
+
+      described_class.publish("subscription.created.billing", id: 1)
+      expect(AttachClassSubscriberFixture.received).to eq([{ id: 1 }])
+    end
+
+    it "dispatches to a private class method so subscribers can keep handlers off their public surface" do
+      stub_const("AttachClassSubscriberFixture", Class.new do
+        @last_payload = nil
+        class << self
+          attr_reader :last_payload
+
+          private
+
+          def secret_handler(payload)
+            @last_payload = payload
+          end
+        end
+      end)
+
+      described_class.attach_class(:private_key, "subscription.created.billing",
+                                   class_name: "AttachClassSubscriberFixture", method_name: :secret_handler)
+      described_class.publish("subscription.created.billing", id: 99)
+
+      expect(AttachClassSubscriberFixture.last_payload).to eq(id: 99)
+    end
+
+    # Regression for the highest-impact dev-experience bug surfaced by
+    # the boundary audit (see commit ada6438): a block passed to
+    # +attach_once+ closes over the subscriber class object as it was
+    # at boot, so when Rails autoreload swaps in a fresh class object
+    # under the same constant, the OLD code keeps firing forever.
+    #
+    # +attach_class+ stores the class NAME (a String) and re-resolves
+    # +Object.const_get+ on every dispatch. We simulate Rails autoreload
+    # by binding the constant to a fresh class with a different handler
+    # body, then publishing — the new behaviour MUST run.
+    it "survives Rails autoreload — a constant reassignment routes the next event to the freshly loaded class" do
+      versions_seen = []
+      stub_subscriber_recording(versions_seen, version_label: :v1)
+      described_class.attach_class(:reload_key, "subscription.created.billing",
+                                   class_name: "AttachClassSubscriberFixture", method_name: :handle)
+      described_class.publish("subscription.created.billing", id: 1)
+
+      # Same constant, brand-new class object — exactly what Rails
+      # autoloading does when the file changes on disk.
+      stub_subscriber_recording(versions_seen, version_label: :v2)
+      described_class.publish("subscription.created.billing", id: 2)
+
+      expect(versions_seen).to eq(%i[v1 v2])
+    end
+
+    it "tracks attach state on Publisher so it shares the attached_keys ledger with attach_once" do
+      stub_const("AttachClassSubscriberFixture", Class.new do
+        def self.handle(_payload); end
+      end)
+
+      described_class.attach_class(:ledger_key, "subscription.created.billing",
+                                   class_name: "AttachClassSubscriberFixture", method_name: :handle)
+      expect(described_class.attached_keys).to include([:ledger_key, "subscription.created.billing"])
+    end
+  end
 end

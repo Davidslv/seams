@@ -13,34 +13,73 @@ module Notifications
   # `Billing::Billable` documents on the host's User model.
   #
   # +.attach!+ is idempotent across Rails autoreload via
-  # +Seams::Events::Publisher.attach_once+.
+  # +Seams::Events::Publisher.attach_class+ — each event registers its
+  # subscriber by class NAME (a String), so dispatch re-resolves the
+  # constant on every call. Edits to a +handle_*+ method take effect
+  # without a server restart.
   class BillingSubscriber
     SUBSCRIBER_KEY = :notifications_billing_subscriber
+    SUBSCRIBER_CLASS_NAME = "Notifications::BillingSubscriber"
     HOST_USER_CLASS_NAME = "User"
 
-    EVENT_TEMPLATES = {
-      "subscription.created.billing"  => "billing/subscription_started",
-      "subscription.updated.billing"  => "billing/subscription_updated",
-      "subscription.canceled.billing" => "billing/subscription_canceled",
-      "invoice.paid.billing"          => "billing/invoice_paid",
-      "invoice.failed.billing"        => "billing/invoice_failed",
+    # (event_name => [handler_method, template]). Handler methods are
+    # one-line wrappers around #enqueue — kept separate (rather than a
+    # single block-capturing handler) so each registration goes through
+    # +attach_class+ and survives Rails autoreload.
+    EVENT_HANDLERS = {
+      "subscription.created.billing"  => [:handle_subscription_created,  "billing/subscription_started"],
+      "subscription.updated.billing"  => [:handle_subscription_updated,  "billing/subscription_updated"],
+      "subscription.canceled.billing" => [:handle_subscription_canceled, "billing/subscription_canceled"],
+      "invoice.paid.billing"          => [:handle_invoice_paid,          "billing/invoice_paid"],
+      "invoice.failed.billing"        => [:handle_invoice_failed,        "billing/invoice_failed"],
       # Lifetime Deal events (issue #2 section 3A.LTD)
-      "lifetime.granted.billing"      => "billing/lifetime_granted",
-      "lifetime.purchased.billing"    => "billing/lifetime_purchased"
+      "lifetime.granted.billing"      => [:handle_lifetime_granted,      "billing/lifetime_granted"],
+      "lifetime.purchased.billing"    => [:handle_lifetime_purchased,    "billing/lifetime_purchased"]
     }.freeze
 
     class << self
       def attach!
-        EVENT_TEMPLATES.each do |event, template|
-          Seams::Events::Publisher.attach_once(SUBSCRIBER_KEY, event) do |payload|
-            handle(payload: payload, template: template)
-          end
+        EVENT_HANDLERS.each do |event, (method_name, _template)|
+          Seams::Events::Publisher.attach_class(
+            SUBSCRIBER_KEY,
+            event,
+            class_name:  SUBSCRIBER_CLASS_NAME,
+            method_name: method_name
+          )
         end
       end
 
       private
 
-      def handle(payload:, template:)
+      def handle_subscription_created(payload)
+        enqueue(payload, EVENT_HANDLERS.fetch("subscription.created.billing").last)
+      end
+
+      def handle_subscription_updated(payload)
+        enqueue(payload, EVENT_HANDLERS.fetch("subscription.updated.billing").last)
+      end
+
+      def handle_subscription_canceled(payload)
+        enqueue(payload, EVENT_HANDLERS.fetch("subscription.canceled.billing").last)
+      end
+
+      def handle_invoice_paid(payload)
+        enqueue(payload, EVENT_HANDLERS.fetch("invoice.paid.billing").last)
+      end
+
+      def handle_invoice_failed(payload)
+        enqueue(payload, EVENT_HANDLERS.fetch("invoice.failed.billing").last)
+      end
+
+      def handle_lifetime_granted(payload)
+        enqueue(payload, EVENT_HANDLERS.fetch("lifetime.granted.billing").last)
+      end
+
+      def handle_lifetime_purchased(payload)
+        enqueue(payload, EVENT_HANDLERS.fetch("lifetime.purchased.billing").last)
+      end
+
+      def enqueue(payload, template)
         host_user_id = host_user_id_for(payload[:customer_ref])
         return unless host_user_id
 
