@@ -37,6 +37,7 @@ module Seams
         template "lib/engine.rb.tt",         engine_path("lib/billing/engine.rb"),        force: true
         template "lib/billing.rb.tt",        engine_path("lib/billing.rb"),               force: true
         template "lib/configuration.rb.tt",  engine_path("lib/billing/configuration.rb")
+        template "lib/tasks/billing_check.rake.tt", engine_path("lib/tasks/billing_check.rake")
       end
 
       def overwrite_routes

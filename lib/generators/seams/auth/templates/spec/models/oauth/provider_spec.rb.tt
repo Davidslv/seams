@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Auth::OAuthProvider do
+RSpec.describe Auth::OAuth::Provider do
   describe "validations" do
     it "requires provider, provider_uid, user_id" do
       record = described_class.new

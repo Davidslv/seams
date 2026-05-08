@@ -25,33 +25,59 @@ module Seams
       module_function
 
       def write!(engine_path:, engine_module:, schema:, mount_at: nil, host_user: nil)
-        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/config/environments"))
-        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/config/initializers"))
-        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/db"))
-        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/app/models"))
-        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/app/controllers"))
-        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/log"))
-        FileUtils.mkdir_p(File.join(engine_path, "spec/dummy/tmp"))
-        FileUtils.mkdir_p(File.join(engine_path, "spec/runtime"))
+        ensure_directories(engine_path)
+        write_dummy_config(engine_path, engine_module, mount_at)
+        write_dummy_app(engine_path, host_user)
+        write_dummy_db(engine_path, schema)
+        write_dummy_meta(engine_path)
+        write_spec_helpers(engine_path)
+      end
 
+      def ensure_directories(engine_path)
+        %w[
+          spec/dummy/config/environments
+          spec/dummy/config/initializers
+          spec/dummy/db
+          spec/dummy/app/models
+          spec/dummy/app/controllers
+          spec/dummy/app/mailers
+          spec/dummy/log
+          spec/dummy/tmp
+          spec/runtime
+        ].each { |dir| FileUtils.mkdir_p(File.join(engine_path, dir)) }
+      end
+
+      def write_dummy_config(engine_path, engine_module, mount_at)
         write(File.join(engine_path, "spec/dummy/config/boot.rb"),         boot_rb)
         write(File.join(engine_path, "spec/dummy/config/application.rb"),  application_rb(engine_module))
         write(File.join(engine_path, "spec/dummy/config/environment.rb"),  environment_rb)
         write(File.join(engine_path, "spec/dummy/config/database.yml"),    database_yml(engine_path))
         write(File.join(engine_path, "spec/dummy/config/environments/test.rb"),       test_environment_rb)
         write(File.join(engine_path, "spec/dummy/config/initializers/secret_key.rb"), secret_key_rb)
-        write(File.join(engine_path, "spec/dummy/config/routes.rb"),       routes_rb(engine_module, mount_at))
-        write(File.join(engine_path, "spec/dummy/db/schema.rb"),           schema_rb(schema))
+        write(File.join(engine_path, "spec/dummy/config/routes.rb"), routes_rb(engine_module, mount_at))
+      end
+
+      def write_dummy_app(engine_path, host_user)
         write(File.join(engine_path, "spec/dummy/app/models/application_record.rb"), application_record_rb)
         write(File.join(engine_path, "spec/dummy/app/controllers/application_controller.rb"), application_controller_rb)
-        write(File.join(engine_path, "spec/dummy/app/models/user.rb"),     host_user) if host_user
-        write(File.join(engine_path, "spec/dummy/log/.keep"),              "")
-        write(File.join(engine_path, "spec/dummy/tmp/.keep"),              "")
-        write(File.join(engine_path, "spec/dummy/Rakefile"),               rakefile_rb)
-        write(File.join(engine_path, "spec/dummy/config.ru"),              config_ru)
+        write(File.join(engine_path, "spec/dummy/app/mailers/application_mailer.rb"),         application_mailer_rb)
+        write(File.join(engine_path, "spec/dummy/app/models/user.rb"),                        host_user) if host_user
+      end
 
-        write(File.join(engine_path, "spec/spec_helper.rb"),               spec_helper_rb(engine_path))
-        write(File.join(engine_path, "spec/rails_helper.rb"),              rails_helper_rb)
+      def write_dummy_db(engine_path, schema)
+        write(File.join(engine_path, "spec/dummy/db/schema.rb"), schema_rb(schema))
+      end
+
+      def write_dummy_meta(engine_path)
+        write(File.join(engine_path, "spec/dummy/log/.keep"), "")
+        write(File.join(engine_path, "spec/dummy/tmp/.keep"), "")
+        write(File.join(engine_path, "spec/dummy/Rakefile"), rakefile_rb)
+        write(File.join(engine_path, "spec/dummy/config.ru"), config_ru)
+      end
+
+      def write_spec_helpers(engine_path)
+        write(File.join(engine_path, "spec/spec_helper.rb"),  spec_helper_rb(engine_path))
+        write(File.join(engine_path, "spec/rails_helper.rb"), rails_helper_rb)
       end
 
       def write(path, content)
@@ -147,6 +173,13 @@ module Seams
             config.active_record.encryption.deterministic_key      = "dummy_deterministic_key_for_tests_only"
             config.active_record.encryption.key_derivation_salt    = "dummy_key_derivation_salt_for_tests_only"
             config.active_record.encryption.support_unencrypted_data = true
+
+            # Mailer specs render views that call URL helpers (e.g.
+            # `edit_password_reset_url`). Without a host they raise
+            # "Missing host to link to!". `test.host` is the Rails
+            # test convention.
+            config.action_mailer.delivery_method     = :test
+            config.action_mailer.default_url_options = { host: "test.host" }
           end
         RB
       end
@@ -210,6 +243,21 @@ module Seams
           # frozen_string_literal: true
 
           class ApplicationController < ActionController::Base
+          end
+        RB
+      end
+
+      def application_mailer_rb
+        # Minimal host ApplicationMailer so engine mailers that inherit
+        # from ::ApplicationMailer (auth's PasswordsMailer,
+        # notifications' ApplicationMailer) can be autoloaded inside
+        # the dummy. Real hosts will have their own; this is
+        # dummy-only.
+        <<~RB
+          # frozen_string_literal: true
+
+          class ApplicationMailer < ActionMailer::Base
+            default from: "from@example.com"
           end
         RB
       end
@@ -297,6 +345,21 @@ module Seams
           abort("Rails is in production mode!") if Rails.env.production?
 
           require "rspec/rails"
+
+          # WebMock is optional — engines that stub outbound HTTP
+          # (billing's stub_stripe helpers, auth's OAuth adapter
+          # specs) bring in `webmock` via the host Gemfile. If
+          # available, require it so specs can call WebMock.stub_request
+          # without each one re-requiring it. We disable real HTTP
+          # connections to make missing stubs explicit instead of
+          # accidentally hitting the network.
+          begin
+            require "webmock/rspec"
+            WebMock.disable_net_connect!(allow_localhost: true)
+          rescue LoadError
+            # webmock isn't bundled — engines that don't stub HTTP
+            # don't need it.
+          end
 
           # FactoryBot is optional — engines that ship factories add
           # `factory_bot_rails` to the host Gemfile. If it's loaded, wire

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require_relative "../rails_helper"
-require_relative "../support/shared_examples/a_billing_gateway"
+require "rails_helper"
+require_relative "../../support/shared_examples/a_billing_gateway"
 
 # Stripe is the reference implementation — it MUST satisfy the
 # contract. Hosts adding a new gateway add a sibling spec file and

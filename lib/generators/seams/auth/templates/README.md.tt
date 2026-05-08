@@ -66,7 +66,7 @@ The provider's redirect URI must match the URL Rails generates for
 
 ### Token storage + encryption
 
-`Auth::OAuthProvider` rows store `access_token` + `refresh_token`
+`Auth::OAuth::Provider` rows store `access_token` + `refresh_token`
 encrypted at the column level via Rails 7+ ActiveRecord::Encryption.
 **One-time host setup:**
 

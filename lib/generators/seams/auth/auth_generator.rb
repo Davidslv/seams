@@ -53,9 +53,12 @@ module Seams
                  engine_path("app/models/auth/user.rb")
         template "app/models/session.rb.tt",
                  engine_path("app/models/auth/session.rb")
-        # OAuth identity link table — issue #2 section 2A.
-        template "app/models/oauth_provider.rb.tt",
-                 engine_path("app/models/auth/oauth_provider.rb")
+        # OAuth identity link table — issue #2 section 2A. Lives under
+        # the Auth::OAuth namespace alongside the lib/ adapter classes
+        # (Abstract, Google, Github) so the Zeitwerk inflector only
+        # needs the single "oauth" => "OAuth" mapping at engine boot.
+        template "app/models/oauth/provider.rb.tt",
+                 engine_path("app/models/auth/oauth/provider.rb")
         # Bearer-token API access — issue #2 section 2A.
         template "app/models/api_token.rb.tt",
                  engine_path("app/models/auth/api_token.rb")
@@ -68,8 +71,8 @@ module Seams
                  engine_path("app/controllers/auth/registrations_controller.rb")
         template "app/controllers/password_resets_controller.rb.tt",
                  engine_path("app/controllers/auth/password_resets_controller.rb")
-        template "app/controllers/oauth_callbacks_controller.rb.tt",
-                 engine_path("app/controllers/auth/oauth_callbacks_controller.rb")
+        template "app/controllers/oauth/callbacks_controller.rb.tt",
+                 engine_path("app/controllers/auth/oauth/callbacks_controller.rb")
       end
 
       def create_services
@@ -79,8 +82,8 @@ module Seams
                  engine_path("app/services/auth/authenticate_user.rb")
         template "app/services/reset_password.rb.tt",
                  engine_path("app/services/auth/reset_password.rb")
-        template "app/services/oauth_authenticator.rb.tt",
-                 engine_path("app/services/auth/oauth_authenticator.rb")
+        template "app/services/oauth/authenticator.rb.tt",
+                 engine_path("app/services/auth/oauth/authenticator.rb")
         template "app/services/generate_api_token.rb.tt",
                  engine_path("app/services/auth/generate_api_token.rb")
         # Phase Wave 5 (review fix): the revoke path was documented in
@@ -162,8 +165,8 @@ module Seams
         # Phase 2A finish — coverage for the new Wave-9/10 models.
         template "spec/models/api_token_spec.rb.tt",
                  engine_path("spec/models/auth/api_token_spec.rb")
-        template "spec/models/oauth_provider_spec.rb.tt",
-                 engine_path("spec/models/auth/oauth_provider_spec.rb")
+        template "spec/models/oauth/provider_spec.rb.tt",
+                 engine_path("spec/models/auth/oauth/provider_spec.rb")
         template "spec/mailers/passwords_mailer_spec.rb.tt",
                  engine_path("spec/mailers/auth/passwords_mailer_spec.rb")
         template "spec/factories/auth.rb.tt",

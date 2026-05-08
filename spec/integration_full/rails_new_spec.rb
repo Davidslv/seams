@@ -192,11 +192,18 @@ RSpec.describe "rails new integration", type: :integration_full do
     # Rails credentials; we ship throwaway integration keys instead.
     configure_host_encryption_keys
 
+    # Run every engine's FULL spec suite, not just spec/runtime. The
+    # broader scope catches Zeitwerk inflector regressions, missing
+    # ApplicationMailer in the dummy app, and bad require_relative
+    # paths in 3-level-deep specs — three bug classes that previously
+    # slipped past CI because we only exercised spec/runtime.
     %w[core auth notifications billing teams].each do |engine|
-      runtime_dir = File.join(host_path, "engines", engine, "spec/runtime")
-      next if Dir.glob("#{runtime_dir}/**/*_spec.rb").empty?
+      spec_dir = File.join(host_path, "engines", engine, "spec")
+      next if Dir.glob("#{spec_dir}/**/*_spec.rb").empty?
 
-      shell(["bundle", "exec", "rspec", "engines/#{engine}/spec/runtime"])
+      shell(["bundle", "exec", "rspec",
+             "--default-path", "engines/#{engine}/spec",
+             "engines/#{engine}/spec"])
     end
 
     # The host must (a) load every engine as a Railtie and (b) pick up

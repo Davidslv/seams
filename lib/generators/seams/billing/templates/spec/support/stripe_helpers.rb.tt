@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 # Stub helpers for specs that talk to the Stripe REST API via
-# Billing::Stripe::Client (Faraday). Use webmock to intercept the
-# Faraday request before it leaves the process — no live network.
+# Billing::Stripe::Client (the official `stripe` gem, which uses
+# Net::HTTP under the hood). WebMock intercepts the request before
+# it leaves the process — no live network. The dummy app's
+# rails_helper.rb requires "webmock/rspec" automatically when the
+# webmock gem is bundled, so individual specs only need:
 #
-# Wire this in spec/rails_helper.rb:
-#
-#   require "webmock/rspec"
 #   require_relative "support/stripe_helpers"
 #   RSpec.configure { |c| c.include StripeHelpers }
 #

@@ -47,7 +47,7 @@ RSpec.describe Billing::Gateways::Stripe do
     it "raises Billing::WebhookError on a bad signature" do
       bad_header = "t=#{timestamp},v1=deadbeef"
       expect { gateway.verify_webhook(payload: payload, signature: bad_header, secret: secret) }
-        .to raise_error(Billing::WebhookError, /no v1 entry matched/)
+        .to raise_error(Billing::WebhookError, /No signatures found matching/)
     end
   end
 end

@@ -17,7 +17,7 @@ FactoryBot.define do
     expires_at  { 30.days.from_now }
   end
 
-  factory :auth_oauth_provider, class: "Auth::OAuthProvider" do
+  factory :auth_oauth_provider, class: "Auth::OAuth::Provider" do
     association :user, factory: :auth_user
     provider          { "google" }
     sequence(:provider_uid) { |n| "google-uid-#{n}" }

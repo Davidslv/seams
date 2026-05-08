@@ -31,12 +31,21 @@ module Billing
     class Stripe < Abstract
       def initialize(client: nil)
         super()
-        @client = client || Billing::Stripe::Client.new(api_key: Billing.configuration.api_key)
+        @injected_client = client
+      end
+
+      # Lazy so `Billing::Gateways::Stripe.new` works without an API
+      # key configured — important for contract specs that only check
+      # the method shape via reflection. Real callers exercise actual
+      # endpoints, which forces the client to be built (and the
+      # missing-key error to fire) at the call site, not at boot.
+      def client
+        @injected_client || @client ||= Billing::Stripe::Client.new(api_key: Billing.configuration.api_key)
       end
 
       # POST /v1/subscriptions
       def create_subscription(customer_ref:, plan_ref:, **opts)
-        sub = @client.create_subscription(
+        sub = client.create_subscription(
           customer: customer_ref,
           items:    [{ price: plan_ref }],
           **opts
@@ -46,19 +55,19 @@ module Billing
 
       # DELETE /v1/subscriptions/{id}
       def cancel_subscription(subscription_ref:, **opts)
-        sub = @client.cancel_subscription(subscription_ref, **opts)
+        sub = client.cancel_subscription(subscription_ref, **opts)
         normalise_subscription(sub)
       end
 
       # GET /v1/subscriptions/{id}
       def fetch_subscription(subscription_ref:)
-        sub = @client.retrieve_subscription(subscription_ref)
+        sub = client.retrieve_subscription(subscription_ref)
         normalise_subscription(sub)
       end
 
       # POST /v1/checkout/sessions  (mode: "subscription")
       def create_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **opts)
-        session = @client.create_checkout_session({
+        session = client.create_checkout_session({
           mode:        "subscription",
           line_items:  [{ price: plan_ref, quantity: 1 }],
           customer:    customer_ref,
@@ -70,7 +79,7 @@ module Billing
 
       # POST /v1/billing_portal/sessions
       def create_billing_portal_session(customer_ref:, return_url:, **)
-        session = @client.create_billing_portal_session(
+        session = client.create_billing_portal_session(
           customer:   customer_ref,
           return_url: return_url
         )
@@ -82,7 +91,7 @@ module Billing
       # are duplicated on the session AND payment_intent_data so the
       # webhook handler can read either one.
       def create_lifetime_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **opts)
-        session = @client.create_checkout_session({
+        session = client.create_checkout_session({
           mode:        "payment",
           line_items:  [{ price: plan_ref, quantity: 1 }],
           customer:    customer_ref,
@@ -106,11 +115,16 @@ module Billing
           signature_header: signature,
           secret:           secret
         )
+        # event.data["object"] is a Stripe::StripeObject. Convert to
+        # a plain Hash so subscribers downstream don't need to know
+        # they're dealing with a Stripe SDK type — the engine's
+        # contract is "events are hashes".
+        object_hash = event.data["object"].respond_to?(:to_hash) ? event.data["object"].to_hash.transform_keys(&:to_s) : event.data["object"]
         {
           id:       event["id"],            # evt_* — controller dedupes via Billing::WebhookEvent
           type:     event["type"],
           livemode: event["livemode"],
-          object:   event.data["object"],   # Stripe::Event#data is a StripeObject; both [] and . accessors work
+          object:   object_hash,
           raw:      payload
         }
       end

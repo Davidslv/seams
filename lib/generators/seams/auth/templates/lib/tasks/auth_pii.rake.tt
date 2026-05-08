@@ -41,7 +41,7 @@ namespace :seams do
         failures[:users] << { id: user.id, error: "#{e.class}: #{e.message}" }
       end
 
-      Auth::OAuthProvider.find_each do |provider|
+      Auth::OAuth::Provider.find_each do |provider|
         provider.update!(provider_uid: provider.provider_uid)
         counts[:oauth_providers] += 1
       rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e

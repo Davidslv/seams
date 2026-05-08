@@ -17,7 +17,7 @@ module Auth
     end
     has_many :sessions,        class_name: "Auth::Session",        dependent: :destroy
     has_many :api_tokens,      class_name: "Auth::ApiToken",       dependent: :destroy
-    has_many :oauth_providers, class_name: "Auth::OAuthProvider",  dependent: :destroy
+    has_many :oauth_providers, class_name: "Auth::OAuth::Provider",  dependent: :destroy
 
     # Email is PII (GDPR Article 4). Stored encrypted at rest via Rails 7+
     # ActiveRecord::Encryption. `deterministic: true` keeps `find_by(email:)`

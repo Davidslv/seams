@@ -32,7 +32,7 @@ module Billing
       def verify!(payload:, signature_header:, secret:, tolerance: DEFAULT_TOLERANCE)
         raise Billing::WebhookError, "Stripe-Signature header missing" if signature_header.nil? || signature_header.empty?
 
-        ::Stripe::Webhook.construct_event(payload, signature_header, secret, tolerance)
+        ::Stripe::Webhook.construct_event(payload, signature_header, secret, tolerance: tolerance)
       rescue ::Stripe::SignatureVerificationError => e
         raise Billing::WebhookError, "Stripe signature invalid: #{e.message}"
       rescue JSON::ParserError => e

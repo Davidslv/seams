@@ -10,7 +10,7 @@ Auth::Engine.routes.draw do
   # time; unknown providers raise Auth::OAuthProviderUnknown which
   # the controller handles.
   scope "/oauth/:provider" do
-    get "start",    to: "oauth_callbacks#start",    as: :oauth_start
-    get "callback", to: "oauth_callbacks#callback", as: :oauth_callback
+    get "start",    to: "oauth/callbacks#start",    as: :oauth_start
+    get "callback", to: "oauth/callbacks#callback", as: :oauth_callback
   end
 end

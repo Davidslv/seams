@@ -288,8 +288,8 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
 
-    it "OAuthProvider model uses encrypts for tokens + correct uniqueness scopes" do
-      assert_file "engines/auth/app/models/auth/oauth_provider.rb" do |content|
+    it "OAuth::Provider model uses encrypts for tokens + correct uniqueness scopes" do
+      assert_file "engines/auth/app/models/auth/oauth/provider.rb" do |content|
         expect(content).to include("encrypts :access_token")
         expect(content).to include("encrypts :refresh_token")
         expect(content).to include("uniqueness: { scope: :provider")
@@ -308,8 +308,8 @@ RSpec.describe Seams::Generators::AuthGenerator do
       expect(content).to include("add_index :auth_oauth_providers, %i[provider provider_uid], unique: true")
     end
 
-    it "OAuthAuthenticator service publishes the canonical signed_up/signed_in events" do
-      assert_file "engines/auth/app/services/auth/oauth_authenticator.rb" do |content|
+    it "OAuth::Authenticator service publishes the canonical signed_up/signed_in events" do
+      assert_file "engines/auth/app/services/auth/oauth/authenticator.rb" do |content|
         expect(content).to include("Auth.oauth(@provider)")
         expect(content).to include("user.signed_up.auth")
         expect(content).to include("user.signed_in.auth")
@@ -318,20 +318,20 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
 
-    it "OAuthCallbacksController verifies state on callback (CSRF guard)" do
-      assert_file "engines/auth/app/controllers/auth/oauth_callbacks_controller.rb" do |content|
+    it "OAuth::CallbacksController verifies state on callback (CSRF guard)" do
+      assert_file "engines/auth/app/controllers/auth/oauth/callbacks_controller.rb" do |content|
         expect(content).to include("def start")
         expect(content).to include("def callback")
         expect(content).to include("OAuth state mismatch")
-        expect(content).to include("Auth::OAuthAuthenticator.call")
+        expect(content).to include("Auth::OAuth::Authenticator.call")
       end
     end
 
     it "routes register the per-provider start + callback URLs" do
       assert_file "engines/auth/config/routes.rb" do |content|
         expect(content).to include('scope "/oauth/:provider"')
-        expect(content).to include("oauth_callbacks#start")
-        expect(content).to include("oauth_callbacks#callback")
+        expect(content).to include("oauth/callbacks#start")
+        expect(content).to include("oauth/callbacks#callback")
       end
     end
 
@@ -505,10 +505,10 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
 
-    it "ships OAuthProvider model spec covering encryption round-trip + uniqueness" do
-      assert_file "engines/auth/spec/models/auth/oauth_provider_spec.rb" do |content|
+    it "ships OAuth::Provider model spec covering encryption round-trip + uniqueness" do
+      assert_file "engines/auth/spec/models/auth/oauth/provider_spec.rb" do |content|
         [
-          "RSpec.describe Auth::OAuthProvider",
+          "RSpec.describe Auth::OAuth::Provider",
           "round-trips access_token",
           "round-trips provider_uid",
           "find_by(provider: \"google\""
@@ -552,14 +552,14 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
 
-    it "OAuthProvider#provider_uid is encrypted deterministically" do
-      assert_file "engines/auth/app/models/auth/oauth_provider.rb" do |content|
+    it "OAuth::Provider#provider_uid is encrypted deterministically" do
+      assert_file "engines/auth/app/models/auth/oauth/provider.rb" do |content|
         expect(content).to include("encrypts :provider_uid, deterministic: true")
       end
     end
 
     it "OAuth tokens remain non-deterministically encrypted (credentials, not query targets)" do
-      assert_file "engines/auth/app/models/auth/oauth_provider.rb" do |content|
+      assert_file "engines/auth/app/models/auth/oauth/provider.rb" do |content|
         expect(content).to include("encrypts :access_token")
         expect(content).to include("encrypts :refresh_token")
         expect(content).not_to include("encrypts :access_token, deterministic")
@@ -574,7 +574,7 @@ RSpec.describe Seams::Generators::AuthGenerator do
           "namespace :auth",
           "task rotate_pii_encryption",
           "Auth::User.find_each",
-          "Auth::OAuthProvider.find_each",
+          "Auth::OAuth::Provider.find_each",
           "user.update!(email: user.email)",
           "provider.update!(provider_uid: provider.provider_uid)"
         ].each { |needle| expect(content).to include(needle) }
