@@ -301,14 +301,20 @@ RSpec.describe Seams::Generators::BillingGenerator do
       expect(content).to include("create_table :billing_subscriptions")
     end
 
-    it "creates billing_invoices migration referencing subscriptions" do
+    it "creates billing_invoices migration with customer_ref + subscription_ref columns" do
       pattern = File.join(destination_root, "engines/billing/db/migrate", "*_create_billing_invoices.rb")
       file    = Dir[pattern].first
       expect(file).not_to be_nil
 
       content = File.read(file)
       expect(content).to include("create_table :billing_invoices")
-      expect(content).to include("to_table: :billing_subscriptions")
+      [
+        ":customer_ref",
+        ":subscription_ref",
+        ":amount_cents",
+        ":paid_at"
+      ].each { |needle| expect(content).to include(needle) }
+      expect(content).to match(/add_index :billing_invoices, :gateway_ref,\s+unique: true/)
     end
 
     it "creates billing_webhook_events migration with unique gateway_event_id index" do

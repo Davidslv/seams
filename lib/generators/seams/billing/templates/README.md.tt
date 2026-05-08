@@ -18,13 +18,24 @@ shape** so subscribers can read one format regardless of source:
   object:       { ... } }      # the gateway object as a hash
 ```
 
-| Event name                          | Subject     | Emitted when |
-| ---                                 | ---         | --- |
-| `subscription.created.billing`      | Subscription | StartSubscriptionJob succeeds, or `customer.subscription.created` webhook fires |
-| `subscription.updated.billing`      | Subscription | `customer.subscription.updated` webhook fires |
-| `subscription.canceled.billing`     | Subscription | CancelSubscriptionJob succeeds, or `customer.subscription.deleted` webhook fires |
-| `invoice.paid.billing`              | Invoice      | `invoice.paid` webhook fires |
-| `invoice.failed.billing`            | Invoice      | `invoice.payment_failed` webhook fires |
+| Event name                                  | Subject       | Emitted when |
+| ---                                         | ---           | --- |
+| `subscription.created.billing`              | Subscription  | StartSubscriptionJob succeeds, or `customer.subscription.created` webhook fires |
+| `subscription.updated.billing`              | Subscription  | `customer.subscription.updated` webhook fires |
+| `subscription.canceled.billing`             | Subscription  | CancelSubscriptionJob succeeds, or `customer.subscription.deleted` webhook fires |
+| `subscription.trial_will_end.billing`       | Subscription  | `customer.subscription.trial_will_end` webhook fires (~3 days before trial end) |
+| `invoice.created.billing`                   | Invoice       | `invoice.created` webhook fires (status: draft) |
+| `invoice.paid.billing`                      | Invoice       | `invoice.paid` webhook fires |
+| `invoice.failed.billing`                    | Invoice       | `invoice.payment_failed` webhook fires |
+| `invoice.finalized.billing`                 | Invoice       | `invoice.finalized` webhook fires |
+| `invoice.voided.billing`                    | Invoice       | `invoice.voided` webhook fires |
+| `payment.succeeded.billing`                 | PaymentIntent | `payment_intent.succeeded` webhook fires |
+| `payment.failed.billing`                    | PaymentIntent | `payment_intent.payment_failed` webhook fires |
+| `charge.refunded.billing`                   | Charge        | `charge.refunded` webhook fires |
+| `checkout.session_completed.billing`        | CheckoutSession | `checkout.session.completed` webhook fires (subscription mode; LTD mode forks to lifetime.purchased.billing) |
+| `lifetime.granted.billing`                  | LifetimePass  | Admin grants a Lifetime Deal via `Billing::Lifetime::GrantPassService` |
+| `lifetime.purchased.billing`                | LifetimePass  | Customer pays for an LTD via Stripe Checkout `mode: "payment"` |
+| `lifetime.revoked.billing`                  | LifetimePass  | `Billing::Lifetime::RevokePassService` is called |
 
 The webhook controller upserts a local `Billing::Subscription` /
 `Billing::Invoice` row before publishing, so subscribers can resolve

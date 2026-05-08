@@ -173,4 +173,41 @@ RSpec.describe Seams::Generators::RemoveGenerator do
       expect(generator).not_to have_received(:system).with("bundle", "install", anything)
     end
   end
+
+  describe "name validation (review-fix regression)" do
+    it "rejects ../etc-style path-traversal names" do
+      expect { run_generator(["../etc", "--force"]) }
+        .to raise_error(Seams::GeneratorError, /must be lowercase/)
+    end
+
+    it "rejects names with uppercase characters" do
+      expect { run_generator(["Billing", "--force"]) }
+        .to raise_error(Seams::GeneratorError, /must be lowercase/)
+    end
+  end
+
+  describe "drop-table regex ignores commented-out create_table calls" do
+    let(:host_migrate_dir) { File.join(destination_root, "db/migrate") }
+
+    it "treats `# create_table :foo` lines as comments, not as schema declarations" do
+      seed_dir = File.join(engine_path, "db/migrate")
+      FileUtils.mkdir_p(seed_dir)
+      File.write(File.join(seed_dir, "20250101000000_create_billing_plans.rb"), <<~RB)
+        # NB: when extracting reports, see `create_table :billing_plans_archive`
+        # below. Do NOT scan this comment as a real migration.
+        class CreateBillingPlans < ActiveRecord::Migration[7.1]
+          def change
+            create_table :billing_plans
+          end
+        end
+      RB
+
+      run_generator(["billing", "--force"])
+
+      drop_migration = Dir[File.join(host_migrate_dir, "*_drop_billing_tables.rb")].first
+      content        = File.read(drop_migration)
+      expect(content).to     include("drop_table :billing_plans, force: :cascade")
+      expect(content).not_to include(":billing_plans_archive")
+    end
+  end
 end

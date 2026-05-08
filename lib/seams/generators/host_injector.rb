@@ -30,12 +30,23 @@ module Seams
           return host_skip("config/routes.rb not found — add `mount #{engine_class}, at: \"#{at}\"` yourself")
         end
 
-        return if File.read(routes).include?("mount #{engine_class}")
+        # Word-boundary match on the engine class name so a sibling
+        # `mount Auth::EngineExtras` doesn't trick us into thinking
+        # `Auth::Engine` is already mounted. The boundary is "anything
+        # that isn't a constant-name character" (`[\w:]` excluded).
+        return if File.read(routes).match?(/\bmount\s+#{Regexp.escape(engine_class)}(?![\w:])/)
 
         say "  inject  config/routes.rb (mount #{engine_class})", :green
-        inject_into_file(routes, after: /Rails\.application\.routes\.draw\s+do\s*\n/) do
+        inject_into_file(routes, after: routes_draw_anchor) do
           "  mount #{engine_class}, at: \"#{at}\"\n"
         end
+      end
+
+      # Matches the common `Rails.application.routes.draw do` forms:
+      # plain `do`, `do |routes|` block-arg, `do  # comment`, and the
+      # rare `Rails::Application.routes.draw`.
+      def routes_draw_anchor
+        /Rails(?:\.application|::Application)\.routes\.draw\s+do(?:\s*\|[^|]+\|)?[^\n]*\n/
       end
 
       def host_inject_include_in_user(concern_name)
@@ -64,7 +75,11 @@ module Seams
         routes = host_path("config/routes.rb")
         return unless File.exist?(routes)
 
-        new_content = File.read(routes).gsub(/^\s*mount\s+#{Regexp.escape(engine_class)},?[^\n]*\n/, "")
+        # Word-boundary match — see host_inject_mount. Without it, an
+        # unrelated `mount Auth::EngineExtras` would match a remove of
+        # `mount Auth::Engine` and silently delete the wrong line.
+        pattern     = /^\s*mount\s+#{Regexp.escape(engine_class)}(?![\w:])[^\n]*\n/
+        new_content = File.read(routes).gsub(pattern, "")
         File.write(routes, new_content)
         say "  remove  config/routes.rb (mount #{engine_class})", :red
       end

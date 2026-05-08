@@ -19,8 +19,21 @@ module Seams
     class RemoveGenerator < Rails::Generators::NamedBase
       include Seams::Generators::HostInjector
 
+      # Same constraints as EngineGenerator — keeps `seams:remove ../../etc`
+      # from being interpreted as a relative path the destructive
+      # FileUtils.rm_rf at line 80 would happily follow with --force.
+      NAME_PATTERN = /\A[a-z][a-z0-9_]*\z/
+
       class_option :force, type: :boolean, default: false,
                            desc: "Skip the confirmation prompt"
+
+      def validate_name
+        return if NAME_PATTERN.match?(name)
+
+        raise Seams::GeneratorError,
+              "Engine name #{name.inspect} must be lowercase letters, digits, " \
+              "and underscores, starting with a letter."
+      end
 
       # Maps engine name -> { mount: <Class>, includes: { user: [...], application_controller: [...] } }
       # Lets remove know what to undo for the canonical engines. Generic
@@ -58,7 +71,11 @@ module Seams
         return @engine_tables = [] unless File.directory?(migrate_dir)
 
         @engine_tables = Dir.glob(File.join(migrate_dir, "*.rb")).flat_map do |file|
-          File.read(file).scan(/create_table\s+:(\w+)/).flatten
+          # Strip line comments before scanning so a stray
+          # `# create_table :backup_table do |t|` in a migration
+          # doesn't end up in the drop-table list.
+          source = File.read(file).gsub(/^\s*#.*$/, "")
+          source.scan(/^\s*create_table\s+:(\w+)/).flatten
         end.uniq
       end
 

@@ -33,12 +33,13 @@ the gem.
 
 - `bin/seams install`        — adds the framework + CI workflow + bin/seams wrapper
 - `bin/seams engine <name>`  — generic engine scaffold
-- `bin/seams auth`           — canonical Auth engine (User, Session, sign-in/out, current_user)
-- `bin/seams notifications`  — canonical Notifications engine (jobs, ActionMailer adapter, AuthSubscriber)
-- `bin/seams billing`        — canonical Billing engine (Subscription, Invoice, Stripe gateway, idempotent webhooks)
-- `bin/seams teams`          — canonical Teams engine (Team, Membership, Invitation, Authorization concern)
-- `bin/seams remove <name>`  — clean removal + sibling cleanup
-- `bin/seams list`           — engines + their events
+- `bin/seams core`           — canonical Core engine (Current attributes, AuditLog, TenantScoped, EmailFormatValidator)
+- `bin/seams auth`           — canonical Auth engine (User, Session, OAuth, API tokens, GDPR-encrypted PII)
+- `bin/seams notifications`  — canonical Notifications engine (STI strategies, ActionCable bell, TypeRegistry, --channels flag)
+- `bin/seams billing`        — canonical Billing engine (Faraday Stripe client, 13-handler webhook router, Lifetime Deals)
+- `bin/seams teams`          — canonical Teams engine (Team, Membership, Invitation, AccountScoped, --with flag)
+- `bin/seams remove <name>`  — clean removal + sibling cleanup + drop-table migration
+- `bin/seams list`           — engines, the events they emit, and what they subscribe to
 - Four custom RuboCop cops that enforce cross-engine boundaries
 - A GitHub Actions CI workflow that runs every engine's specs in parallel
 
@@ -63,11 +64,20 @@ the gem.
 
 ## Status
 
-Phase 1–4 complete: foundation, auth, notifications, billing
-(Stripe), teams. CI workflow + bin/seams wrapper shipped in Phase 6.
-Documentation in Phase 7.
+Phases 1–5 complete: foundation, auth (with OAuth, API tokens,
+GDPR-encrypted PII), notifications (with TypeRegistry,
+ActionCable bell, multipart mailers), billing (Faraday Stripe
+client, 13-handler webhook router, Lifetime Deals), teams (with
+account scoping, role-based authz). Phase 6 quality gates:
+8/10 ticked; the two remaining items are manual operator
+verifications (Stripe test-mode walkthrough + real `docker build`
+with all engines). Phase 7 (launch + RubyGems publish) is open.
 
-Suite: 197 specs, 97% line coverage, RuboCop clean, brakeman + bundle-audit clean.
+See [issue #5](https://github.com/Davidslv/seams/issues/5) for the live
+work tracker.
+
+Suite: 506 specs + 2 integration_full specs, RuboCop clean,
+brakeman + bundle-audit clean.
 
 ## License
 

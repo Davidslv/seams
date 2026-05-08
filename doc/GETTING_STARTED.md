@@ -24,11 +24,13 @@ bin/rails generate seams:install
 The install generator scaffolds:
 
 - `config/initializers/seams.rb`
-- `config/initializers/seams_engines.rb` — adds `engines/*` to autoload
+- `config/seams_engines.rb` — registers each engine on the host's load path; `require_relative "seams_engines"` is injected into `config/application.rb` so engines load before `Rails.application.initialize!`
 - `engines/.keep`
 - `lib/tasks/seams.rake`
 - `.github/workflows/ci.yml` — lint + brakeman + per-engine test matrix
 - `bin/seams` — short CLI wrapper
+- `script/run_affected_tests.sh`, `script/collate_coverage.rb` — host-local helpers
+- `doc/ARCHITECTURE.md` — per-host architecture template
 
 ## 2. Generate your first engine
 

@@ -15,7 +15,10 @@ class CreateAuthOauthProviders < ActiveRecord::Migration[7.1]
     create_table :auth_oauth_providers do |t|
       t.references :user,         null: false, foreign_key: { to_table: :auth_users }
       t.string     :provider,     null: false
-      t.string     :provider_uid, null: false
+      # `:text` because `provider_uid` is encrypted via
+      # ActiveRecord::Encryption (deterministic) — see Wave 11. Same
+      # ciphertext-overflow concern as auth_users.email.
+      t.text       :provider_uid, null: false
       # encrypts :access_token / :refresh_token store ciphertext as
       # text. ActiveRecord::Encryption handles the (de)cipher.
       t.text       :access_token

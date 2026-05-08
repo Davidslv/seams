@@ -83,6 +83,10 @@ module Seams
                  engine_path("app/services/auth/oauth_authenticator.rb")
         template "app/services/generate_api_token.rb.tt",
                  engine_path("app/services/auth/generate_api_token.rb")
+        # Phase Wave 5 (review fix): the revoke path was documented in
+        # the README + registered in engine.rb but had no implementer.
+        template "app/services/revoke_api_token.rb.tt",
+                 engine_path("app/services/auth/revoke_api_token.rb")
       end
 
       def create_jobs
@@ -241,7 +245,7 @@ module Seams
       def dummy_schema
         <<~SCHEMA
           create_table :auth_users do |t|
-            t.string  :email,            null: false
+            t.text    :email,            null: false
             t.string  :password_digest,  null: false
             t.bigint  :host_user_id
             t.string  :password_reset_token
@@ -263,7 +267,7 @@ module Seams
           create_table :auth_oauth_providers do |t|
             t.references :user,         null: false, foreign_key: { to_table: :auth_users }
             t.string     :provider,     null: false
-            t.string     :provider_uid, null: false
+            t.text       :provider_uid, null: false
             t.text       :access_token
             t.text       :refresh_token
             t.datetime   :expires_at

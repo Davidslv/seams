@@ -45,10 +45,9 @@ FactoryBot.define do
   end
 
   factory :billing_webhook_event, class: "Billing::WebhookEvent" do
-    gateway                       { "stripe" }
+    gateway                     { "stripe" }
     sequence(:gateway_event_id) { |n| "evt_test_#{n}" }
-    event_type                    { "customer.subscription.created" }
-    livemode                      { false }
-    payload                       { { stub: true } }
+    event_type                  { "customer.subscription.created" }
+    livemode                    { false }
   end
 end

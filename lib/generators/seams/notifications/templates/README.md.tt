@@ -105,6 +105,8 @@ production:
 | `subscription.canceled.billing` | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_canceled`. |
 | `invoice.paid.billing`          | `Notifications::BillingSubscriber` | InApp notification, template `billing/invoice_paid`. |
 | `invoice.failed.billing`        | `Notifications::BillingSubscriber` | InApp notification, template `billing/invoice_failed`. |
+| `lifetime.granted.billing`      | `Notifications::BillingSubscriber` | InApp notification, template `billing/lifetime_granted`. |
+| `lifetime.purchased.billing`    | `Notifications::BillingSubscriber` | InApp notification, template `billing/lifetime_purchased`. |
 
 The Billing subscriber resolves the host User by
 `stripe_customer_id` (the column the `Billing::Billable` concern

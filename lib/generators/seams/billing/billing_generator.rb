@@ -377,14 +377,16 @@ module Seams
           add_index :billing_subscriptions, :gateway_ref, unique: true
 
           create_table :billing_invoices do |t|
-            t.references :subscription
-            t.string     :gateway_ref,  null: false
-            t.integer    :amount_cents, null: false
-            t.string     :currency,     null: false, default: "usd"
-            t.string     :status,       null: false, default: "open"
+            t.string     :gateway_ref,      null: false
+            t.string     :customer_ref,     null: false
+            t.string     :subscription_ref
+            t.integer    :amount_cents,     null: false
+            t.string     :currency,         null: false, default: "USD"
+            t.string     :status,           null: false, default: "open"
             t.datetime   :paid_at
             t.timestamps
           end
+          add_index :billing_invoices, :gateway_ref, unique: true
 
           create_table :billing_webhook_events do |t|
             t.string   :gateway,           null: false

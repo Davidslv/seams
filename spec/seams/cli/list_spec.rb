@@ -116,5 +116,29 @@ RSpec.describe Seams::CLI::List do
       expect(io.string.scan("depends on: auth").size).to eq(1)
       expect(io.string).not_to match(/depends on: notifications/)
     end
+
+    # Regression: real generated engines wire subscribers via
+    # `Publisher.attach_once(KEY, "event")` inside
+    # `app/subscribers/*.rb` — not via `Publisher.subscribe` in
+    # engine.rb. Pre-fix, the CLI scanned only engine.rb and silently
+    # reported zero subscriptions for every shipped engine.
+    it "scans app/subscribers/**/*.rb for Publisher.attach_once calls" do
+      subscriber_dir = File.join(engines_root, "billing", "app", "subscribers", "billing")
+      FileUtils.mkdir_p(subscriber_dir)
+      FileUtils.mkdir_p(File.join(engines_root, "billing", "lib"))
+      File.write(File.join(subscriber_dir, "auth_subscriber.rb"), <<~RUBY)
+        module Billing
+          class AuthSubscriber
+            def self.attach!
+              Seams::Events::Publisher.attach_once(:billing_auth_subscriber, "user.signed_up.auth") { |p| }
+            end
+          end
+        end
+      RUBY
+
+      list.call
+      expect(io.string).to include("subscribes: user.signed_up.auth")
+      expect(io.string).to include("depends on: auth")
+    end
   end
 end

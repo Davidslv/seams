@@ -410,6 +410,21 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
 
+    it "ships RevokeApiToken service that destroys the row + publishes api_token.revoked.auth" do
+      assert_file "engines/auth/app/services/auth/revoke_api_token.rb" do |content|
+        [
+          "module RevokeApiToken",
+          "api_token.destroy!",
+          "Seams::Events::Publisher.publish(",
+          '"api_token.revoked.auth"',
+          "auth_user_id:",
+          "host_user_id:",
+          "api_token_id:",
+          "token_prefix:"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
     it "registers api_token.issued.auth + api_token.revoked.auth in the engine event registry" do
       assert_file "engines/auth/lib/auth/engine.rb" do |content|
         expect(content).to include('"api_token.issued.auth"')

@@ -7,7 +7,13 @@
 class CreateAuthUsers < ActiveRecord::Migration[7.1]
   def change
     create_table :auth_users do |t|
-      t.string  :email,            null: false
+      # `:text` (not `:string`) because `email` is encrypted via
+      # ActiveRecord::Encryption (deterministic). Stripe-style envelope
+      # ciphertext + base64 + IV/key-id headers expand a 30-char email
+      # to ~150–250 bytes; on MySQL `:string` defaults to VARCHAR(255)
+      # which silently truncates the cipher and breaks decryption.
+      # https://guides.rubyonrails.org/active_record_encryption.html#about-storage-and-column-size
+      t.text    :email,            null: false
       t.string  :password_digest,  null: false
       t.bigint  :host_user_id
       t.timestamps

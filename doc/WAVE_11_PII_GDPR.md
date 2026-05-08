@@ -1,8 +1,7 @@
 # Wave 11 — PII encryption & GDPR notes
 
-> Status: **planning notes only — not yet implemented.**
-> Wave 10 (API tokens + rate limiting + cleanup job) is complete; this
-> file captures what Wave 11 should do so we can pick it up later.
+> Status: **implemented in commit `5dd68c0` and follow-up review fixes.**
+> Kept here as a record of the design decisions and the migration path for hosts upgrading from Wave ≤10. The "Scope" section below describes work that has already shipped; the rotation rake task is at `lib/generators/seams/auth/templates/lib/tasks/auth_pii.rake.tt`.
 
 ## Why this wave
 

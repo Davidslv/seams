@@ -44,14 +44,27 @@ module Seams
         return unless File.exist?(application_rb)
 
         snippet = %(require_relative "seams_engines")
-        return if File.read(application_rb).include?(snippet)
+        contents = File.read(application_rb)
+        return if contents.include?(snippet)
+
+        # The default Rails 8 application.rb contains
+        # `Bundler.require(*Rails.groups)` verbatim. If a host has
+        # customised it (Rails 4-style asset groups, multi-arg
+        # Bundler.require, brace-form do-block, trailing comment, ...),
+        # the regex misses and Thor silently warns "File unchanged!"
+        # — leaving the host bootable but with engines never required.
+        # That is the worst kind of failure: silent + production-bug.
+        # Print a loud red warning so the user knows to wire it by hand.
+        anchor = /Bundler\.require\(\*Rails\.groups\)\n/
+        unless contents.match?(anchor)
+          say "  WARNING config/application.rb has no `Bundler.require(*Rails.groups)` line — " \
+              "add `#{snippet}` manually after Bundler.require so engines load before initialize!",
+              :red
+          return
+        end
 
         say "  inject  config/application.rb (require_relative \"seams_engines\")", :green
-        inject_into_file(
-          application_rb,
-          "\n#{snippet}\n",
-          after: /Bundler\.require\(\*Rails\.groups\)\n/
-        )
+        inject_into_file(application_rb, "\n#{snippet}\n", after: anchor)
       end
 
       def create_host_rubocop

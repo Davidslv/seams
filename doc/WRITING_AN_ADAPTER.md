@@ -11,8 +11,12 @@ every adapter must implement:
 ```ruby
 # engines/notifications/lib/notifications/adapters/abstract.rb
 module Notifications::Adapters
+  # Each adapter receives the full Notification object so it can
+  # read recipient, template, rendered_content, owner — whatever
+  # the gateway needs. Returns a Hash that includes at least
+  # { ok: true|false, provider: <string> }.
   class Abstract
-    def deliver(_to:, _subject:, _body:, **_extras)
+    def deliver(notification:)
       raise NotImplementedError, "#{self.class} must implement #deliver"
     end
   end
@@ -23,12 +27,13 @@ end
 # engines/billing/lib/billing/gateways/abstract.rb
 module Billing::Gateways
   class Abstract
-    def create_subscription(customer_ref:, plan_ref:, **)
-      raise NotImplementedError
-    end
-    def cancel_subscription(subscription_ref:, **);    raise NotImplementedError; end
-    def fetch_subscription(subscription_ref:);          raise NotImplementedError; end
-    def verify_webhook(payload:, signature:, secret:);  raise NotImplementedError; end
+    def create_subscription(customer_ref:, plan_ref:, **);                                       raise NotImplementedError; end
+    def cancel_subscription(subscription_ref:, **);                                              raise NotImplementedError; end
+    def fetch_subscription(subscription_ref:);                                                   raise NotImplementedError; end
+    def create_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **);        raise NotImplementedError; end
+    def create_billing_portal_session(customer_ref:, return_url:, **);                           raise NotImplementedError; end
+    def create_lifetime_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **); raise NotImplementedError; end
+    def verify_webhook(payload:, signature:, secret:);                                           raise NotImplementedError; end
   end
 end
 ```
@@ -36,18 +41,25 @@ end
 ## Write your adapter
 
 Subclass the abstract base in your host application (typically under
-`app/adapters/`):
+`app/adapters/`). The Notifications adapter receives the full
+`Notifications::Notification` object — read `recipient`, `template`,
+`rendered_content(format:)`, and `owner` off it directly:
 
 ```ruby
 # app/adapters/mailgun_adapter.rb
 require "notifications/adapters/abstract"
 
 class MailgunAdapter < Notifications::Adapters::Abstract
-  def deliver(to:, subject:, body:, from: nil, **)
-    response = mailgun.send_message(domain, {
-      from: from || ENV.fetch("MAILGUN_FROM"),
-      to: to, subject: subject, text: body
-    })
+  # Docs: https://documentation.mailgun.com/docs/mailgun/api-reference/sending-messages/
+  # Required params: from, to, subject, text or html.
+  def deliver(notification:)
+    response = mailgun.send_message(domain,
+      from:    ENV.fetch("MAILGUN_FROM"),
+      to:      notification.recipient,
+      subject: notification.template.to_s.titleize,
+      html:    notification.rendered_content(format: :html),
+      text:    notification.rendered_content(format: :text)
+    )
     { ok: true, provider: "mailgun", message_id: response.id }
   end
 
@@ -66,18 +78,11 @@ end
 ## Verify against the provider's docs
 
 Per the Seams external-API rule, every adapter MUST cite the
-provider's official documentation URL inline:
-
-```ruby
-class MailgunAdapter < Notifications::Adapters::Abstract
-  # Docs: https://documentation.mailgun.com/docs/mailgun/api-reference/sending-messages/
-  # Required params: from, to, subject, text or html.
-  # Returns: { id, message } on success; raises Mailgun::CommunicationError otherwise.
-  def deliver(to:, subject:, body:, from: nil, **)
-    # ...
-  end
-end
-```
+provider's official documentation URL inline. Every outbound HTTP
+call MUST go through Faraday — no `Net::HTTP`, no provider SDKs
+that wrap `Net::HTTP`. The Stripe gateway
+(`engines/billing/lib/billing/stripe/client.rb`) is the reference
+implementation of this rule.
 
 The Stripe gateway in the canonical Billing engine is the reference
 implementation — generated under `engines/billing/lib/billing/gateways/stripe.rb`

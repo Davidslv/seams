@@ -120,4 +120,44 @@ RSpec.describe Seams::Generators::HostInjector do
       expect(content).not_to include("include Auth::Authenticatable")
     end
   end
+
+  describe "prefix-collision regressions (Wave 5 review fixes)" do
+    it "host_inject_mount injects Auth::Engine even when Auth::EngineExtras is already mounted" do
+      File.write(File.join(destination_root, "config/routes.rb"), <<~RB)
+        Rails.application.routes.draw do
+          mount Auth::EngineExtras, at: "/x"
+        end
+      RB
+
+      generator.host_inject_mount(engine_class: "Auth::Engine", at: "/auth")
+      content = File.read(File.join(destination_root, "config/routes.rb"))
+      expect(content).to include("mount Auth::Engine,")
+      expect(content).to include("mount Auth::EngineExtras,")
+    end
+
+    it "host_uninject_mount deletes only the exact class, not prefix matches" do
+      File.write(File.join(destination_root, "config/routes.rb"), <<~RB)
+        Rails.application.routes.draw do
+          mount Auth::Engine, at: "/auth"
+          mount Auth::EngineExtras, at: "/x"
+        end
+      RB
+
+      generator.host_uninject_mount(engine_class: "Auth::Engine")
+      content = File.read(File.join(destination_root, "config/routes.rb"))
+      expect(content).not_to match(/mount Auth::Engine,/)
+      expect(content).to     include("mount Auth::EngineExtras,")
+    end
+
+    it "host_inject_mount works with `do |routes|` block-arg form" do
+      File.write(File.join(destination_root, "config/routes.rb"), <<~RB)
+        Rails.application.routes.draw do |routes|
+        end
+      RB
+
+      generator.host_inject_mount(engine_class: "Foo::Engine", at: "/foo")
+      content = File.read(File.join(destination_root, "config/routes.rb"))
+      expect(content).to include("mount Foo::Engine, at: \"/foo\"")
+    end
+  end
 end
