@@ -13,7 +13,7 @@ module Auth
     end
 
     def create
-      result = Auth::AuthenticateUser.call(
+      result = Auth::AuthenticateIdentity.call(
         email: params[:email], password: params[:password]
       )
 
@@ -33,12 +33,11 @@ module Auth
       if token
         session = Auth::Session.find_by(token: token)
         if session
-          auth_user = session.user
+          identity = session.identity
           Seams::Events::Publisher.publish(
-            "user.signed_out.auth",
-            auth_user_id: auth_user.id,
-            host_user_id: auth_user.host_user_id,
-            session_id:   session.id
+            "identity.signed_out.auth",
+            identity_id: identity.id,
+            session_id:  session.id
           )
           session.destroy
         end

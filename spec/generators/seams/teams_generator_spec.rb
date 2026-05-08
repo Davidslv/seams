@@ -32,8 +32,8 @@ RSpec.describe Seams::Generators::TeamsGenerator do
     it "registers the five canonical team events" do
       assert_file "engines/teams/lib/teams/engine.rb" do |content|
         expect(content).to include('"team.created.teams"')
-        expect(content).to include('"team.member_added.teams"')
-        expect(content).to include('"team.member_removed.teams"')
+        expect(content).to include('"team.member_joined.teams"')
+        expect(content).to include('"team.member_left.teams"')
         expect(content).to include('"invitation.sent.teams"')
         expect(content).to include('"invitation.accepted.teams"')
       end
@@ -109,10 +109,26 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       end
     end
 
-    it "creates Teams::Membership with role inclusion" do
+    it "creates Teams::Membership with role inclusion + identity_id" do
       assert_file "engines/teams/app/models/teams/membership.rb" do |content|
         expect(content).to include("ROLES")
         expect(content).to include("def admin?")
+        expect(content).to include("validates :identity_id")
+      end
+    end
+
+    it "Teams::Membership has no belongs_to :identity / no user_id (Wave 9 bare-FK pattern)" do
+      assert_file "engines/teams/app/models/teams/membership.rb" do |content|
+        # Strip comments before asserting code-shape — explanatory
+        # comments reference the concept by name to explain WHY
+        # cross-engine references are absent.
+        code = content.lines.reject { |line| line.lstrip.start_with?("#") }.join
+        aggregate_failures do
+          expect(code).not_to include("belongs_to :identity")
+          expect(code).not_to include("Auth::Identity")
+          expect(code).not_to include("Auth::User")
+          expect(code).not_to include(":user_id")
+        end
       end
     end
 
@@ -126,16 +142,21 @@ RSpec.describe Seams::Generators::TeamsGenerator do
   end
 
   describe "controllers" do
-    it "creates TeamsController publishing team.created.teams" do
+    it "creates TeamsController publishing team.created.teams with creator_identity_id" do
       assert_file "engines/teams/app/controllers/teams/teams_controller.rb" do |content|
         expect(content).to include('"team.created.teams"')
+        expect(content).to include("creator_identity_id:")
+        expect(content).not_to include("user_id:")
+        expect(content).not_to include("owner_id:")
       end
     end
 
-    it "creates MembershipsController publishing team.member_added/removed.teams" do
+    it "creates MembershipsController publishing team.member_joined/left.teams with identity_id" do
       assert_file "engines/teams/app/controllers/teams/memberships_controller.rb" do |content|
-        expect(content).to include('"team.member_added.teams"')
-        expect(content).to include('"team.member_removed.teams"')
+        expect(content).to include('"team.member_joined.teams"')
+        expect(content).to include('"team.member_left.teams"')
+        expect(content).to include("identity_id: membership.identity_id")
+        expect(content).not_to include("user_id: membership.user_id")
       end
     end
 
@@ -144,6 +165,25 @@ RSpec.describe Seams::Generators::TeamsGenerator do
         expect(content).to include('"invitation.sent.teams"')
         expect(content).to include('"invitation.accepted.teams"')
         expect(content).to include("def accept")
+        expect(content).to include("identity_id:   current_identity_id")
+        expect(content).to include("invitation_id: @invitation.id")
+      end
+    end
+
+    # Wave 9 regression: current_identity_id reads Auth::Current.identity,
+    # not bare Current — without the qualified reference the lookup
+    # silently 403s on every request.
+    it "InvitationsController#current_identity_id reads Auth::Current.identity (not bare Current)" do
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
+        expect(content).to include("Auth::Current")
+        expect(content).not_to match(/(?<!Auth::)Current\.respond_to\?\(:identity\)/)
+      end
+    end
+
+    it "TeamsController#current_identity_id reads Auth::Current.identity (not bare Current)" do
+      assert_file "engines/teams/app/controllers/teams/teams_controller.rb" do |content|
+        expect(content).to include("Auth::Current")
+        expect(content).not_to match(/(?<!Auth::)Current\.respond_to\?\(:identity\)/)
       end
     end
 
@@ -169,26 +209,37 @@ RSpec.describe Seams::Generators::TeamsGenerator do
   end
 
   describe "concerns" do
-    it "creates Teams::Teamable with member_of?, admin_of?, owner_of?" do
-      assert_file "engines/teams/lib/teams/concerns/teamable.rb" do |content|
-        expect(content).to include('require "active_support/concern"')
-        expect(content).to include("def member_of?")
-        expect(content).to include("def admin_of?")
-        expect(content).to include("def owner_of?")
-      end
+    it "does NOT ship the host-User Teamable concern post-Wave-9" do
+      teamable_path = File.join(destination_root, "engines/teams/lib/teams/concerns/teamable.rb")
+      expect(File.exist?(teamable_path)).to be(false),
+                                            "Teamable was removed in Wave 9 — host User model is gone"
     end
 
-    it "creates Teams::Authorization with require_team_admin!" do
+    it "creates Teams::Authorization with require_team_admin! and identity-based predicates" do
       assert_file "engines/teams/lib/teams/concerns/authorization.rb" do |content|
         expect(content).to include("def require_team_admin!")
         expect(content).to include("def require_team_member!")
+        expect(content).to include("identity_id: current_identity_id")
+        expect(content).to include("def current_identity_id")
+        expect(content).not_to include("current_user_id")
       end
     end
 
-    it "registers both concerns in ExposedConcerns" do
+    # Wave 9 regression: must reference the qualified Auth::Current.identity
+    # (not bare Current.identity) so it resolves inside `module Teams`.
+    # Pre-Wave-9 this silently no-op'd, 403'ing every team membership check.
+    it "Teams::Authorization references Auth::Current.identity (not bare Current)" do
+      assert_file "engines/teams/lib/teams/concerns/authorization.rb" do |content|
+        expect(content).to include("Auth::Current")
+        expect(content).not_to match(/(?<!Auth::)Current\.respond_to\?\(:identity\)/)
+      end
+    end
+
+    it "registers AccountScoped + Authorization in ExposedConcerns (Teamable removed)" do
       assert_file "engines/teams/.rubocop.yml" do |content|
-        expect(content).to include("Teams::Teamable")
+        expect(content).to include("Teams::AccountScoped")
         expect(content).to include("Teams::Authorization")
+        expect(content).not_to include("Teams::Teamable")
       end
     end
   end
@@ -203,6 +254,15 @@ RSpec.describe Seams::Generators::TeamsGenerator do
         content = File.read(file)
         expect(content).to include("# What:"), "expected #{file} to have a What: comment"
       end
+    end
+
+    it "create_team_memberships uses identity_id (not user_id) and indexes accordingly" do
+      pattern = File.join(destination_root, "engines/teams/db/migrate", "*_create_team_memberships.rb")
+      content = File.read(Dir[pattern].first)
+      expect(content).to include("t.bigint     :identity_id")
+      expect(content).to include("add_index :team_memberships, %i[team_id identity_id], unique: true")
+      expect(content).to include("add_index :team_memberships, :identity_id")
+      expect(content).not_to include(":user_id")
     end
   end
 
@@ -226,10 +286,16 @@ RSpec.describe Seams::Generators::TeamsGenerator do
   describe "documentation + specs" do
     it "rewrites README with the canonical events table + role rubric" do
       assert_file "engines/teams/README.md" do |content|
-        expect(content).to include("team.created.teams")
-        expect(content).to include("Teams::Teamable")
-        expect(content).to include("owner")
-        expect(content).to include("admin")
+        aggregate_failures do
+          expect(content).to include("team.created.teams")
+          expect(content).to include("creator_identity_id")
+          expect(content).to include("identity_id")
+          expect(content).to include("owner")
+          expect(content).to include("admin")
+          # README mentions Teamable in a "removed in Wave 9" note so
+          # readers grepping for it find an explanation, not silence.
+          expect(content).to include("removed")
+        end
       end
     end
 
@@ -247,35 +313,53 @@ RSpec.describe Seams::Generators::TeamsGenerator do
           "module AccountScoped",
           'belongs_to :team, class_name: "Teams::Team"',
           "default_scope",
-          "Current.team",
+          # Wave 9: must reference the qualified Teams::Current.team
+          # (not bare Current.team) so the default_scope actually
+          # resolves inside `module Teams`.
+          "Teams::Current.team",
           "before_validation :assign_current_team"
+        ].each { |needle| expect(content).to include(needle) }
+        # Regression: pre-Wave-9 the concern referenced bare `Current.team`,
+        # which silently no-op'd inside `module Teams`. Reject that shape.
+        expect(content).not_to match(/(?<!Teams::)Current\.team/)
+      end
+    end
+
+    it "ships Teams::Current as a peer to Auth::Current and Accounts::Current" do
+      assert_file "engines/teams/app/models/teams/current.rb" do |content|
+        [
+          "module Teams",
+          "class Current < ActiveSupport::CurrentAttributes",
+          "attribute :team"
         ].each { |needle| expect(content).to include(needle) }
       end
     end
 
-    it "registers AccountScoped + Teamable + Authorization in ExposedConcerns" do
+    it "registers AccountScoped + Authorization in ExposedConcerns" do
       assert_file "engines/teams/.rubocop.yml" do |content|
         [
-          "Teams::Teamable",
           "Teams::AccountScoped",
           "Teams::Authorization"
         ].each { |needle| expect(content).to include(needle) }
       end
     end
 
-    it "ships FactoryBot factories for team, membership, invitation, host User" do
+    it "ships FactoryBot factories for team, membership, invitation (no host User factory)" do
       assert_file "engines/teams/spec/factories/teams.rb" do |content|
         %w[
-          teams_user
           team
           team_membership
           team_admin_membership
           team_invitation
         ].each { |name| expect(content).to include("factory :#{name}") }
+        # Wave 9 dropped the host User; the factory file no longer
+        # ships a `:teams_user` factory.
+        expect(content).not_to include("factory :teams_user")
+        expect(content).not_to include('class: "User"')
       end
     end
 
-    it "wire_into_host adds factory_bot_rails to the test group" do
+    it "wire_into_host adds factory_bot_rails to the test group and does NOT include in host User" do
       gen_path = File.expand_path(
         "../../../lib/generators/seams/teams/teams_generator.rb",
         __dir__
@@ -283,6 +367,12 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       content = File.read(gen_path)
       expect(content).to include('host_inject_gem("factory_bot_rails"')
       expect(content).to include("group: :test")
+      # Wave 9: host User is gone — the generator no longer CALLS
+      # host_inject_include_in_user. Comments in the file may still
+      # reference the helper by name (explaining its absence), so we
+      # assert there's no executable call.
+      executable = content.lines.reject { |line| line.lstrip.start_with?("#") }.join
+      expect(executable).not_to include("host_inject_include_in_user")
     end
   end
 

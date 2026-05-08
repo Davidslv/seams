@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# What: creates auth_oauth_providers — links Auth::User to external
-#       OAuth identities (Google, GitHub, etc.). One row per (user,
+# What: creates auth_oauth_providers — links Auth::Identity to external
+#       OAuth identities (Google, GitHub, etc.). One row per (identity,
 #       provider) pair.
 # Why:  the engine ships native OAuth support so hosts don't roll their
 #       own. Tokens are encrypted at the column level via
@@ -13,11 +13,11 @@
 class CreateAuthOauthProviders < ActiveRecord::Migration[7.1]
   def change
     create_table :auth_oauth_providers do |t|
-      t.references :user,         null: false, foreign_key: { to_table: :auth_users }
+      t.references :identity,     null: false, foreign_key: { to_table: :auth_identities }
       t.string     :provider,     null: false
       # `:text` because `provider_uid` is encrypted via
       # ActiveRecord::Encryption (deterministic) — see Wave 11. Same
-      # ciphertext-overflow concern as auth_users.email.
+      # ciphertext-overflow concern as auth_identities.email.
       t.text       :provider_uid, null: false
       # encrypts :access_token / :refresh_token store ciphertext as
       # text. ActiveRecord::Encryption handles the (de)cipher.
@@ -30,6 +30,6 @@ class CreateAuthOauthProviders < ActiveRecord::Migration[7.1]
     end
 
     add_index :auth_oauth_providers, %i[provider provider_uid], unique: true
-    add_index :auth_oauth_providers, %i[user_id provider],      unique: true
+    add_index :auth_oauth_providers, %i[identity_id provider],  unique: true
   end
 end

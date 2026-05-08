@@ -11,7 +11,15 @@ class CreateNotifications < ActiveRecord::Migration[7.1]
   def change
     create_table :notifications do |t|
       t.string  :type,             null: false   # STI discriminator
-      t.references :owner,         polymorphic: true, null: false, index: true
+      # Polymorphic owner: can be Auth::Identity (bigint), an
+      # Accounts::Account (UUID post-Wave-9), or any other host model.
+      # `owner_id` is stored as a string so the column accommodates
+      # both PK types without needing two separate FKs. Rails handles
+      # the type coercion in the polymorphic association — the lookup
+      # uses `WHERE owner_type = ? AND owner_id = ?` and AR casts the
+      # parameter to text in the prepared statement.
+      t.string  :owner_type, null: false
+      t.string  :owner_id,   null: false
       t.string  :recipient                       # destination address (override of owner default)
       t.string  :template,         null: false
       t.jsonb   :schedule_data                   # IceCube::Schedule#to_hash
@@ -20,6 +28,7 @@ class CreateNotifications < ActiveRecord::Migration[7.1]
       t.timestamps
     end
 
+    add_index :notifications, %i[owner_type owner_id]
     add_index :notifications, :next_delivery_at
     add_index :notifications, %i[type next_delivery_at]
   end

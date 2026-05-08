@@ -122,6 +122,17 @@ RSpec.describe Seams::Generators::BillingGenerator do
         expect(content).to include("attr_accessor :gateway, :api_key, :webhook_secret, :default_currency")
       end
     end
+
+    it "ships a billable_class knob defaulting to Accounts::Account" do
+      # Post-Wave-9: Billing::Billable is included into the
+      # configured tenant class at boot rather than injected into
+      # a host User model. The default `Accounts::Account` matches
+      # the canonical accounts engine.
+      assert_file "engines/billing/lib/billing/configuration.rb" do |content|
+        expect(content).to include(":billable_class")
+        expect(content).to include('@billable_class         = "Accounts::Account"')
+      end
+    end
   end
 
   describe "gateways" do
@@ -191,10 +202,46 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
+    it "Billable concern keys associations off account_id (Account-as-customer)" do
+      assert_file "engines/billing/lib/billing/concerns/billable.rb" do |content|
+        # Wave 9 contract: the tenant model gets the concern, and
+        # has_many associations are keyed on account_id. There is
+        # no stripe_customer_id reference here because the Stripe
+        # customer is per-Account, not per-Identity.
+        expect(content).to include("foreign_key: :account_id")
+        expect(content).to include("class_name: \"Billing::Subscription\"")
+        expect(content).to include("class_name: \"Billing::LifetimePass\"")
+        expect(content).not_to include("stripe_customer_id")
+      end
+    end
+
+    it "Billable#start_subscription! takes plan_ref + email (no host User assumed)" do
+      assert_file "engines/billing/lib/billing/concerns/billable.rb" do |content|
+        expect(content).to match(/def start_subscription!\(plan_ref:, email:\)/)
+      end
+    end
+
     it "registers Billing::Billable in ExposedConcerns" do
       assert_file "engines/billing/.rubocop.yml" do |content|
         expect(content).to include("Billing::Billable")
       end
+    end
+
+    it "engine.rb auto-includes Billable into the configured billable_class" do
+      assert_file "engines/billing/lib/billing/engine.rb" do |content|
+        expect(content).to include("config.to_prepare")
+        expect(content).to include("Billing.configuration.billable_class")
+        expect(content).to include("include(Billing::Billable)")
+      end
+    end
+
+    it "wire_into_host does NOT inject Billing::Billable into the host User" do
+      gen_path = File.expand_path("../../../lib/generators/seams/billing/billing_generator.rb", __dir__)
+      content  = File.read(gen_path)
+      # Pre-Wave-9 the generator called host_inject_include_in_user("Billing::Billable").
+      # Post-Wave-9 the engine wires Billable via Billing.configuration.billable_class
+      # at boot, so there is no host User edit.
+      expect(content).not_to match(/host_inject_include_in_user\(["']Billing::Billable["']\)/)
     end
   end
 
@@ -329,6 +376,19 @@ RSpec.describe Seams::Generators::BillingGenerator do
       expect(content).to include("create_table :billing_subscriptions")
     end
 
+    it "billing_subscriptions has account_id (uuid) and indexes it" do
+      # Post-Wave-9: account_id (UUID) is the local FK to
+      # Accounts::Account. No DB-level FK because the engines may
+      # live in different schemas / databases — application-layer
+      # integrity only.
+      pattern = File.join(destination_root, "engines/billing/db/migrate", "*_create_billing_subscriptions.rb")
+      content = File.read(Dir[pattern].first)
+      expect(content).to match(/t\.uuid\s+:account_id,\s+null: false/)
+      expect(content).to include("add_index :billing_subscriptions, :account_id")
+      expect(content).not_to include(":user_id")
+      expect(content).not_to include(":host_user_id")
+    end
+
     it "creates billing_invoices migration with customer_ref + subscription_ref columns" do
       pattern = File.join(destination_root, "engines/billing/db/migrate", "*_create_billing_invoices.rb")
       file    = Dir[pattern].first
@@ -343,6 +403,39 @@ RSpec.describe Seams::Generators::BillingGenerator do
         ":paid_at"
       ].each { |needle| expect(content).to include(needle) }
       expect(content).to match(/add_index :billing_invoices, :gateway_ref,\s+unique: true/)
+    end
+
+    it "billing_invoices has account_id (uuid)" do
+      pattern = File.join(destination_root, "engines/billing/db/migrate", "*_create_billing_invoices.rb")
+      content = File.read(Dir[pattern].first)
+      expect(content).to match(/t\.uuid\s+:account_id,\s+null: false/)
+      expect(content).to include("add_index :billing_invoices, :account_id")
+      expect(content).not_to include(":user_id")
+      expect(content).not_to include(":host_user_id")
+    end
+
+    it "billing_lifetime_passes has account_id (uuid)" do
+      content = read_lifetime_passes_migration
+      expect(content).to match(/t\.uuid\s+:account_id,\s+null: false/)
+    end
+
+    it "billing_lifetime_passes renames granted_by/revoked_by columns to identity-scoped" do
+      content = read_lifetime_passes_migration
+      expect(content).to include(":granted_by_identity_id")
+      expect(content).to include(":revoked_by_identity_id")
+    end
+
+    it "billing_lifetime_passes has no user_id-flavoured stale columns" do
+      content = read_lifetime_passes_migration
+      %i[granted_by_user_id revoked_by_user_id user_id host_user_id].each do |stale|
+        expect(content).not_to include(":#{stale}")
+      end
+    end
+
+    def read_lifetime_passes_migration
+      pattern = File.join(destination_root, "engines/billing/db/migrate",
+                          "*_create_billing_lifetime_passes.rb")
+      File.read(Dir[pattern].first)
     end
 
     it "creates billing_webhook_events migration with unique gateway_event_id index" do
@@ -401,11 +494,14 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
-    it "ships LifetimePass model + dedicated migration with unique (customer_ref, plan_ref)" do
+    it "ships LifetimePass model + dedicated migration with unique (account_id, plan_ref)" do
+      # Post-Wave-9: the unique constraint is on (account_id, plan_ref)
+      # because the entitlement belongs to the tenant Account, not to
+      # the gateway-side customer record.
       assert_file "engines/billing/app/models/billing/lifetime_pass.rb" do |content|
         expect(content).to include("class LifetimePass < ApplicationRecord")
         expect(content).to include("self.table_name = \"billing_lifetime_passes\"")
-        expect(content).to include("validates :customer_ref, uniqueness: { scope: :plan_ref")
+        expect(content).to include("validates :account_id, uniqueness: { scope: :plan_ref")
       end
       ltd_migration = Dir.glob(File.join(destination_root, "engines/billing/db/migrate/*_create_billing_lifetime_passes.rb")).first
       expect(ltd_migration).not_to be_nil
@@ -679,6 +775,11 @@ RSpec.describe Seams::Generators::BillingGenerator do
       # concurrent signups can both miss + both POST. The fix:
       # SHA-256(email:scope) → Stripe Idempotency-Key header
       # (https://docs.stripe.com/api/idempotent_requests).
+      # Post-Wave-9 the scope is `account_id` — the tenant the
+      # Stripe customer represents — so two members of the same
+      # Account who happen to share an email don't get two
+      # customers, and two members of *different* Accounts with the
+      # same email do get separate customers (one per tenant).
       assert_file "engines/billing/app/services/billing/customers/find_or_create_service.rb" do |content|
         [
           'require "digest"',
@@ -686,7 +787,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
           "def idempotency_key",
           "Digest::SHA256.hexdigest",
           "seams:billing:customer:",
-          "@metadata[:host_user_id]",
+          "@metadata[:account_id]",
           "docs.stripe.com/api/idempotent_requests"
         ].each { |needle| expect(content).to include(needle) }
       end

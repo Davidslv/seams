@@ -30,11 +30,11 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "engine entry point" do
-    it "registers the four canonical auth events in the engine initializer" do
+    it "registers the canonical auth events in the engine initializer" do
       assert_file "engines/auth/lib/auth/engine.rb" do |content|
-        expect(content).to include('Seams::EventRegistry.register("user.signed_up.auth"')
-        expect(content).to include('Seams::EventRegistry.register("user.signed_in.auth"')
-        expect(content).to include('Seams::EventRegistry.register("user.signed_out.auth"')
+        expect(content).to include('Seams::EventRegistry.register("identity.signed_up.auth"')
+        expect(content).to include('Seams::EventRegistry.register("identity.signed_in.auth"')
+        expect(content).to include('Seams::EventRegistry.register("identity.signed_out.auth"')
         expect(content).to include('Seams::EventRegistry.register("session.expired.auth"')
       end
     end
@@ -47,11 +47,13 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "models" do
-    it "creates the Auth::User model with has_secure_password and table mapping" do
-      assert_file "engines/auth/app/models/auth/user.rb" do |content|
-        expect(content).to include("class User < ApplicationRecord")
+    it "creates the Auth::Identity model with has_secure_password and table mapping" do
+      assert_file "engines/auth/app/models/auth/identity.rb" do |content|
+        expect(content).to include("class Identity < ApplicationRecord")
         expect(content).to include("has_secure_password")
-        expect(content).to include('self.table_name = "auth_users"')
+        expect(content).to include('self.table_name = "auth_identities"')
+        # Rails 8 reset_token feature is on by default — no opt-out workaround.
+        expect(content).not_to include("reset_token: false")
       end
     end
 
@@ -60,6 +62,7 @@ RSpec.describe Seams::Generators::AuthGenerator do
         expect(content).to include("class Session < ApplicationRecord")
         expect(content).to include("SecureRandom.hex(32)")
         expect(content).to include("Auth.configuration.session_ttl")
+        expect(content).to include("belongs_to :identity")
       end
     end
 
@@ -68,18 +71,25 @@ RSpec.describe Seams::Generators::AuthGenerator do
         expect(content).to include("self.abstract_class = true")
       end
     end
+
+    it "creates Auth::Current with an :identity attribute" do
+      assert_file "engines/auth/app/models/auth/current.rb" do |content|
+        expect(content).to include("class Current < ActiveSupport::CurrentAttributes")
+        expect(content).to include("attribute :identity")
+      end
+    end
   end
 
   describe "controllers" do
-    it "creates SessionsController that delegates to Auth::AuthenticateUser" do
+    it "creates SessionsController that delegates to Auth::AuthenticateIdentity" do
       assert_file "engines/auth/app/controllers/auth/sessions_controller.rb" do |content|
-        expect(content).to include("Auth::AuthenticateUser.call")
+        expect(content).to include("Auth::AuthenticateIdentity.call")
       end
     end
 
-    it "creates RegistrationsController that delegates to Auth::RegisterUser" do
+    it "creates RegistrationsController that delegates to Auth::RegisterIdentity" do
       assert_file "engines/auth/app/controllers/auth/registrations_controller.rb" do |content|
-        expect(content).to include("Auth::RegisterUser.call")
+        expect(content).to include("Auth::RegisterIdentity.call")
       end
     end
 
@@ -92,25 +102,31 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "services" do
-    it "creates Auth::RegisterUser that publishes user.signed_up.auth" do
-      assert_file "engines/auth/app/services/auth/register_user.rb" do |content|
-        expect(content).to include("class RegisterUser")
-        expect(content).to include('"user.signed_up.auth"')
+    it "creates Auth::RegisterIdentity that publishes identity.signed_up.auth" do
+      assert_file "engines/auth/app/services/auth/register_identity.rb" do |content|
+        expect(content).to include("class RegisterIdentity")
+        expect(content).to include('"identity.signed_up.auth"')
       end
     end
 
-    it "creates Auth::AuthenticateUser that publishes user.signed_in.auth" do
-      assert_file "engines/auth/app/services/auth/authenticate_user.rb" do |content|
-        expect(content).to include("class AuthenticateUser")
-        expect(content).to include('"user.signed_in.auth"')
+    it "creates Auth::AuthenticateIdentity that publishes identity.signed_in.auth" do
+      assert_file "engines/auth/app/services/auth/authenticate_identity.rb" do |content|
+        expect(content).to include("class AuthenticateIdentity")
+        expect(content).to include('"identity.signed_in.auth"')
       end
     end
 
-    it "creates Auth::ResetPassword with two-phase request/complete API" do
+    it "creates Auth::ResetPassword backed by Rails 8 has_secure_password reset_token", :aggregate_failures do
       assert_file "engines/auth/app/services/auth/reset_password.rb" do |content|
         expect(content).to include("def request")
         expect(content).to include("def complete")
-        expect(content).to include("TOKEN_TTL")
+        expect(content).to include("find_by_password_reset_token")
+        # No more column-based token / TOKEN_TTL constant — Rails 8
+        # signed_id has built-in expiry. The column-based assignments
+        # are gone (only a doc-comment may mention the old column).
+        expect(content).not_to include("TOKEN_TTL")
+        expect(content).not_to match(/password_reset_token: SecureRandom/)
+        expect(content).not_to match(/password_reset_token_sent_at:/)
       end
     end
   end
@@ -120,23 +136,26 @@ RSpec.describe Seams::Generators::AuthGenerator do
       assert_file "engines/auth/app/mailers/auth/passwords_mailer.rb" do |content|
         expect(content).to include("class PasswordsMailer < ::ApplicationMailer")
         expect(content).to include("def reset_email")
+        expect(content).to include("identity.password_reset_token")
       end
       assert_file "engines/auth/app/views/auth/passwords_mailer/reset_email.html.erb"
     end
   end
 
   describe "exposed concerns" do
-    it "creates Auth::Authenticatable" do
+    it "creates Auth::Authenticatable that links via identity_id (post-Wave-9 OPTIONAL)" do
       assert_file "engines/auth/lib/auth/concerns/authenticatable.rb" do |content|
         expect(content).to include("module Authenticatable")
         expect(content).to include('require "active_support/concern"')
+        expect(content).to include("auth_identity")
+        expect(content).to include("identity_id")
       end
     end
 
-    it "creates Auth::Authentication with current_user / authenticate_user! helpers" do
+    it "creates Auth::Authentication with current_identity / authenticate_identity! helpers" do
       assert_file "engines/auth/lib/auth/concerns/authentication.rb" do |content|
-        expect(content).to include("def current_user")
-        expect(content).to include("def authenticate_user!")
+        expect(content).to include("def current_identity")
+        expect(content).to include("def authenticate_identity!")
         expect(content).to include('require "active_support/concern"')
       end
     end
@@ -178,37 +197,34 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "migrations" do
-    it "creates the auth_users migration with a leading comment block" do
-      pattern = File.join(destination_root, "engines/auth/db/migrate", "*_create_auth_users.rb")
+    it "creates the auth_identities migration with a leading comment block" do
+      pattern = File.join(destination_root, "engines/auth/db/migrate", "*_create_auth_identities.rb")
       file    = Dir[pattern].first
       expect(file).not_to be_nil
 
       content = File.read(file)
       expect(content).to include("# What:")
       expect(content).to include("# Why:")
-      expect(content).to include("create_table :auth_users")
+      expect(content).to include("create_table :auth_identities")
+      expect(content).to include(":staff")
     end
 
-    it "creates the auth_sessions migration referencing auth_users" do
+    it "creates the auth_sessions migration referencing auth_identities" do
       pattern = File.join(destination_root, "engines/auth/db/migrate", "*_create_auth_sessions.rb")
       file    = Dir[pattern].first
       expect(file).not_to be_nil
 
       content = File.read(file)
       expect(content).to include("create_table :auth_sessions")
-      expect(content).to include("to_table: :auth_users")
+      expect(content).to include("to_table: :auth_identities")
+      expect(content).to include(":identity")
     end
 
-    it "creates the password-reset migration with token + sent_at columns" do
+    it "does NOT create a password_reset migration (Rails 8 signed_id replaces the column)" do
       pattern = File.join(destination_root,
                           "engines/auth/db/migrate",
-                          "*_add_password_reset_to_auth_users.rb")
-      file    = Dir[pattern].first
-      expect(file).not_to be_nil
-
-      content = File.read(file)
-      expect(content).to include("add_column :auth_users, :password_reset_token")
-      expect(content).to include("password_reset_token_sent_at")
+                          "*_add_password_reset_to_auth_*.rb")
+      expect(Dir[pattern]).to be_empty
     end
   end
 
@@ -224,13 +240,13 @@ RSpec.describe Seams::Generators::AuthGenerator do
   describe "documentation + specs" do
     it "rewrites the README with the canonical events table" do
       assert_file "engines/auth/README.md" do |content|
-        expect(content).to include("user.signed_up.auth")
+        expect(content).to include("identity.signed_up.auth")
         expect(content).to include("Auth::Authenticatable")
       end
     end
 
-    it "creates user_spec and session_spec files" do
-      assert_file "engines/auth/spec/models/auth/user_spec.rb"
+    it "creates identity_spec and session_spec files" do
+      assert_file "engines/auth/spec/models/auth/identity_spec.rb"
       assert_file "engines/auth/spec/models/auth/session_spec.rb"
     end
   end
@@ -293,10 +309,11 @@ RSpec.describe Seams::Generators::AuthGenerator do
         expect(content).to include("encrypts :access_token")
         expect(content).to include("encrypts :refresh_token")
         expect(content).to include("uniqueness: { scope: :provider")
+        expect(content).to include("belongs_to :identity")
       end
     end
 
-    it "create_auth_oauth_providers migration exists with unique indexes" do
+    it "create_auth_oauth_providers migration exists with unique indexes on identity_id" do
       pattern = File.join(destination_root,
                           "engines/auth/db/migrate",
                           "*_create_auth_oauth_providers.rb")
@@ -306,15 +323,15 @@ RSpec.describe Seams::Generators::AuthGenerator do
       content = File.read(file)
       expect(content).to include("create_table :auth_oauth_providers")
       expect(content).to include("add_index :auth_oauth_providers, %i[provider provider_uid], unique: true")
+      expect(content).to include("identity_id")
     end
 
     it "OAuth::Authenticator service publishes the canonical signed_up/signed_in events" do
       assert_file "engines/auth/app/services/auth/oauth/authenticator.rb" do |content|
         expect(content).to include("Auth.oauth(@provider)")
-        expect(content).to include("user.signed_up.auth")
-        expect(content).to include("user.signed_in.auth")
-        expect(content).to include("auth_user_id")
-        expect(content).to include("host_user_id")
+        expect(content).to include("identity.signed_up.auth")
+        expect(content).to include("identity.signed_in.auth")
+        expect(content).to include("identity_id")
       end
     end
 
@@ -359,12 +376,13 @@ RSpec.describe Seams::Generators::AuthGenerator do
           "def self.find_by_plaintext",
           "def expired?",
           "def touch_last_used!",
-          "scope :active"
+          "scope :active",
+          "belongs_to :identity"
         ].each { |needle| expect(content).to include(needle) }
       end
     end
 
-    it "ships the create_auth_api_tokens migration with unique digest index" do
+    it "ships the create_auth_api_tokens migration with unique digest index + identity_id reference" do
       pattern = File.join(destination_root,
                           "engines/auth/db/migrate",
                           "*_create_auth_api_tokens.rb")
@@ -375,6 +393,7 @@ RSpec.describe Seams::Generators::AuthGenerator do
       expect(content).to include("create_table :auth_api_tokens")
       expect(content).to include(":token_digest")
       expect(content).to include("add_index :auth_api_tokens, :token_digest, unique: true")
+      expect(content).to include(":identity")
     end
 
     it "ships GenerateApiToken service that returns plaintext once + publishes api_token.issued.auth" do
@@ -385,8 +404,7 @@ RSpec.describe Seams::Generators::AuthGenerator do
           "ApiToken::PREFIX",
           "SecureRandom.urlsafe_base64",
           "api_token.issued.auth",
-          "auth_user_id",
-          "host_user_id"
+          "identity_id"
         ].each { |needle| expect(content).to include(needle) }
       end
     end
@@ -404,8 +422,8 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
 
-    it "User model has_many :api_tokens" do
-      assert_file "engines/auth/app/models/auth/user.rb" do |content|
+    it "Identity model has_many :api_tokens" do
+      assert_file "engines/auth/app/models/auth/identity.rb" do |content|
         expect(content).to include("has_many :api_tokens")
       end
     end
@@ -417,8 +435,7 @@ RSpec.describe Seams::Generators::AuthGenerator do
           "api_token.destroy!",
           "Seams::Events::Publisher.publish(",
           '"api_token.revoked.auth"',
-          "auth_user_id:",
-          "host_user_id:",
+          "identity_id:",
           "api_token_id:",
           "token_prefix:"
         ].each { |needle| expect(content).to include(needle) }
@@ -479,11 +496,11 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "Phase 2A — factories + spec coverage" do
-    it "ships FactoryBot factories for users, sessions, oauth_providers, api_tokens" do
+    it "ships FactoryBot factories for identities, sessions, oauth_providers, api_tokens" do
       assert_file "engines/auth/spec/factories/auth.rb" do |content|
         [
           "FactoryBot.define",
-          "factory :auth_user",
+          "factory :auth_identity",
           "factory :auth_session",
           "factory :auth_oauth_provider",
           "factory :auth_api_token",
@@ -532,7 +549,7 @@ RSpec.describe Seams::Generators::AuthGenerator do
         [
           "RSpec.describe Auth::PasswordsMailer",
           "type: :mailer",
-          "described_class.reset_email(user)"
+          "described_class.reset_email(identity)"
         ].each { |needle| expect(content).to include(needle) }
       end
     end
@@ -546,8 +563,8 @@ RSpec.describe Seams::Generators::AuthGenerator do
   end
 
   describe "PII encryption (Wave 11 GDPR)" do
-    it "User#email is encrypted deterministically with downcase normalisation" do
-      assert_file "engines/auth/app/models/auth/user.rb" do |content|
+    it "Identity#email is encrypted deterministically with downcase normalisation" do
+      assert_file "engines/auth/app/models/auth/identity.rb" do |content|
         expect(content).to include("encrypts :email, deterministic: true, downcase: true")
       end
     end
@@ -573,9 +590,9 @@ RSpec.describe Seams::Generators::AuthGenerator do
           "namespace :seams",
           "namespace :auth",
           "task rotate_pii_encryption",
-          "Auth::User.find_each",
+          "Auth::Identity.find_each",
           "Auth::OAuth::Provider.find_each",
-          "user.update!(email: user.email)",
+          "identity.update!(email: identity.email)",
           "provider.update!(provider_uid: provider.provider_uid)"
         ].each { |needle| expect(content).to include(needle) }
       end

@@ -1,5 +1,5 @@
 <%%# Default welcome HTML template, used by AuthSubscriber when it %>
-<%%# consumes user.signed_up.auth. Override by dropping a file at %>
+<%%# consumes identity.signed_up.auth. Override by dropping a file at %>
 <%%# app/views/notifications/templates/welcome.html.erb in your host. %>
 <p>Welcome<%%= ", #{notification.owner.respond_to?(:name) ? notification.owner.name : ''}".rstrip %>!</p>
 

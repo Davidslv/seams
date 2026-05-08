@@ -283,12 +283,17 @@ module Seams
       end
 
       def create_dummy_app
+        # Post Wave 9: the dummy app does NOT ship a host User model.
+        # Billing addresses an Accounts::Account (the tenant), not a
+        # human; the engine specs use the dummy `accounts` table that
+        # ships in dummy_schema below. Hosts that keep a User model
+        # are unaffected — Billable is included into the configured
+        # tenant class (default Accounts::Account), not into User.
         Seams::Generators::DummyAppWriter.write!(
           engine_path: File.join(destination_root, "engines", ENGINE_NAME),
           engine_module: "Billing",
           mount_at: "/billing",
-          schema: dummy_schema,
-          host_user: dummy_host_user
+          schema: dummy_schema
         )
         template "spec/runtime/boot_spec.rb.tt",
                  engine_path("spec/runtime/billing_boot_spec.rb")
@@ -310,7 +315,12 @@ module Seams
         host_inject_gem("factory_bot_rails", "~> 6.4",  group: :test)
         host_inject_gem("webmock",           "~> 3.23", group: :test)
         host_inject_mount(engine_class: "Billing::Engine", at: "/billing")
-        host_inject_include_in_user("Billing::Billable")
+        # Post Wave 9: Billing::Billable is included into the
+        # configured tenant class (default Accounts::Account) at
+        # engine boot via Billing::Configuration#billable_class —
+        # not injected into a host User model. Hosts that customise
+        # the tenant class set Billing.configuration.billable_class
+        # in config/initializers/billing.rb.
       end
 
       def report_summary
@@ -375,8 +385,22 @@ module Seams
       end
 
       def dummy_schema
+        # Post Wave 9 — every billing table carries `account_id` (UUID)
+        # as a bare local FK to Accounts::Account. The dummy schema
+        # ships a minimal `accounts` table so the runtime specs can
+        # write rows and read them back; we don't ship the full
+        # accounts engine schema here because billing's tests don't
+        # exercise the accounts engine — they need just a tenant id.
         <<~SCHEMA
+          enable_extension "pgcrypto"
+
+          create_table :accounts, id: :uuid do |t|
+            t.string :name, null: false
+            t.timestamps
+          end
+
           create_table :billing_subscriptions do |t|
+            t.uuid     :account_id,         null: false
             t.string   :customer_ref,       null: false
             t.string   :plan_ref,           null: false
             t.string   :gateway_ref,        null: false
@@ -384,9 +408,11 @@ module Seams
             t.datetime :current_period_end
             t.timestamps
           end
+          add_index :billing_subscriptions, :account_id
           add_index :billing_subscriptions, :gateway_ref, unique: true
 
           create_table :billing_invoices do |t|
+            t.uuid       :account_id,       null: false
             t.string     :gateway_ref,      null: false
             t.string     :customer_ref,     null: false
             t.string     :subscription_ref
@@ -396,6 +422,7 @@ module Seams
             t.datetime   :paid_at
             t.timestamps
           end
+          add_index :billing_invoices, :account_id
           add_index :billing_invoices, :gateway_ref, unique: true
 
           create_table :billing_webhook_events do |t|
@@ -422,35 +449,21 @@ module Seams
           end
 
           create_table :billing_lifetime_passes do |t|
-            t.string   :customer_ref,        null: false
-            t.string   :plan_ref,            null: false
+            t.uuid     :account_id,                null: false
+            t.string   :customer_ref,              null: false
+            t.string   :plan_ref,                  null: false
             t.string   :gateway_ref
-            t.bigint   :granted_by_user_id
-            t.datetime :granted_at,          null: false
+            t.bigint   :granted_by_identity_id
+            t.datetime :granted_at,                null: false
             t.datetime :revoked_at
-            t.bigint   :revoked_by_user_id
+            t.bigint   :revoked_by_identity_id
             t.text     :notes
             t.timestamps
           end
-          add_index :billing_lifetime_passes, %i[customer_ref plan_ref], unique: true,
-                                                                         name: "index_billing_ltd_unique"
-
-          create_table :users do |t|
-            t.string :email
-            t.string :stripe_customer_id
-            t.timestamps
-          end
+          add_index :billing_lifetime_passes, :account_id
+          add_index :billing_lifetime_passes, %i[account_id plan_ref], unique: true,
+                                                                       name: "index_billing_ltd_unique"
         SCHEMA
-      end
-
-      def dummy_host_user
-        <<~RB
-          # frozen_string_literal: true
-
-          class User < ApplicationRecord
-            include Billing::Billable
-          end
-        RB
       end
     end
     # rubocop:enable Metrics/ClassLength

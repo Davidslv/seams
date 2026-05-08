@@ -1,0 +1,58 @@
+# frozen_string_literal: true
+
+# Configuration for the Notifications engine.
+#
+# Adapters
+# --------
+# Email defaults to Notifications::Adapters::ActionMailer (delegates to
+# the engine's NotificationMailer). SMS defaults to a no-op NullSms
+# adapter that logs and drops. Swap either by assigning a class name
+# (a string — resolved via constantize at delivery time so the host
+# doesn't have to require the adapter at boot):
+#
+#   Notifications.configure do |config|
+#     config.email_adapter = "MyApp::MailgunAdapter"
+#     config.sms_adapter   = "MyApp::TwilioAdapter"
+#   end
+#
+# Optional: Notifiable concern
+# ----------------------------
+# Notifications work without the concern — every Notification has a
+# polymorphic `owner`, and `Notifications::Notification.create!(owner: anything, ...)`
+# is the always-supported path.
+#
+# The concern is OPTIONAL sugar: it adds a `notifications` has_many
+# association and a `#notify(strategy:, template:)` helper to whatever
+# class includes it. Pick one of the patterns below if you want that
+# convenience.
+#
+# Pattern A — wire onto Auth::Identity (canonical post-Wave-9 host):
+#
+#   Rails.application.config.to_prepare do
+#     Auth::Identity.include(Notifications::Notifiable)
+#   end
+#
+# Pattern B — wire onto a host User class (hosts that keep their own
+# domain User alongside Auth::Identity):
+#
+#   class User < ApplicationRecord
+#     include Notifications::Notifiable
+#   end
+#
+# Pattern C — don't include the concern at all. Use
+# `Notifications::Notification.create!(owner: ..., template: ...)` or
+# the per-strategy classes directly.
+#
+# Default subscriber
+# ------------------
+# Notifications::AuthSubscriber listens for `identity.signed_up.auth`
+# and creates an InApp + Email welcome notification owned by the
+# Auth::Identity. To redirect the welcome notification at a different
+# owner (an Account, a Membership, a host User), copy
+# `engines/notifications/app/subscribers/notifications/auth_subscriber.rb`
+# into your host's app/subscribers/, change `OWNER_CLASS_NAME` and the
+# resolution rule, then re-attach in this initializer:
+#
+#   Rails.application.config.to_prepare do
+#     Notifications::AuthSubscriber.attach!
+#   end

@@ -2,6 +2,11 @@
 
 <%%= form_with url: billing.admin_lifetime_passes_path, scope: nil, local: true do %>
   <p>
+    <label>Account id (Accounts::Account#id, UUID):
+      <input type="text" name="account_id" required>
+    </label>
+  </p>
+  <p>
     <label>Customer ref (Stripe customer id):
       <input type="text" name="customer_ref" required>
     </label>

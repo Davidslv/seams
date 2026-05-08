@@ -2,6 +2,11 @@
 
 > Status: **implemented in commit `5dd68c0` and follow-up review fixes.**
 > Kept here as a record of the design decisions and the migration path for hosts upgrading from Wave ≤10. The "Scope" section below describes work that has already shipped; the rotation rake task is at `lib/generators/seams/auth/templates/lib/tasks/auth_pii.rake.tt`.
+>
+> **Wave-9 readers:** the snapshot below uses pre-Wave-9 vocabulary
+> (`Auth::User`, `auth_users`). Read every `Auth::User` as
+> `Auth::Identity` and every `auth_users` as `auth_identities` —
+> the column-level PII story is unchanged by the Wave 9 rename.
 
 ## Why this wave
 

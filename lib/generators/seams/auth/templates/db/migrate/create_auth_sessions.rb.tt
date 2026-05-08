@@ -7,7 +7,7 @@
 class CreateAuthSessions < ActiveRecord::Migration[7.1]
   def change
     create_table :auth_sessions do |t|
-      t.references :user,        null: false, foreign_key: { to_table: :auth_users }, index: true
+      t.references :identity,    null: false, foreign_key: { to_table: :auth_identities }, index: true
       t.string     :token,       null: false
       t.datetime   :expires_at,  null: false
       t.timestamps

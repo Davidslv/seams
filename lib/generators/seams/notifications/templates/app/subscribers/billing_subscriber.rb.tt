@@ -5,12 +5,18 @@ module Notifications
   # (which creates the InApp Notification out-of-band — never inline,
   # see Seams::Events::Publisher docstring).
   #
-  # Every subscribed event publishes the same canonical payload shape:
-  #   { gateway:, livemode:, customer_ref:, ref:, object_id:, object: }
+  # Every subscribed event publishes the same canonical Wave-9 payload
+  # shape:
+  #   { gateway:, livemode:, account_id:, customer_ref:, ref:, object_id:, object: }
   #
-  # `customer_ref` is the gateway-side customer id (e.g. cus_xxx). The
-  # host User is resolved via `stripe_customer_id` — the column
-  # `Billing::Billable` documents on the host's User model.
+  # `account_id` is the UUID of the Accounts::Account (the billing
+  # tenant) the event belongs to. Notifications attaches the resulting
+  # Notification row to that Account directly — the recipient model is
+  # whatever class the host configured as the billing tenant
+  # (`Billing.configuration.billable_class`, default
+  # "Accounts::Account"). One human Identity may belong to many
+  # Accounts; per-Account billing notifications belong with the tenant,
+  # not with the human.
   #
   # +.attach!+ is idempotent across Rails autoreload via
   # +Seams::Events::Publisher.attach_class+ — each event registers its
@@ -20,7 +26,6 @@ module Notifications
   class BillingSubscriber
     SUBSCRIBER_KEY = :notifications_billing_subscriber
     SUBSCRIBER_CLASS_NAME = "Notifications::BillingSubscriber"
-    HOST_USER_CLASS_NAME = "User"
 
     # (event_name => [handler_method, template]). Handler methods are
     # one-line wrappers around #enqueue — kept separate (rather than a
@@ -47,6 +52,18 @@ module Notifications
             method_name: method_name
           )
         end
+      end
+
+      # Owner class the billing subscriber attaches the Notification row
+      # to. Reads from `Billing.configuration.billable_class` so hosts
+      # with a custom tenant model (a host-defined `Workspace`, etc.) get
+      # the right `owner_type` without overriding this subscriber. Falls
+      # back to the canonical `"Accounts::Account"` if billing isn't
+      # configured.
+      def owner_class_name
+        return "Accounts::Account" unless defined?(Billing) && Billing.respond_to?(:configuration)
+
+        Billing.configuration.billable_class.to_s.presence || "Accounts::Account"
       end
 
       private
@@ -79,34 +96,31 @@ module Notifications
         enqueue(payload, EVENT_HANDLERS.fetch("lifetime.purchased.billing").last)
       end
 
+      # Wave 9: every canonical billing payload carries `account_id:`
+      # (the UUID of the Accounts::Account that owns the billing row)
+      # right next to `customer_ref:`. We address the notification at
+      # the tenant directly — no host-User lookup needed.
       def enqueue(payload, template)
-        host_user_id = host_user_id_for(payload[:customer_ref])
-        return unless host_user_id
-
-        Notifications::CreateNotificationJob.perform_later(
-          owner_class: HOST_USER_CLASS_NAME,
-          owner_id:    host_user_id,
-          template:    template,
-          strategy:    "in_app"
-        )
-      end
-
-      def host_user_id_for(customer_ref)
-        return nil if customer_ref.nil? || customer_ref.to_s.empty?
-
-        unless defined?(::User) && ::User.column_names.include?("stripe_customer_id")
+        account_id = payload[:account_id]
+        if account_id.nil? || account_id.to_s.empty?
           # Visible signal — a silent miss here looks identical to "no
-          # user matched", which makes "billing notifications never
-          # fire for ANY user" hard to debug. Log loudly once per call.
+          # recipient matched", which makes "billing notifications never
+          # fire" hard to debug. Log loudly once per call.
           Seams::Observability.adapter.warn(
             "notifications.billing_subscriber.skip",
             engine: "notifications",
-            reason: "host User class is not defined or has no stripe_customer_id column"
+            reason: "billing event missing account_id",
+            customer_ref: payload[:customer_ref]
           )
-          return nil
+          return
         end
 
-        ::User.where(stripe_customer_id: customer_ref).pick(:id)
+        Notifications::CreateNotificationJob.perform_later(
+          owner_class: owner_class_name,
+          owner_id:    account_id,
+          template:    template,
+          strategy:    "in_app"
+        )
       end
     end
   end

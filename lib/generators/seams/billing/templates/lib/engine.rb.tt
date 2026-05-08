@@ -38,5 +38,30 @@ module Billing
         end
       end
     end
+
+    # Auto-include Billing::Billable into the configured tenant class
+    # (default: Accounts::Account). Wired via a to_prepare hook so the
+    # host's accounts engine has had a chance to autoload its model
+    # first; safe to re-run because Module#include is idempotent. The
+    # host can opt out by setting `billable_class = nil`.
+    config.to_prepare do
+      target = Billing.configuration.billable_class
+      next if target.nil? || (target.respond_to?(:empty?) && target.empty?)
+
+      begin
+        # Accept either a String ("Accounts::Account") or a Class
+        # (Accounts::Account). String is the documented shape — late
+        # constantize sidesteps autoload-order issues — but a host
+        # that hardwires the class object (e.g. via `c.billable_class
+        # = User`) shouldn't blow up at boot just because Class
+        # doesn't respond to `.constantize`.
+        klass = target.is_a?(String) ? target.constantize : target
+        klass.include(Billing::Billable)
+      rescue NameError
+        # Tenant class not yet loaded (e.g. accounts engine not
+        # installed). Hosts that wire Billable manually will still
+        # work; this is a best-effort auto-include.
+      end
+    end
   end
 end

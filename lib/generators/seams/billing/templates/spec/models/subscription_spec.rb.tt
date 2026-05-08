@@ -4,12 +4,23 @@ require "rails_helper"
 
 RSpec.describe Billing::Subscription do
   let(:valid_attrs) do
-    { customer_ref: "cus_x", plan_ref: "price_x", gateway_ref: "sub_x", status: "active" }
+    {
+      account_id:   SecureRandom.uuid,
+      customer_ref: "cus_x",
+      plan_ref:     "price_x",
+      gateway_ref:  "sub_x",
+      status:       "active"
+    }
   end
 
   describe "validations" do
     it "requires gateway_ref" do
       sub = described_class.new(valid_attrs.merge(gateway_ref: nil))
+      expect(sub).not_to be_valid
+    end
+
+    it "requires account_id" do
+      sub = described_class.new(valid_attrs.merge(account_id: nil))
       expect(sub).not_to be_valid
     end
 

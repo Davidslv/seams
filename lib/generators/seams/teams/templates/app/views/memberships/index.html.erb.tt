@@ -1,17 +1,21 @@
 <%%# Members table. Owners + admins can remove a member or change %>
-<%%# their role; members read-only see the list. %>
+<%%# their role; members read-only see the list. The Identity column %>
+<%%# shows the raw identity_id — hosts that want to render the human's %>
+<%%# email/name should override this view and look the Identity up %>
+<%%# themselves (cross-engine boundary keeps Teams from joining to %>
+<%%# auth_identities at the data layer). %>
 <h1>Members of <%%= @team.name %></h1>
 
 <%%= link_to "← Back to team", @team %>
 
 <table>
   <thead>
-    <tr><th>User</th><th>Role</th><th>Joined</th><th></th></tr>
+    <tr><th>Identity</th><th>Role</th><th>Joined</th><th></th></tr>
   </thead>
   <tbody>
     <%% @memberships.each do |membership| %>
       <tr>
-        <td><%%= membership.user_id %></td>
+        <td><%%= membership.identity_id %></td>
         <td><%%= membership.role.titleize %></td>
         <td><%%= membership.created_at.to_date %></td>
         <td>

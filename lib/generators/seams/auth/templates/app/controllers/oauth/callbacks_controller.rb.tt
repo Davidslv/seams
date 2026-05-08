@@ -60,7 +60,7 @@ module Auth
             expires:  result.session.expires_at
           }
           redirect_to Auth.configuration.after_sign_in_url,
-                      notice: result.new_user ? "Welcome!" : "Signed in"
+                      notice: result.new_identity ? "Welcome!" : "Signed in"
         else
           redirect_to Auth.configuration.after_sign_out_url, alert: result.error
         end

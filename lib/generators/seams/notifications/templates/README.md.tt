@@ -4,6 +4,15 @@
 > Seams-powered host. STI delivery strategies, ice_cube schedules,
 > swappable adapters.
 
+**Requires:** soft requirements only.
+- The `auth` engine: `Notifications::AuthSubscriber.owner_class_name`
+  resolves the recipient via `Auth::Identity` by default.
+- The `accounts` and/or `billing` engines: the `BillingSubscriber`
+  resolves the recipient via `Billing.configuration.billable_class`
+  (default `"Accounts::Account"`). Without billing the subscriber
+  attaches no handlers; without accounts, set `billable_class` to
+  whatever class the host uses for the billing recipient.
+
 ## Model
 
 `Notifications::Notification` is an STI base. Three concrete
@@ -20,21 +29,44 @@ Every Notification belongs to an `owner` (polymorphic), names a
 serialised to a `schedule_data` jsonb column. `next_delivery_at` is
 the indexed cache the recurring sweeper reads from.
 
+### Polymorphic owner
+
+The Notification's `owner` is polymorphic — an `owner_type` /
+`owner_id` pair. After Wave 9 the canonical "human" is
+`Auth::Identity`, but **any** ActiveRecord model can own
+notifications: an Account (the tenant), a Membership (Identity in
+Account), or a host-defined model. Hosts mix and match without any
+schema changes:
+
+```ruby
+Notifications::Notification.create!(owner: identity,    template: "welcome")
+Notifications::Notification.create!(owner: account,     template: "billing/invoice_paid")
+Notifications::Notification.create!(owner: membership,  template: "team/role_changed")
+Notifications::Notification.create!(owner: project,     template: "project/deadline")
+```
+
 ## Scheduling
+
+The examples below assume the host has included
+`Notifications::Notifiable` on `Auth::Identity` (or another model)
+to pick up the `#notify` helper — see "Notifiable is optional"
+below. Hosts that skip the concern call
+`Notifications::Notification.create!(owner: ..., template: ...)`
+directly.
 
 ```ruby
 # Send right now (default if you skip schedule_config)
-user.notify(strategy: :email, template: "welcome")
+identity.notify(strategy: :email, template: "welcome")
 
 # Send in 24h
-user.notify(
+identity.notify(
   strategy: :email,
   template: "trial_ending",
   schedule_config: { starts_at: 1.day.from_now, frequency: "once" }
 )
 
 # Weekly digest
-user.notify(
+identity.notify(
   strategy: :email,
   template: "weekly_digest",
   schedule_config: {
@@ -45,7 +77,7 @@ user.notify(
 )
 
 # Monthly, capped at 12 occurrences
-user.notify(
+identity.notify(
   strategy: :email,
   template: "anniversary",
   schedule_config: {
@@ -64,7 +96,7 @@ sched = IceCube::Schedule.new(Time.current)
 sched.add_recurrence_rule(
   IceCube::Rule.weekly.day(:monday).hour_of_day(9)
 )
-notification = user.notifications.create!(
+notification = identity.notifications.create!(
   type:     "Notifications::Strategies::Email",
   template: "monday_morning"
 )
@@ -91,15 +123,19 @@ production:
 
 | Event name | Payload | Emitted when |
 | --- | --- | --- |
-| `notification.queued.notifications`     | `{ id:, type:, owner_id: }`           | `Notification#send!` begins |
-| `notification.delivered.notifications`  | `{ id:, type:, owner_id: }`           | `dispatch!` succeeded + Delivery recorded |
-| `notification.failed.notifications`     | `{ id:, type:, error: }`              | `dispatch!` raised |
+| `notification.queued.notifications`     | `{ id:, type:, owner_type:, owner_id: }`  | `Notification#send!` begins |
+| `notification.delivered.notifications`  | `{ id:, type:, owner_type:, owner_id: }`  | `dispatch!` succeeded + Delivery recorded |
+| `notification.failed.notifications`     | `{ id:, type:, error: }`                  | `dispatch!` raised |
+
+Owner reference uses `owner_type` + `owner_id` (the polymorphic
+columns) — Notifications are addressed at any model, so subscribers
+need both halves to resolve a recipient.
 
 ## Events consumed
 
 | Event name | Subscriber | What it does |
 | --- | --- | --- |
-| `user.signed_up.auth` | `Notifications::AuthSubscriber` | Creates an InApp + Email welcome notification (subject to NotificationPreference). |
+| `identity.signed_up.auth` | `Notifications::AuthSubscriber` | Creates an InApp + Email welcome notification owned by the Auth::Identity (subject to NotificationPreference). |
 | `subscription.created.billing`  | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_started`. |
 | `subscription.updated.billing`  | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_updated`. |
 | `subscription.canceled.billing` | `Notifications::BillingSubscriber` | InApp notification, template `billing/subscription_canceled`. |
@@ -108,26 +144,32 @@ production:
 | `lifetime.granted.billing`      | `Notifications::BillingSubscriber` | InApp notification, template `billing/lifetime_granted`. |
 | `lifetime.purchased.billing`    | `Notifications::BillingSubscriber` | InApp notification, template `billing/lifetime_purchased`. |
 
-The Billing subscriber resolves the host User by
-`stripe_customer_id` (the column the `Billing::Billable` concern
-documents). It only attaches when `Billing::Engine` is loaded.
+The Billing subscriber resolves the recipient by reading
+`Billing.configuration.billable_class` (default `Accounts::Account`)
+and looking up the row by `account_id` carried on the billing
+event payload. It only attaches when `Billing::Engine` is loaded.
+Hosts that want a different recipient (e.g. a domain User on top
+of `Auth::Identity`) override `Billing.configuration.billable_class`
+in their initializer.
 
 ### Cross-engine dependencies
 
-The subscribers in this engine reach into other engines' models and
-the host User class. This dependency direction is intentional but
-worth documenting explicitly:
+The subscribers in this engine resolve owners by reaching into other
+engines' models. This dependency direction is intentional but worth
+documenting explicitly:
 
 | Subscriber | Reaches into | Why |
 | --- | --- | --- |
-| `Notifications::AuthSubscriber`    | host `::User` class    | resolve owner from `host_user_id` payload |
-| `Notifications::BillingSubscriber` | host `::User` class    | resolve owner from `customer_ref` via `stripe_customer_id` column |
-| `Notifications::CreateNotificationJob` | host `::User` class | resolve owner before creating the Notification |
+| `Notifications::AuthSubscriber`    | `Auth::Identity`                              | resolve owner from `identity_id` payload (the human who just signed up) |
+| `Notifications::BillingSubscriber` | `Billing.configuration.billable_class` (default `Accounts::Account`) | resolve owner from `account_id` payload — the tenant the subscription / invoice / lifetime grant belongs to |
+| `Notifications::CreateNotificationJob` | any AR class                              | resolve owner via `owner_class.constantize.find_by(id: owner_id)` |
 
-If you have a host whose user-facing class isn't `::User`, the
-default subscribers won't find owners. Override by writing your own
-subscriber that publishes `Notifications::CreateNotificationJob`
-with your class name in `owner_class:`.
+If you want a different owner for the welcome notification (an
+Account, a Membership, a host User), copy
+`engines/notifications/app/subscribers/notifications/auth_subscriber.rb`
+into your host, change `OWNER_CLASS_NAME`, then re-attach in
+`config/initializers/notifications.rb`. The Notification table is
+fully polymorphic — no schema changes needed.
 
 ### Subscribers enqueue, never block the publisher
 
@@ -141,7 +183,44 @@ Publishing should never wait on the bus.
 
 | Concern | Purpose |
 | --- | --- |
-| `Notifications::Notifiable` | Mix into the host's user model for `notifications` association + `#notify(strategy:, template:, schedule_config:)` helper. |
+| `Notifications::Notifiable` | OPTIONAL. Mix into any model that should expose `notifications` + `#notify(strategy:, template:, schedule_config:)` sugar. |
+
+### Notifiable is optional
+
+The `Notifications::Notification` row is polymorphic — every record
+has an `owner_type` / `owner_id` pair, and `create!(owner: anything, template: ...)`
+works with any ActiveRecord model. The `Notifiable` concern is just
+sugar for the receiving side; you don't need it.
+
+Three include patterns hosts can pick from:
+
+1. **Wire onto `Auth::Identity`** (canonical post-Wave-9 host —
+   the "human" is `Auth::Identity`, no host User):
+
+   ```ruby
+   # config/initializers/notifications.rb
+   Rails.application.config.to_prepare do
+     Auth::Identity.include(Notifications::Notifiable)
+   end
+   ```
+
+2. **Wire onto a host User class** (hosts that keep their own User
+   alongside `Auth::Identity`):
+
+   ```ruby
+   class User < ApplicationRecord
+     include Notifications::Notifiable
+   end
+   ```
+
+3. **Don't include the concern at all.** Use
+   `Notifications::Notification.create!(owner: ..., template: ...)`
+   directly — the polymorphic owner column accepts any AR record.
+
+Hosts including the concern on a non-Identity class (an Account, a
+host User keyed by a different `identity_id`, etc.) should override
+`#notification_preference_identity_id` so preference lookups key off
+the right Identity.
 
 ## Adapters
 
@@ -168,12 +247,15 @@ the template via the local variable `notification` — use
 
 ## Preferences
 
-`Notifications::NotificationPreference` lets a user opt out by
-channel + notification_type:
+`Notifications::NotificationPreference` lets an Identity opt out by
+channel + notification_type. The table keys off `identity_id` (not
+the polymorphic Notification owner) — channel preferences live with
+the human, not with whatever model a notification happens to be
+addressed at:
 
 ```ruby
 Notifications::NotificationPreference.enabled?(
-  user_id: 42, channel: "email", notification_type: "weekly_digest"
+  identity_id: 42, channel: "email", notification_type: "weekly_digest"
 ) # => true (default) | false (if a row says enabled: false)
 ```
 

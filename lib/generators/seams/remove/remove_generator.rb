@@ -48,13 +48,31 @@ module Seams
           mount: "Notifications::Engine",
           user_includes: %w[Notifications::Notifiable]
         },
+        # Post-Wave-9: billing no longer injects Billing::Billable
+        # into the host User — the engine includes it into the
+        # configured tenant class (default Accounts::Account) at
+        # boot via Billing.configuration.billable_class. The only
+        # host-side edit billing makes is the mount line, so unmount
+        # is the only reverse-edit we need.
         "billing" => {
           mount: "Billing::Engine",
-          user_includes: %w[Billing::Billable]
+          user_includes: %w[]
         },
         "teams" => {
+          # Wave 9 removed Teams::Teamable — there's no canonical host
+          # User concern to remove. The `mount Teams::Engine` line is
+          # the only host edit the teams generator makes, so unmount
+          # is the only reverse-edit we need here.
           mount: "Teams::Engine",
-          user_includes: %w[Teams::Teamable]
+          user_includes: %w[]
+        },
+        # Wave 9 — accounts engine. Like billing/teams post-Wave-9, the
+        # accounts generator does NOT inject anything into the host User
+        # (the canonical demo doesn't have one). Mount is the only
+        # host-side edit, so unmount is the only reverse-edit we need.
+        "accounts" => {
+          mount: "Accounts::Engine",
+          user_includes: %w[]
         }
       }.freeze
 

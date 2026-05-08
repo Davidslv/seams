@@ -87,7 +87,7 @@ RSpec.describe "Phase 3 integration", type: :integration do
   it "registering all engines' events does not collide" do
     Seams::EventRegistry.reset!
 
-    auth_events = %w[user.signed_up.auth user.signed_in.auth user.signed_out.auth session.expired.auth]
+    auth_events = %w[identity.signed_up.auth identity.signed_in.auth identity.signed_out.auth session.expired.auth]
     notif_events = %w[notification.queued.notifications notification.delivered.notifications notification.failed.notifications]
     billing_events = %w[subscription.created.billing subscription.updated.billing
                         subscription.canceled.billing invoice.paid.billing invoice.failed.billing]

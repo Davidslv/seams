@@ -6,13 +6,13 @@ RSpec.describe Teams::Membership do
   let(:team) { Teams::Team.create!(name: "Acme") }
 
   it "rejects unknown roles" do
-    m = described_class.new(team: team, user_id: 1, role: "made_up")
+    m = described_class.new(team: team, identity_id: 1, role: "made_up")
     expect(m).not_to be_valid
   end
 
-  it "is unique on (team_id, user_id)" do
-    described_class.create!(team: team, user_id: 1, role: "member")
-    dup = described_class.new(team: team, user_id: 1, role: "admin")
+  it "is unique on (team_id, identity_id)" do
+    described_class.create!(team: team, identity_id: 1, role: "member")
+    dup = described_class.new(team: team, identity_id: 1, role: "admin")
     expect(dup).not_to be_valid
   end
 

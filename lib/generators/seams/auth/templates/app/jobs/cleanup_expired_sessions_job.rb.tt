@@ -17,12 +17,11 @@ module Auth
 
     def perform
       Auth::Session.where(expires_at: ..Time.current).find_each(batch_size: BATCH_SIZE) do |session|
-        user = session.user
+        identity = session.identity
         Seams::Events::Publisher.publish(
           "session.expired.auth",
-          auth_user_id: user&.id,
-          host_user_id: user&.host_user_id,
-          session_id:   session.id
+          identity_id: identity&.id,
+          session_id:  session.id
         )
         session.destroy
       end

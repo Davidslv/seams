@@ -188,7 +188,8 @@ module Seams
           engine_module: "Notifications",
           mount_at: "/notifications",
           schema: dummy_schema,
-          host_user: dummy_host_user
+          host_user: dummy_host_user,
+          host_user_path: "app/models/auth/identity.rb"
         )
         # Wire the runtime spec templates into the generator output —
         # they were orphaned in templates/ pre-Wave-12 (the integration
@@ -218,13 +219,27 @@ module Seams
         File.write(rubocop_path, contents)
       end
 
+      def create_initializer
+        # Host-side initializer — documents the configure-adapters
+        # entry point AND the optional Notifiable concern include
+        # patterns. Wave 9 dropped the auto-include into the host
+        # User; hosts now opt in by uncommenting one of the patterns
+        # below (or leave the concern uninvoked — the polymorphic
+        # owner column doesn't require it).
+        template "config/initializers/notifications.rb.tt",
+                 File.join(destination_root, "config/initializers/notifications.rb")
+      end
+
       def wire_into_host
         host_inject_gem("ice_cube", ">= 0.16")
         # factory_bot_rails powers the engine's spec/factories/*. Lives
         # in the host's test group only.
         host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
         host_inject_mount(engine_class: "Notifications::Engine", at: "/notifications")
-        host_inject_include_in_user("Notifications::Notifiable")
+        # Wave 9: no auto-include into a host User. The canonical demo
+        # has no host User after Wave 9 (the "human" is Auth::Identity).
+        # Hosts wire `Notifications::Notifiable` themselves via the
+        # initializer template — see config/initializers/notifications.rb.
       end
 
       def report_summary
@@ -239,8 +254,10 @@ module Seams
         say "           class: Notifications::SendDueNotificationsJob"
         say "           schedule: every minute"
         say "    4. Configure adapters in config/initializers/notifications.rb"
+        say "    5. (optional) Include Notifications::Notifiable on Auth::Identity"
+        say "       via the same initializer — see the file's comments."
         say ""
-        say "  Subscribed to: user.signed_up.auth (creates an InApp + Email Notification)"
+        say "  Subscribed to: identity.signed_up.auth (creates an InApp + Email Notification)"
         say ""
       end
 
@@ -275,16 +292,32 @@ module Seams
       end
 
       def dummy_schema
+        # Wave 9: the dummy ships an `auth_identities` table (not
+        # `users`) so spec fixtures can construct a realistic owner
+        # for polymorphic Notifications. The dummy doesn't load the
+        # auth gem itself — a slim Auth::Identity stub model lives in
+        # spec/dummy/app/models/auth/identity.rb (see dummy_host_user
+        # below) and includes Notifiable so existing helpers
+        # (`unread_in_app_notifications`, etc.) keep working.
+        # The schema mirrors the auth + accounts engine shape (text
+        # email, password_digest, staff flag + partial index) so
+        # cross-engine fixture sharing doesn't drift.
         <<~SCHEMA
-          create_table :users do |t|
-            t.string :email, null: false
+          create_table :auth_identities do |t|
+            t.text    :email,            null: false
+            t.string  :password_digest,  null: false, default: ""
+            t.boolean :staff,            null: false, default: false
             t.timestamps
           end
-          add_index :users, :email, unique: true
+          add_index :auth_identities, :email, unique: true
+          add_index :auth_identities, :staff, where: "staff = true"
 
           create_table :notifications do |t|
             t.string  :type,             null: false
-            t.references :owner,         polymorphic: true, null: false, index: true
+            # Polymorphic owner stored as strings so the column holds
+            # bigint Identity IDs and UUID Account IDs simultaneously.
+            t.string  :owner_type,       null: false
+            t.string  :owner_id,         null: false
             t.string  :recipient
             t.string  :template,         null: false
             t.jsonb   :schedule_data
@@ -292,17 +325,18 @@ module Seams
             t.datetime :read_at
             t.timestamps
           end
+          add_index :notifications, %i[owner_type owner_id]
           add_index :notifications, :next_delivery_at
 
           create_table :notification_preferences do |t|
-            t.bigint  :user_id,           null: false
+            t.bigint  :identity_id,       null: false
             t.string  :channel,           null: false
             t.string  :notification_type
             t.boolean :enabled,           null: false, default: true
             t.timestamps
           end
-          add_index :notification_preferences, %i[user_id channel notification_type], unique: true,
-                                                                                       name: "index_notification_prefs_unique"
+          add_index :notification_preferences, %i[identity_id channel notification_type], unique: true,
+                                                                                           name: "index_notification_prefs_unique"
 
           create_table :notification_deliveries do |t|
             t.references :notification, null: false, foreign_key: true, index: true
@@ -312,12 +346,20 @@ module Seams
         SCHEMA
       end
 
+      # Slim Auth::Identity stub for the dummy app. Stands in for the
+      # real Auth::Identity (which lives in the auth engine, not loaded
+      # by the dummy) so notifications specs can build a polymorphic
+      # owner. Includes Notifiable so the bell + #notify helpers
+      # exercise the same code path the canonical seams host uses.
       def dummy_host_user
         <<~RB
           # frozen_string_literal: true
 
-          class User < ApplicationRecord
-            include Notifications::Notifiable
+          module Auth
+            class Identity < ApplicationRecord
+              self.table_name = "auth_identities"
+              include Notifications::Notifiable
+            end
           end
         RB
       end

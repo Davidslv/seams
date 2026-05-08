@@ -24,8 +24,8 @@ namespace :seams do
   namespace :auth do
     desc "Re-encrypt PII columns (email, provider_uid) — host upgrades from Wave ≤10"
     task rotate_pii_encryption: :environment do
-      counts   = { users: 0, oauth_providers: 0 }
-      failures = { users: [], oauth_providers: [] }
+      counts   = { identities: 0, oauth_providers: 0 }
+      failures = { identities: [], oauth_providers: [] }
 
       # `update!` runs ALL validations. Legacy rows whose data fails
       # today's regex (e.g. emails without @, stale imports) would
@@ -34,11 +34,11 @@ namespace :seams do
       # the failure, and keep going — the operator gets a final report
       # of which rows still need attention before flipping
       # support_unencrypted_data back to false.
-      Auth::User.find_each do |user|
-        user.update!(email: user.email)
-        counts[:users] += 1
+      Auth::Identity.find_each do |identity|
+        identity.update!(email: identity.email)
+        counts[:identities] += 1
       rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
-        failures[:users] << { id: user.id, error: "#{e.class}: #{e.message}" }
+        failures[:identities] << { id: identity.id, error: "#{e.class}: #{e.message}" }
       end
 
       Auth::OAuth::Provider.find_each do |provider|
@@ -49,7 +49,7 @@ namespace :seams do
       end
 
       puts "Auth PII rotation complete:"
-      puts "  users           re-encrypted: #{counts[:users]}, failures: #{failures[:users].size}"
+      puts "  identities      re-encrypted: #{counts[:identities]}, failures: #{failures[:identities].size}"
       puts "  oauth_providers re-encrypted: #{counts[:oauth_providers]}, failures: #{failures[:oauth_providers].size}"
 
       if failures.values.any?(&:any?)

@@ -1,9 +1,9 @@
 <h1>Create an account</h1>
 
-<%%= form_with model: @user, url: registration_path, local: true do |f| %>
-  <%% if @user.errors.any? %>
+<%%= form_with model: @identity, url: registration_path, scope: :identity, local: true do |f| %>
+  <%% if @identity.errors.any? %>
     <ul>
-      <%% @user.errors.full_messages.each do |msg| %>
+      <%% @identity.errors.full_messages.each do |msg| %>
         <li><%%= msg %></li>
       <%% end %>
     </ul>

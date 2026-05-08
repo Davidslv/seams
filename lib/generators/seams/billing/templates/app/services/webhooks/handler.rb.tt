@@ -53,11 +53,26 @@ module Billing
         @customer_ref ||= object_hash.is_a?(Hash) && (object_hash[:customer] || object_hash["customer"])
       end
 
+      # Resolves the Accounts::Account id for this webhook event by
+      # cross-referencing the gateway's customer id (`cus_*`) against
+      # the local Billing::Subscription mirror. Returns nil if no
+      # matching local row exists yet (e.g. the very first
+      # `customer.subscription.created` event lands before the local
+      # row is upserted; the leaf handler does the upsert and reads
+      # account_id off the just-saved row in that case).
+      def account_id
+        return @account_id if defined?(@account_id)
+
+        @account_id =
+          Billing::Subscription.where(customer_ref: customer_ref).pick(:account_id) if customer_ref
+      end
+
       def publish(seams_event = self.class::SEAMS_EVENT, ref: object_id)
         Seams::Events::Publisher.publish(
           seams_event,
           gateway:      gateway,
           livemode:     event[:livemode],
+          account_id:   account_id,
           customer_ref: customer_ref,
           ref:          ref,
           object_id:    object_id,

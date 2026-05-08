@@ -68,7 +68,7 @@ module Seams
         # Use a per-subscriber-class symbol as the key:
         #
         #   Publisher.attach_once(:notifications_auth_subscriber,
-        #     "user.signed_up.auth") { |payload| ... }
+        #     "identity.signed_up.auth") { |payload| ... }
         def attach_once(key, event_name, &)
           attach_once_mutex.synchronize do
             attached_keys[[key, event_name.to_s]] ||= subscribe(event_name, &)
@@ -94,7 +94,7 @@ module Seams
         #
         #   Publisher.attach_class(
         #     :notifications_auth_subscriber,
-        #     "user.signed_up.auth",
+        #     "identity.signed_up.auth",
         #     class_name:  "Notifications::AuthSubscriber",
         #     method_name: :handle_signed_up
         #   )
@@ -138,7 +138,7 @@ module Seams
         # Walks every subscription and returns the names that no engine
         # has registered as an emitted event. Hosts can call this from
         # an after_initialize block (or in a CI smoke test) to catch
-        # typos like subscribing to "user.signed_up.atuh".
+        # typos like subscribing to "identity.signed_up.atuh".
         def orphan_subscriptions
           subscriptions.reject { |name| EventRegistry.registered?(name) }.uniq
         end

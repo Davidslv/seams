@@ -1,6 +1,6 @@
 <h1>Reset your password</h1>
 
-<p>Click the link below to set a new password. The link is valid for 30 minutes.</p>
+<p>Click the link below to set a new password. The link is valid for 15 minutes.</p>
 
 <p><%%= link_to "Reset password", edit_password_reset_url(token: @token) %></p>
 

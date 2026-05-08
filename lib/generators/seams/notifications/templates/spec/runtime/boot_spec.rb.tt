@@ -29,7 +29,11 @@ RSpec.describe "Notifications engine boot", type: :integration do
     expect(Notifications::Strategies::Sms.superclass).to   eq(Notifications::Notification)
   end
 
-  it "Notifiable is mixed into the host User in the dummy" do
-    expect(User.ancestors).to include(Notifications::Notifiable)
+  it "Notifiable can be mixed into Auth::Identity (the canonical Wave-9 owner)" do
+    # Wave 9 dropped the auto-include into a host User (no canonical
+    # host User after Wave 9 — the human is Auth::Identity). The
+    # dummy app exercises the "include Notifiable on Auth::Identity"
+    # pattern documented in the engine's README.
+    expect(Auth::Identity.ancestors).to include(Notifications::Notifiable)
   end
 end

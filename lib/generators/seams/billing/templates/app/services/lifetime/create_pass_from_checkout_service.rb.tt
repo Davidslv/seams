@@ -8,6 +8,12 @@ module Billing
     # `mode == "payment"` AND the session metadata flags `access_type:
     # "lifetime"`.
     #
+    # The session metadata MUST include `account_id` (the
+    # Accounts::Account id) — CreateLifetimeSessionService writes it
+    # when generating the Stripe Checkout session, so a webhook that
+    # arrives without it is from a manually-created session and
+    # should fail loudly.
+    #
     # Idempotent on `gateway_ref` (the Stripe Checkout Session id) so
     # Stripe retries hit the unique index and short-circuit.
     #
@@ -26,15 +32,18 @@ module Billing
         customer_ref = session_field(session, :customer)
         metadata     = session_field(session, :metadata) || {}
         plan_ref     = metadata_value(metadata, :plan_ref)
+        account_id   = metadata_value(metadata, :account_id)
 
         return Result.new(ok?: false, error: "Session id missing") if gateway_ref.nil?
         return Result.new(ok?: false, error: "Customer ref missing on session") if customer_ref.nil?
         return Result.new(ok?: false, error: "plan_ref metadata missing on session") if plan_ref.nil?
+        return Result.new(ok?: false, error: "account_id metadata missing on session") if account_id.nil?
 
         pass = Billing::LifetimePass.find_or_initialize_by(gateway_ref: gateway_ref)
         return Result.new(ok?: true, pass: pass) if pass.persisted?
 
         pass.assign_attributes(
+          account_id:   account_id,
           customer_ref: customer_ref,
           plan_ref:     plan_ref,
           granted_at:   Time.current,
@@ -46,10 +55,11 @@ module Billing
           "lifetime.purchased.billing",
           gateway:      Billing.configuration.gateway_name,
           livemode:     livemode,
+          account_id:   account_id,
           customer_ref: customer_ref,
           ref:          pass.id.to_s,
           object_id:    gateway_ref,
-          object:       { id: gateway_ref, plan_ref: plan_ref, pass_id: pass.id }
+          object:       { id: gateway_ref, account_id: account_id, plan_ref: plan_ref, pass_id: pass.id }
         )
         Result.new(ok?: true, pass: pass)
       rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e

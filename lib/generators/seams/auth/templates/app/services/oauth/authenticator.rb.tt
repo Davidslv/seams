@@ -7,16 +7,16 @@ module Auth
     #   1. Exchange the authorization `code` for an access token.
     #   2. Fetch the provider's user profile.
     #   3. Find an existing Auth::OAuth::Provider row by (provider,
-    #      provider_uid) OR find an existing Auth::User by email OR
-    #      create a new Auth::User. Link the row to the user.
+    #      provider_uid) OR find an existing Auth::Identity by email OR
+    #      create a new Auth::Identity. Link the row to the identity.
     #   4. Refresh stored token + profile.
     #   5. Create a new Auth::Session.
-    #   6. Publish user.signed_up.auth (first sign-in via OAuth) or
-    #      user.signed_in.auth (returning user).
+    #   6. Publish identity.signed_up.auth (first sign-in via OAuth) or
+    #      identity.signed_in.auth (returning identity).
     #
-    # Returns a Result: ok?, user, session, oauth_provider, new_user, error.
+    # Returns a Result: ok?, identity, session, oauth_provider, new_identity, error.
     class Authenticator
-      Result = Struct.new(:ok?, :user, :session, :oauth_provider, :new_user, :error,
+      Result = Struct.new(:ok?, :identity, :session, :oauth_provider, :new_identity, :error,
                           keyword_init: true)
 
       def self.call(...)
@@ -36,19 +36,18 @@ module Auth
 
         return Result.new(ok?: false, error: "OAuth provider returned no email") if profile.email.blank?
 
-        oauth_row, user, new_user = link_or_create(profile, tokens)
-        session = user.sessions.create!
+        oauth_row, identity, new_identity = link_or_create(profile, tokens)
+        session = identity.sessions.create!
 
         Seams::Events::Publisher.publish(
-          new_user ? "user.signed_up.auth" : "user.signed_in.auth",
-          auth_user_id: user.id,
-          host_user_id: user.host_user_id,
-          session_id:   session.id,
-          email:        user.email
+          new_identity ? "identity.signed_up.auth" : "identity.signed_in.auth",
+          identity_id: identity.id,
+          session_id:  session.id,
+          email:       identity.email
         )
 
-        Result.new(ok?: true, user: user, session: session,
-                   oauth_provider: oauth_row, new_user: new_user)
+        Result.new(ok?: true, identity: identity, session: session,
+                   oauth_provider: oauth_row, new_identity: new_identity)
       rescue Auth::OAuthError, ActiveRecord::RecordInvalid => e
         Result.new(ok?: false, error: e.message)
       end
@@ -59,25 +58,25 @@ module Auth
         Provider.transaction do
           oauth_row = Provider.find_by(provider: @provider, provider_uid: profile.provider_uid)
 
-          new_user = false
-          user =
+          new_identity = false
+          identity =
             if oauth_row
-              oauth_row.user
+              oauth_row.identity
             else
-              existing = Auth::User.find_by(email: profile.email.to_s.downcase)
+              existing = Auth::Identity.find_by(email: profile.email.to_s.downcase)
               existing || begin
-                new_user = true
-                # Random unguessable password — OAuth users don't have a
+                new_identity = true
+                # Random unguessable password — OAuth identities don't have a
                 # password but the column is required. They sign in via
                 # the provider; password reset lets them set one later.
-                Auth::User.create!(
+                Auth::Identity.create!(
                   email:    profile.email,
                   password: SecureRandom.urlsafe_base64(32)
                 )
               end
             end
 
-          oauth_row ||= Provider.new(provider: @provider, provider_uid: profile.provider_uid, user: user)
+          oauth_row ||= Provider.new(provider: @provider, provider_uid: profile.provider_uid, identity: identity)
           oauth_row.assign_attributes(
             access_token:  tokens[:access_token],
             refresh_token: tokens[:refresh_token],
@@ -87,7 +86,7 @@ module Auth
           )
           oauth_row.save!
 
-          [oauth_row, user, new_user]
+          [oauth_row, identity, new_identity]
         end
       end
     end

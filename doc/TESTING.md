@@ -69,11 +69,11 @@ app and assert that publishing event X causes engine Y's subscriber
 to enqueue job Z. Example:
 
 ```ruby
-RSpec.describe "user signup -> welcome email", type: :integration do
-  it "enqueues a welcome email when a user signs up" do
+RSpec.describe "identity signup -> welcome email", type: :integration do
+  it "enqueues a welcome email when an identity signs up" do
     expect {
-      Seams::Events::Publisher.publish("user.signed_up.auth",
-                                       user_id: 42, email: "x@y.com")
+      Seams::Events::Publisher.publish("identity.signed_up.auth",
+                                       identity_id: 42, email: "x@y.com")
     }.to have_enqueued_job(Notifications::DeliverEmailJob)
       .with(to: "x@y.com", subject: "Welcome", body: anything)
   end
@@ -89,7 +89,7 @@ orphans = Seams::Events::Publisher.orphan_subscriptions
 raise "Subscribed to unknown events: #{orphans.inspect}" if orphans.any?
 ```
 
-This catches typos like subscribing to `user.signed_up.atuh`.
+This catches typos like subscribing to `identity.signed_up.atuh`.
 
 ## Coverage
 

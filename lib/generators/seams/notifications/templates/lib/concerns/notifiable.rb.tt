@@ -3,17 +3,43 @@
 require "active_support/concern"
 
 module Notifications
-  # Mix into the host's user-facing model. Adds a +notifications+
-  # association and a +#notify+ helper that creates the right
-  # +Strategies::*+ subclass for the requested channel.
+  # OPTIONAL convenience concern. Adds a +notifications+ has_many
+  # association + a +#notify+ helper to whatever model includes it.
+  # Notifications themselves are polymorphic — every Notification has
+  # an +owner+, which can be ANY ActiveRecord model. You don't need
+  # this concern to attach notifications to a model:
   #
-  #   class User < ApplicationRecord
-  #     include Notifications::Notifiable
-  #   end
+  #   Notifications::Notification.create!(owner: anything, template: ...)
   #
-  #   user.notify(strategy: :email,  template: "welcome")
-  #   user.notify(strategy: :sms,    template: "alert", schedule_config: { starts_at: 1.day.from_now, frequency: "once" })
-  #   user.notify(strategy: :in_app, template: "system")
+  # The concern is just sugar for the receiving side.
+  #
+  # Three include patterns hosts can pick from:
+  #
+  # 1. Wire into Auth::Identity (most common for canonical seams hosts
+  #    after Wave 9 — the "human" is Auth::Identity, not a host User):
+  #
+  #    # config/initializers/notifications.rb
+  #    Rails.application.config.to_prepare do
+  #      Auth::Identity.include(Notifications::Notifiable)
+  #    end
+  #
+  # 2. Wire into a host-defined User class (older hosts that still
+  #    keep their own User model alongside Auth::Identity):
+  #
+  #    class User < ApplicationRecord
+  #      include Notifications::Notifiable
+  #    end
+  #
+  # 3. Don't include the concern at all. Create notifications via
+  #    +Notifications::Notification.create!(owner: ..., template: ...)+
+  #    or the per-strategy classes directly. The polymorphic +owner+
+  #    column doesn't care.
+  #
+  # Once included:
+  #
+  #   target.notify(strategy: :email,  template: "welcome")
+  #   target.notify(strategy: :sms,    template: "alert", schedule_config: { starts_at: 1.day.from_now, frequency: "once" })
+  #   target.notify(strategy: :in_app, template: "system")
   module Notifiable
     extend ActiveSupport::Concern
 
@@ -50,12 +76,19 @@ module Notifications
     # and creates one Notification per channel the type supports
     # (subject to the host's NotificationPreference rows). Returns the
     # array of created notifications.
+    #
+    # Preference lookup keys off `identity_id` — if the including
+    # model is an Auth::Identity, that's just `id`. Hosts that include
+    # the concern on a non-Identity model (a host User keyed by a
+    # different identity_id, an Account, etc.) should override
+    # `notification_preference_identity_id` to return the right id.
     def notify_typed(type:, schedule_config: nil, recipient: nil)
       record = Notifications::TypeRegistry.fetch(type)
+      preference_id = notification_preference_identity_id
       record.channels.filter_map do |channel|
         next unless STRATEGY_CLASSES.key?(channel.to_sym)
         next unless Notifications::NotificationPreference.enabled?(
-          user_id:           id, channel: channel.to_s, notification_type: record.name
+          identity_id: preference_id, channel: channel.to_s, notification_type: record.name
         )
 
         notify(strategy: channel, template: record.template,
@@ -63,12 +96,24 @@ module Notifications
       end
     end
 
+    # Override on a non-Identity host class to point preference lookup
+    # at the right identity_id. Default: the receiver's own id (works
+    # when Notifiable is included on Auth::Identity directly).
+    def notification_preference_identity_id
+      id
+    end
+
+    # Override per-host if the receiver exposes its email address under
+    # a different name (e.g. a host User that keeps `primary_email_id`).
+    # Default falls back to `email_address` (the Rails 8 has_secure_password
+    # convention some hosts keep) and then `email` (Auth::Identity + most
+    # host User models).
     def email_notification_recipient
-      respond_to?(:email) ? email : nil
+      try(:email_address) || try(:email)
     end
 
     def sms_notification_recipient
-      respond_to?(:phone) ? phone : nil
+      try(:phone)
     end
 
     def unread_in_app_notifications

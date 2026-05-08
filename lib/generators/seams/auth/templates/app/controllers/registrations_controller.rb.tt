@@ -9,14 +9,14 @@ module Auth
                with: -> { redirect_to auth.new_registration_path, alert: "Too many sign-ups from this IP. Try again later." }
 
     def new
-      @user = Auth::User.new
+      @identity = Auth::Identity.new
     end
 
     def create
-      result = Auth::RegisterUser.call(
-        email:                 params.dig(:user, :email),
-        password:              params.dig(:user, :password),
-        password_confirmation: params.dig(:user, :password_confirmation)
+      result = Auth::RegisterIdentity.call(
+        email:                 params.dig(:identity, :email),
+        password:              params.dig(:identity, :password),
+        password_confirmation: params.dig(:identity, :password_confirmation)
       )
 
       if result.ok?
@@ -25,7 +25,7 @@ module Auth
         }
         redirect_to Auth.configuration.after_sign_in_url, notice: "Welcome"
       else
-        @user = Auth::User.new(email: params.dig(:user, :email))
+        @identity = Auth::Identity.new(email: params.dig(:identity, :email))
         flash.now[:alert] = result.error
         render :new, status: :unprocessable_entity
       end

@@ -1,0 +1,181 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+RSpec.describe "Accounts engine boot", type: :integration do
+  it "loads the engine" do
+    expect(defined?(Accounts::Engine)).to eq("constant")
+  end
+
+  it "registers the five canonical accounts events" do
+    %w[
+      account.created.accounts
+      account.cancelled.accounts
+      membership.created.accounts
+      membership.role_changed.accounts
+      membership.removed.accounts
+    ].each do |event|
+      expect(Seams::EventRegistry.registered?(event)).to be(true)
+    end
+  end
+
+  it "creates the accounts tables from the dummy schema" do
+    %i[accounts accounts_memberships auth_identities].each do |t|
+      expect(ActiveRecord::Base.connection.table_exists?(t)).to be(true), "missing #{t}"
+    end
+  end
+
+  it "exposes the canonical concerns + Current + Configuration" do
+    expect(defined?(Accounts::Account)).to        eq("constant")
+    expect(defined?(Accounts::Membership)).to     eq("constant")
+    expect(defined?(Accounts::Current)).to        eq("constant")
+    expect(defined?(Accounts::AccountScoped)).to  eq("constant")
+    expect(defined?(Accounts::Authorization)).to  eq("constant")
+    expect(defined?(Accounts::Configuration)).to  eq("constant")
+  end
+
+  describe "Account.create_with_owner" do
+    let(:identity) { Auth::Identity.create!(email: "owner-#{SecureRandom.hex(4)}@example.com", password: "verysecret") }
+    let(:owner)    { Struct.new(:identity, :name).new(identity, "Ada Lovelace") }
+
+    it "creates the account, a system membership, and an owner membership in one transaction" do
+      account = Accounts::Account.create_with_owner(account: { name: "Acme" }, owner: owner)
+
+      expect(account).to be_persisted
+      expect(account.name).to eq("Acme")
+      expect(account.memberships.count).to eq(2)
+
+      system = account.memberships.find_by(role: "system")
+      expect(system).not_to be_nil
+      expect(system.identity_id).to be_nil
+      expect(system.name).to eq("System")
+
+      human = account.memberships.find_by(role: "owner")
+      expect(human).not_to be_nil
+      expect(human.identity_id).to eq(identity.id)
+      expect(human.name).to eq("Ada Lovelace")
+      expect(human.verified_at).not_to be_nil
+    end
+
+    it "publishes account.created.accounts on create" do
+      received = []
+      sub = Seams::Events::Publisher.adapter.subscribe("account.created.accounts") do |*args|
+        received << args.last
+      end
+
+      Accounts::Account.create_with_owner(account: { name: "Acme" }, owner: owner)
+
+      expect(received.last).to include(:account_id, :owner_identity_id)
+      expect(received.last[:owner_identity_id]).to eq(identity.id)
+    ensure
+      Seams::Events::Publisher.adapter.unsubscribe(sub) if sub
+    end
+
+    it "enforces exactly one system actor per Account at the DB level" do
+      account = Accounts::Account.create_with_owner(account: { name: "Acme 3" }, owner: owner)
+      expect(account.memberships.where(role: "system").count).to eq(1)
+
+      # Inserting a second system actor is a tenant-integrity bug —
+      # the partial unique index must reject it.
+      expect {
+        account.memberships.create!(role: "system", name: "System 2", identity_id: nil, active: true)
+      }.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+  end
+
+  describe "Accounts::Current" do
+    it "derives membership from the current Auth::Identity when account is set" do
+      identity = Auth::Identity.create!(email: "u-#{SecureRandom.hex(4)}@example.com", password: "verysecret")
+      owner    = Struct.new(:identity, :name).new(identity, "Tester")
+      account  = Accounts::Account.create_with_owner(account: { name: "Acme 2" }, owner: owner)
+
+      Auth::Current.identity      = identity
+      Accounts::Current.account   = account
+
+      expect(Accounts::Current.membership).not_to be_nil
+      expect(Accounts::Current.membership.identity_id).to eq(identity.id)
+      expect(Accounts::Current.membership.role).to eq("owner")
+    ensure
+      Accounts::Current.reset
+      Auth::Current.reset
+    end
+  end
+
+  # The AccountScoped concern is the canonical multi-tenant data
+  # boundary. Wave 9 made it fail-closed: if Accounts::Current.account
+  # is unset, queries return an empty relation rather than every
+  # tenant's rows. These specs lock that contract in.
+  describe "Accounts::AccountScoped" do
+    # Define a tiny test model under a stub_const so we don't pollute
+    # the dummy app's autoload tree. The articles table is created in
+    # the dummy schema specifically for engine-internal tests like this.
+    before do
+      stub_const("ScopedArticle", Class.new(ActiveRecord::Base) {
+        self.table_name = "articles_for_account_scoped"
+        include Accounts::AccountScoped
+      })
+
+      ActiveRecord::Base.connection.create_table :articles_for_account_scoped, force: true do |t|
+        t.string  :title
+        t.string  :account_id
+        t.timestamps
+      end
+    end
+
+    after do
+      ActiveRecord::Base.connection.drop_table :articles_for_account_scoped, if_exists: true
+    end
+
+    let(:identity) { Auth::Identity.create!(email: "scoped-#{SecureRandom.hex(4)}@example.com", password: "verysecret") }
+    let(:owner)    { Struct.new(:identity, :name).new(identity, "Tester") }
+    let(:acme)     { Accounts::Account.create_with_owner(account: { name: "Acme" }, owner: owner) }
+    let(:other)    { Accounts::Account.create_with_owner(account: { name: "Other" }, owner: owner) }
+
+    it "auto-assigns account_id from Accounts::Current.account on create" do
+      Accounts::Current.account = acme
+      record = ScopedArticle.create!(title: "Hello")
+      expect(record.account_id).to eq(acme.id)
+    ensure
+      Accounts::Current.reset
+    end
+
+    it "filters queries to Accounts::Current.account" do
+      Accounts::Current.account = acme
+      ScopedArticle.create!(title: "Acme one")
+      Accounts::Current.account = other
+      ScopedArticle.create!(title: "Other one")
+
+      Accounts::Current.account = acme
+      expect(ScopedArticle.pluck(:title)).to eq(["Acme one"])
+      Accounts::Current.account = other
+      expect(ScopedArticle.pluck(:title)).to eq(["Other one"])
+    ensure
+      Accounts::Current.reset
+    end
+
+    it "returns NONE when Accounts::Current.account is unset (fail-closed)" do
+      Accounts::Current.account = acme
+      ScopedArticle.create!(title: "Acme")
+      Accounts::Current.reset
+
+      # No Current.account bound. Wave 9 fail-closed: don't leak across
+      # tenants — return an empty relation instead.
+      expect(ScopedArticle.count).to eq(0)
+      expect(ScopedArticle.all.to_a).to eq([])
+    ensure
+      Accounts::Current.reset
+    end
+
+    it "exposes .with_no_account_scope to opt out (for seeds / platform admin)" do
+      Accounts::Current.account = acme
+      ScopedArticle.create!(title: "Acme")
+      Accounts::Current.account = other
+      ScopedArticle.create!(title: "Other")
+      Accounts::Current.reset
+
+      expect(ScopedArticle.with_no_account_scope.count).to eq(2)
+    ensure
+      Accounts::Current.reset
+    end
+  end
+end

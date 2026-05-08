@@ -39,7 +39,19 @@ module Notifications
       @notification = current_recipient&.notifications&.find(params[:id])
     end
 
+    # Resolves the recipient whose notifications this controller
+    # exposes. Post-Wave-9 the canonical recipient is
+    # `Auth::Current.identity` (the signed-in human). Hosts that keep
+    # a domain User on top of Auth::Identity can override
+    # `current_recipient` (or expose `current_user` from their auth
+    # concern) to point at that User instead — the legacy
+    # `respond_to?(:current_user)` fallback below preserves Wave-8
+    # behaviour for hosts that haven't migrated.
     def current_recipient
+      if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
+        return Auth::Current.identity
+      end
+
       respond_to?(:current_user) ? current_user : nil
     end
   end

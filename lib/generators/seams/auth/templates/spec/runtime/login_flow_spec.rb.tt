@@ -10,14 +10,14 @@ RSpec.describe "Auth login flow", type: :request do
     let(:email)    { "round-trip-#{SecureRandom.hex(4)}@example.com" }
     let(:password) { "verysecret" }
 
-    it "creates a user, opens an Auth::Session, then revokes it on signout" do
+    it "creates an identity, opens an Auth::Session, then revokes it on signout" do
       expect {
         post "/auth/registration",
-             params: { user: { email: email, password: password } }
-      }.to change(Auth::User, :count).by(1)
+             params: { identity: { email: email, password: password } }
+      }.to change(Auth::Identity, :count).by(1)
 
-      user = Auth::User.find_by(email: email)
-      expect(user).not_to be_nil
+      identity = Auth::Identity.find_by(email: email)
+      expect(identity).not_to be_nil
 
       expect {
         post "/auth/session",
@@ -25,7 +25,7 @@ RSpec.describe "Auth login flow", type: :request do
       }.to change(Auth::Session, :count).by(1)
 
       session = Auth::Session.last
-      expect(session.user).to eq(user)
+      expect(session.identity).to eq(identity)
       expect(session.expires_at).to be > Time.current
 
       delete "/auth/session"
@@ -35,7 +35,7 @@ RSpec.describe "Auth login flow", type: :request do
 
   describe "signin with the wrong password" do
     it "does not create a session" do
-      create(:auth_user, email: "ada@example.com", password: "verysecret")
+      create(:auth_identity, email: "ada@example.com", password: "verysecret")
 
       expect {
         post "/auth/session", params: { email: "ada@example.com", password: "wrong" }

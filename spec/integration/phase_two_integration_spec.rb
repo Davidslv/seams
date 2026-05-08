@@ -54,7 +54,7 @@ RSpec.describe "Phase 2 integration", type: :integration do
       .to eq(["Notifications::Notifiable"])
   end
 
-  it "auth subscriber + notifications subscriber together emit a welcome email on user.signed_up.auth" do
+  it "auth subscriber + notifications subscriber together emit a welcome email on identity.signed_up.auth" do
     run(Seams::Generators::InstallGenerator)
     run(Seams::Generators::AuthGenerator)
     run(Seams::Generators::NotificationsGenerator)
@@ -62,7 +62,7 @@ RSpec.describe "Phase 2 integration", type: :integration do
     auth_subscriber = File.read(File.join(host_root,
                                           "engines/notifications/app/subscribers/notifications/auth_subscriber.rb"))
     expect(auth_subscriber).to include("attach_class(")
-    expect(auth_subscriber).to include('"user.signed_up.auth"')
+    expect(auth_subscriber).to include('"identity.signed_up.auth"')
     expect(auth_subscriber).to include('class_name:  "Notifications::AuthSubscriber"')
     expect(auth_subscriber).to include("Notifications::CreateNotificationJob.perform_later")
   end
@@ -83,9 +83,9 @@ RSpec.describe "Phase 2 integration", type: :integration do
     Seams::EventRegistry.reset!
 
     # Simulate Rails boot: each engine's engine.rb runs its register block.
-    Seams::EventRegistry.register("user.signed_up.auth",                     emitted_by: "Auth")
-    Seams::EventRegistry.register("user.signed_in.auth",                     emitted_by: "Auth")
-    Seams::EventRegistry.register("user.signed_out.auth",                    emitted_by: "Auth")
+    Seams::EventRegistry.register("identity.signed_up.auth",                 emitted_by: "Auth")
+    Seams::EventRegistry.register("identity.signed_in.auth",                 emitted_by: "Auth")
+    Seams::EventRegistry.register("identity.signed_out.auth",                emitted_by: "Auth")
     Seams::EventRegistry.register("session.expired.auth",                    emitted_by: "Auth")
     Seams::EventRegistry.register("notification.queued.notifications",       emitted_by: "Notifications")
     Seams::EventRegistry.register("notification.delivered.notifications",    emitted_by: "Notifications")

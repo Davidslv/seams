@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
 module Billing
-  # Read-only billing history. The local Billing::Invoice rows are
-  # populated by the InvoiceHandlerBase webhook handlers as Stripe
-  # fires invoice.* events; SyncService can refresh on demand.
+  # Read-only billing history for the current Account. The local
+  # Billing::Invoice rows are populated by the InvoiceHandlerBase
+  # webhook handlers as Stripe fires invoice.* events; SyncService
+  # can refresh on demand.
   #
   # No `download` action — Stripe hosts the PDF; link to the
   # `hosted_invoice_url` Stripe returns on the invoice object. Saves
@@ -42,11 +43,21 @@ module Billing
     end
 
     def current_billing_customer_ref
-      return current_user.billing_customer_ref if current_user.respond_to?(:billing_customer_ref)
+      account = current_billing_account
+      return nil unless account
 
-      raise NotImplementedError,
-            "Override #current_billing_customer_ref in your host InvoicesController " \
-            "to point at your User's billing customer reference."
+      account.billing_subscriptions.pick(:customer_ref) ||
+        account.billing_invoices.pick(:customer_ref) ||
+        account.billing_lifetime_passes.pick(:customer_ref)
+    end
+
+    def current_billing_account
+      return @current_billing_account if defined?(@current_billing_account)
+
+      @current_billing_account =
+        if defined?(Accounts::Current) && Accounts::Current.respond_to?(:account)
+          Accounts::Current.account
+        end
     end
   end
 end

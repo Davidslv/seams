@@ -3,12 +3,12 @@
 require_relative "../rails_helper"
 
 RSpec.describe "Notifications schedule round-trip", type: :integration do
-  let(:user) { User.create!(email: "x@y.com") }
+  let(:identity) { Auth::Identity.create!(email: "x@y.com") }
 
   describe "ice_cube serialisation" do
     it "round-trips an immediate one-shot" do
       sched = IceCube::Schedule.new(Time.current)
-      n = Notifications::Strategies::InApp.new(owner: user, template: "default")
+      n = Notifications::Strategies::InApp.new(owner: identity, template: "default")
       n.schedule = sched
       n.save!
 
@@ -21,7 +21,7 @@ RSpec.describe "Notifications schedule round-trip", type: :integration do
       sched = IceCube::Schedule.new(Time.current)
       sched.add_recurrence_rule(IceCube::Rule.weekly)
 
-      n = Notifications::Strategies::Email.new(owner: user, template: "default")
+      n = Notifications::Strategies::Email.new(owner: identity, template: "default")
       n.schedule = sched
       n.save!
 
@@ -32,7 +32,7 @@ RSpec.describe "Notifications schedule round-trip", type: :integration do
 
   describe "schedule_config=" do
     it "builds an IceCube schedule from a structured hash" do
-      n = Notifications::Strategies::Email.new(owner: user, template: "default")
+      n = Notifications::Strategies::Email.new(owner: identity, template: "default")
       n.schedule_config = { starts_at: 1.day.from_now, frequency: "daily", interval: 2 }
       n.save!
 
@@ -44,7 +44,7 @@ RSpec.describe "Notifications schedule round-trip", type: :integration do
   describe "#advance!" do
     it "sets next_delivery_at to nil for a completed one-shot" do
       sched = IceCube::Schedule.new(2.days.ago)
-      n = Notifications::Strategies::InApp.new(owner: user, template: "default")
+      n = Notifications::Strategies::InApp.new(owner: identity, template: "default")
       n.schedule = sched
       n.save!
       n.advance!

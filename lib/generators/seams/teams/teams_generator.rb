@@ -11,8 +11,12 @@ module Seams
   module Generators
     # Generates a canonical Teams engine on top of the generic engine
     # scaffold. Models cover Team, Membership, Invitation; controllers
-    # cover team CRUD + membership management + invitation send/accept;
-    # the Teamable concern is exposed for the host's user model.
+    # cover team CRUD + membership management + invitation send/accept.
+    #
+    # Wave 9 model: Teams is a peer to Accounts (not nested). A
+    # Teams::Membership joins Auth::Identity directly to a Teams::Team.
+    # The host-User Teamable concern is gone — Wave 9 dropped the
+    # canonical demo's host User, so there's nowhere to mix it into.
     #
     # Run with: bin/rails generate seams:teams
     class TeamsGenerator < Rails::Generators::Base
@@ -47,6 +51,8 @@ module Seams
                  engine_path("app/models/teams/team.rb")
         template "app/models/membership.rb.tt",
                  engine_path("app/models/teams/membership.rb")
+        template "app/models/current.rb.tt",
+                 engine_path("app/models/teams/current.rb")
         return unless features.include?("invitations")
 
         template "app/models/invitation.rb.tt",
@@ -81,8 +87,6 @@ module Seams
       end
 
       def create_concerns
-        template "lib/concerns/teamable.rb.tt",
-                 engine_path("lib/teams/concerns/teamable.rb")
         # Phase 4A — account scoping helper that pairs with Core's
         # TenantScoped. Mix into models that belong to a single team.
         template "lib/concerns/account_scoped.rb.tt",
@@ -145,7 +149,7 @@ module Seams
         return unless File.exist?(rubocop_path)
 
         contents       = File.read(rubocop_path)
-        exposed_lines  = ["    - Teams::Teamable", "    - Teams::AccountScoped"]
+        exposed_lines  = ["    - Teams::AccountScoped"]
         exposed_lines << "    - Teams::Authorization" if features.include?("roles")
         replacement    = "  ExposedConcerns:\n#{exposed_lines.join("\n")}"
         contents.sub!(/^  ExposedConcerns: \[\]$/, replacement)
@@ -153,12 +157,20 @@ module Seams
       end
 
       def create_dummy_app
+        # Wave 9: no host User model in the dummy. The dummy ships a
+        # slim Auth::Identity stub at app/models/auth/identity.rb so
+        # the teams engine's boot-time dependency assertion (defined?
+        # ::Auth::Identity) passes without pulling in the full auth
+        # engine. The same stub also lets `create(:auth_identity)`
+        # build real AR rows against the auth_identities table baked
+        # into dummy_schema.
         Seams::Generators::DummyAppWriter.write!(
           engine_path: File.join(destination_root, "engines", ENGINE_NAME),
           engine_module: "Teams",
           mount_at: "/teams",
           schema: dummy_schema,
-          host_user: dummy_host_user
+          host_user: dummy_host_identity,
+          host_user_path: "app/models/auth/identity.rb"
         )
         template "spec/runtime/boot_spec.rb.tt",
                  engine_path("spec/runtime/teams_boot_spec.rb")
@@ -169,7 +181,9 @@ module Seams
         # the host's test group only.
         host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
         host_inject_mount(engine_class: "Teams::Engine", at: "/teams")
-        host_inject_include_in_user("Teams::Teamable")
+        # NB: no host_inject_include_in_user — the host User is gone
+        # post-Wave-9. Hosts that DO keep a User model and want
+        # team-membership query helpers wire those up themselves.
       end
 
       def report_summary
@@ -212,8 +226,39 @@ module Seams
         (base + 300 + offset).to_s
       end
 
+      # Slim Auth::Identity stub for the teams dummy app. Stands in
+      # for the real Auth::Identity (which lives in the auth engine,
+      # not loaded by the dummy) so the teams engine's boot-time
+      # cross-engine dependency assertion passes and specs that
+      # `create(:auth_identity)` get a real Active Record row backing
+      # the auth_identities table.
+      def dummy_host_identity
+        <<~RB
+          # frozen_string_literal: true
+          module Auth
+            class Identity < ApplicationRecord
+              self.table_name = "auth_identities"
+              has_secure_password
+            end
+          end
+        RB
+      end
+
+      # Includes auth_identities so factories that link memberships to
+      # an Identity can `create(:auth_identity)` against a real row.
+      # Match the auth engine's schema for that table so cross-engine
+      # specs don't drift.
       def dummy_schema
         <<~SCHEMA
+          create_table :auth_identities do |t|
+            t.text    :email,            null: false
+            t.string  :password_digest,  null: false
+            t.boolean :staff,            null: false, default: false
+            t.timestamps
+          end
+          add_index :auth_identities, :email, unique: true
+          add_index :auth_identities, :staff, where: "staff = true"
+
           create_table :teams do |t|
             t.string :name, null: false
             t.string :slug, null: false
@@ -222,12 +267,13 @@ module Seams
           add_index :teams, :slug, unique: true
 
           create_table :team_memberships do |t|
-            t.references :team,    null: false
-            t.bigint     :user_id, null: false
-            t.string     :role,    null: false, default: "member"
+            t.references :team,        null: false
+            t.bigint     :identity_id, null: false
+            t.string     :role,        null: false, default: "member"
             t.timestamps
           end
-          add_index :team_memberships, %i[team_id user_id], unique: true
+          add_index :team_memberships, %i[team_id identity_id], unique: true
+          add_index :team_memberships, :identity_id
 
           create_table :team_invitations do |t|
             t.references :team,        null: false
@@ -241,22 +287,7 @@ module Seams
           add_index :team_invitations, :token, unique: true
           add_index :team_invitations, %i[team_id email], unique: true,
                                                           where: "accepted_at IS NULL"
-
-          create_table :users do |t|
-            t.string :email
-            t.timestamps
-          end
         SCHEMA
-      end
-
-      def dummy_host_user
-        <<~RB
-          # frozen_string_literal: true
-
-          class User < ApplicationRecord
-            include Teams::Teamable
-          end
-        RB
       end
     end
   end

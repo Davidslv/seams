@@ -14,7 +14,7 @@ require "tmpdir"
 # inside a real Rails app.
 #
 # Excluded from the default rspec run because it takes ~5–10 minutes
-# (rails new + two bundle installs + five engine spec runs). Run it
+# (rails new + two bundle installs + six engine spec runs). Run it
 # explicitly with:
 #
 #   bundle exec rspec spec/integration_full/
@@ -129,6 +129,10 @@ RSpec.describe "rails new integration", type: :integration_full do
   # the keys in Rails credentials; the integration host doesn't have
   # credentials, so we ship a tiny initializer with throwaway test
   # keys. The dummy DB is wiped per run anyway.
+  #
+  # Wave 9: encryption is on Auth::Identity (#email). Accounts::Account
+  # has no encrypted columns of its own, so this initializer continues
+  # to be required for the auth engine alone.
   def configure_host_encryption_keys
     initializer = File.join(host_path, "config/initializers/active_record_encryption.rb")
     File.write(initializer, <<~RB)
@@ -140,6 +144,24 @@ RSpec.describe "rails new integration", type: :integration_full do
         config.active_record.encryption.deterministic_key      = "integration_deterministic_key_throwaway"
         config.active_record.encryption.key_derivation_salt    = "integration_key_derivation_salt_throwaway"
         config.active_record.encryption.support_unencrypted_data = true
+      end
+    RB
+  end
+
+  # Wave 9: there is no host User. The notifications engine's
+  # Notifiable concern is OPTIONAL — the canonical demo wires it onto
+  # Auth::Identity in the host's notifications initializer so
+  # `identity.notify(...)` becomes available. Reproduce that wiring
+  # here so the smoke probe can exercise the helper.
+  def wire_notifiable_into_identity
+    initializer = File.join(host_path, "config/initializers/notifications_wiring.rb")
+    File.write(initializer, <<~RB)
+      # frozen_string_literal: true
+      # Wave 9 canonical wiring: the human is Auth::Identity, and we
+      # want `identity.notify(...)` available. Pattern A from the
+      # notifications engine's initializer.
+      Rails.application.config.to_prepare do
+        Auth::Identity.include(Notifications::Notifiable)
       end
     RB
   end
@@ -172,32 +194,27 @@ RSpec.describe "rails new integration", type: :integration_full do
     bundle_install
     create_test_database
 
-    # Generate the host User model BEFORE the canonical engines run,
-    # so each engine's host_inject_include_in_user(...) call lands on
-    # the right file (Auth::Authenticatable, Notifications::Notifiable,
-    # Billing::Billable, Teams::Teamable). Without this, the engines
-    # skip with a "User model not found" notice and the cross-engine
-    # wiring assertions at the bottom of this example would have to
-    # patch Notifiable in by hand.
-    #
-    # stripe_customer_id is included so Phase 3B's billing-event check
-    # below can resolve User.find_by(stripe_customer_id: ...) — the
-    # column Billing::Billable documents on the host User.
-    shell(%w[bin/rails generate model User email:string stripe_customer_id:string])
-
-    %w[install core auth notifications billing teams].each { |g| generate(g) }
+    # Wave 9 dropped the canonical demo's host User. Auth::Identity is
+    # the human; Accounts::Account is the tenant. No `bin/rails generate
+    # model User ...` step here — the generators don't touch a host
+    # User any more, and the Notifiable concern is wired onto
+    # Auth::Identity below via an initializer (Pattern A from the
+    # notifications engine README).
+    %w[install core auth accounts notifications billing teams].each { |g| generate(g) }
 
     # Wave 11 PII encryption requires keys at host boot. Real hosts
     # run `bin/rails db:encryption:init` once and store the keys in
     # Rails credentials; we ship throwaway integration keys instead.
     configure_host_encryption_keys
+    # Wave 9: opt-in Notifiable on Auth::Identity (canonical pattern).
+    wire_notifiable_into_identity
 
     # Run every engine's FULL spec suite, not just spec/runtime. The
     # broader scope catches Zeitwerk inflector regressions, missing
     # ApplicationMailer in the dummy app, and bad require_relative
     # paths in 3-level-deep specs — three bug classes that previously
     # slipped past CI because we only exercised spec/runtime.
-    %w[core auth notifications billing teams].each do |engine|
+    %w[core auth accounts notifications billing teams].each do |engine|
       spec_dir = File.join(host_path, "engines", engine, "spec")
       next if Dir.glob("#{spec_dir}/**/*_spec.rb").empty?
 
@@ -208,15 +225,18 @@ RSpec.describe "rails new integration", type: :integration_full do
 
     # The host must (a) load every engine as a Railtie and (b) pick up
     # each engine's migrations through the append_migrations
-    # initializer. Both regressed silently in the past.
+    # initializer. Both regressed silently in the past. No host User
+    # migration to run any more — the generators ship the engine
+    # tables and nothing else.
     shell(%w[bin/rails db:migrate])
 
     expected = %w[
-      auth_users auth_sessions
+      auth_identities auth_sessions auth_api_tokens auth_oauth_providers
+      accounts accounts_memberships
       core_audit_logs
-      billing_subscriptions billing_invoices billing_plans
-      teams team_memberships
-      notifications notification_deliveries
+      billing_subscriptions billing_invoices billing_plans billing_lifetime_passes billing_webhook_events
+      teams team_memberships team_invitations
+      notifications notification_deliveries notification_preferences
     ]
     tables = shell_capture(["bin/rails", "runner", "puts ActiveRecord::Base.connection.tables.sort.join(',')"])
     actual = tables.lines.last.to_s.strip.split(",")
@@ -224,77 +244,90 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(missing).to be_empty, "host db is missing engine tables: #{missing.join(", ")} (got: #{actual.inspect})"
 
     # Phase 2C — verify Auth + Notifications wiring end-to-end.
-    # Publish the canonical user.signed_up.auth event from a runner
-    # process and assert the Notifications::AuthSubscriber actually
-    # creates a Notification row. Exercises Publisher.attach_class +
-    # the CreateNotificationJob inline path the engine boots with.
-    # The host User model was generated above (before the engines)
-    # so Notifications::Notifiable was injected into it by the
-    # notifications generator's wire_into_host.
+    # Publish the canonical identity.signed_up.auth event from a
+    # runner process and assert the Notifications::AuthSubscriber
+    # actually creates a Notification row. Exercises Publisher.attach_class
+    # + the CreateNotificationJob inline path the engine boots with.
+    # The host User model is gone post-Wave-9 — the welcome notification
+    # is owned by the Auth::Identity itself.
     notification_count = boot_probe(<<~RUBY)
       ActiveJob::Base.queue_adapter = :inline
-      user = User.create!(email: "phase2c-\#{Process.pid}@example.com")
-
-      Seams::Events::Publisher.publish(
-        "user.signed_up.auth",
-        auth_user_id: 0,
-        host_user_id: user.id,
-        email: user.email
+      identity = Auth::Identity.create!(
+        email: "phase2c-\#{Process.pid}@example.com",
+        password: "verysecret"
       )
 
-      puts Notifications::Notification.where(owner: user).count
+      Seams::Events::Publisher.publish(
+        "identity.signed_up.auth",
+        identity_id: identity.id,
+        email:       identity.email
+      )
+
+      puts Notifications::Notification.where(owner: identity).count
     RUBY
 
     expect(notification_count).to eq("1").or(eq("2")),
                                   "expected at least one Notifications::Notification to be created " \
                                   "by the AuthSubscriber, got #{notification_count.inspect}"
 
-    # Phase 3B — verify billing + auth + notifications wire up
-    # end-to-end. Publish a canonical invoice.paid.billing event
-    # whose customer_ref matches a User's stripe_customer_id; the
-    # BillingSubscriber should resolve the host user and enqueue a
-    # CreateNotificationJob. Inline-queue runs it sync so we can
-    # assert on the resulting Notification row directly.
+    # Phase 3B — verify billing + accounts + notifications wire up
+    # end-to-end. Publish a canonical invoice.paid.billing event with
+    # `account_id:` keyed on a real Accounts::Account; the
+    # BillingSubscriber should enqueue a CreateNotificationJob with
+    # owner_class: "Accounts::Account" and owner_id: that account.
+    # Inline-queue runs it sync so we can assert on the Notification row
+    # directly.
     billing_count = boot_probe(<<~RUBY)
       ActiveJob::Base.queue_adapter = :inline
-      user = User.create!(
-        email:              "phase3b-\#{Process.pid}@example.com",
-        stripe_customer_id: "cus_phase3b_\#{Process.pid}"
+
+      identity = Auth::Identity.create!(
+        email: "phase3b-\#{Process.pid}@example.com",
+        password: "verysecret"
+      )
+      OwnerStruct = Struct.new(:identity, :name) unless defined?(OwnerStruct)
+      account = Accounts::Account.create_with_owner(
+        account: { name: "Phase3B Co \#{Process.pid}" },
+        owner:   OwnerStruct.new(identity, "Phase3B Owner")
       )
 
       Seams::Events::Publisher.publish(
         "invoice.paid.billing",
         gateway:      "stripe",
         livemode:     false,
-        customer_ref: user.stripe_customer_id,
+        account_id:   account.id,
+        customer_ref: "cus_phase3b_\#{Process.pid}",
         ref:          "in_phase3b",
         object_id:    "in_phase3b",
-        object:       { id: "in_phase3b", customer: user.stripe_customer_id, status: "paid" }
+        object:       { id: "in_phase3b", customer: "cus_phase3b_\#{Process.pid}", status: "paid" }
       )
 
-      puts Notifications::Notification.where(owner: user, template: "billing/invoice_paid").count
+      puts Notifications::Notification.where(owner: account, template: "billing/invoice_paid").count
     RUBY
 
     expect(billing_count).to eq("1"),
                              "expected exactly one Notification(template: billing/invoice_paid) " \
-                             "to be created by the BillingSubscriber, got #{billing_count.inspect}"
+                             "to be created by the BillingSubscriber against the Account, got #{billing_count.inspect}"
 
     # Phase 4A — verify the Teams engine's full lifecycle in the host:
-    # Team.create + Membership.create + canonical team.created.teams
-    # event publish. Catches Railtie / autoload / migration regressions
-    # in the Teams engine that would not show up in a generator spec.
+    # Team.create + Membership.create (keyed on identity_id) + canonical
+    # team.created.teams event publish. Catches Railtie / autoload /
+    # migration regressions in the Teams engine that would not show up
+    # in a generator spec.
     teams_state = boot_probe(<<~RUBY)
       ActiveJob::Base.queue_adapter = :inline
 
       received = []
       Seams::Events::Publisher.subscribe("team.created.teams") { |payload| received << payload }
 
-      user = User.create!(email: "phase4a-\#{Process.pid}@example.com")
+      identity = Auth::Identity.create!(
+        email: "phase4a-\#{Process.pid}@example.com",
+        password: "verysecret"
+      )
       team = Teams::Team.create!(name: "Phase 4A Co.", slug: "phase4a-\#{Process.pid}")
-      Teams::Membership.create!(team: team, user_id: user.id, role: "owner")
+      Teams::Membership.create!(team: team, identity_id: identity.id, role: "owner")
 
       Seams::Events::Publisher.publish(
-        "team.created.teams", team_id: team.id, owner_id: user.id
+        "team.created.teams", team_id: team.id, owner_id: identity.id
       )
 
       puts "team_persisted=\#{Teams::Team.exists?(team.id)};" \\
@@ -305,6 +338,45 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(teams_state).to include("team_persisted=true")
     expect(teams_state).to include("membership_count=1")
     expect(teams_state).to include("events_received=1")
+
+    # Wave 9 — Accounts smoke probe. Exercises the new accounts engine
+    # end-to-end: create_with_owner produces a system + owner Membership
+    # in one transaction, and the engine publishes the canonical
+    # account.created.accounts + membership.created.accounts events.
+    accounts_state = boot_probe(<<~RUBY)
+      ActiveJob::Base.queue_adapter = :inline
+
+      received_account     = []
+      received_membership  = []
+      Seams::Events::Publisher.subscribe("account.created.accounts")    { |p| received_account    << p }
+      Seams::Events::Publisher.subscribe("membership.created.accounts") { |p| received_membership << p }
+
+      identity = Auth::Identity.create!(
+        email: "wave9-acc-\#{Process.pid}@example.com",
+        password: "verysecret"
+      )
+      OwnerStruct = Struct.new(:identity, :name) unless defined?(OwnerStruct)
+      account = Accounts::Account.create_with_owner(
+        account: { name: "Wave 9 Co \#{Process.pid}" },
+        owner:   OwnerStruct.new(identity, "Wave 9 Owner")
+      )
+
+      system_count = account.memberships.where(role: "system").count
+      owner_count  = account.memberships.where(role: "owner").count
+
+      puts "account_persisted=\#{Accounts::Account.exists?(account.id)};" \\
+           "system_memberships=\#{system_count};" \\
+           "owner_memberships=\#{owner_count};" \\
+           "account_events=\#{received_account.size};" \\
+           "membership_events=\#{received_membership.size}"
+    RUBY
+
+    expect(accounts_state).to include("account_persisted=true")
+    expect(accounts_state).to include("system_memberships=1")
+    expect(accounts_state).to include("owner_memberships=1")
+    expect(accounts_state).to include("account_events=1")
+    # 2 memberships = system + owner created inside create_with_owner.
+    expect(accounts_state).to include("membership_events=2")
 
     # Wave 6 — comprehensive every-function smoke probe. Exercises
     # every public seams API surface in one boot so a regression in
@@ -319,20 +391,21 @@ RSpec.describe "rails new integration", type: :integration_full do
     #                  Bearer-resolve API token, revoke API token,
     #                  request password reset, complete password
     #                  reset, encrypts email round-trip.
+    # - Accounts:      create_with_owner round-trip, system actor.
     # - Notifications: create + due scope, AuthSubscriber wiring
     #                  (already covered by phase 2c above; included
     #                  here for the regression net), TypeRegistry
     #                  register + lookup, NotificationPreference
     #                  default-on, bell unread count.
-    # - Billing:       Plan + Subscription + Invoice CRUD,
-    #                  WebhookEvent uniqueness, EventRouter handler
-    #                  lookup for all 13 mapped Stripe event types,
-    #                  LifetimePass grant + revoke, Plan inventory
-    #                  lock raises SoldOut.
-    # - Teams:         AccountScoped scope filter, Authorization
-    #                  predicates, role inclusion.
-    # - Events:        every registered event resolves to its emitter
-    #                  via EventRegistry.
+    # - Billing:       Plan + Subscription + Invoice CRUD (account_id
+    #                  keyed), WebhookEvent uniqueness, EventRouter
+    #                  handler lookup for all 13 mapped Stripe event
+    #                  types, LifetimePass grant + revoke (account
+    #                  scoped), Plan inventory lock raises SoldOut.
+    # - Teams:         Team / Membership (identity_id) / Invitation,
+    #                  membership role inclusion.
+    # - Events:        every registered event resolves via the
+    #                  EventRegistry.
     smoke = boot_probe_full(<<~'RUBY')
       ActiveJob::Base.queue_adapter = :test
       lines = []
@@ -350,15 +423,15 @@ RSpec.describe "rails new integration", type: :integration_full do
 
       # ---- AUTH ------------------------------------------------------
       auth_email = "smoke-#{SecureRandom.hex(4)}@example.com"
-      check.call("auth.register") { Auth::RegisterUser.call(email: auth_email, password: "verysecret").ok? }
+      check.call("auth.register") { Auth::RegisterIdentity.call(email: auth_email, password: "verysecret").ok? }
 
-      auth_user = Auth::User.find_by(email: auth_email)
-      check.call("auth.encrypts_email") { auth_user && auth_user.email == auth_email }
+      auth_identity = Auth::Identity.find_by(email: auth_email)
+      check.call("auth.encrypts_email") { auth_identity && auth_identity.email == auth_email }
 
-      check.call("auth.authenticate") { Auth::AuthenticateUser.call(email: auth_email, password: "verysecret").ok? }
+      check.call("auth.authenticate") { Auth::AuthenticateIdentity.call(email: auth_email, password: "verysecret").ok? }
 
       token = nil
-      check.call("auth.api_token_issued") { (token = Auth::GenerateApiToken.call(user: auth_user, name: "smoke")).ok? }
+      check.call("auth.api_token_issued") { (token = Auth::GenerateApiToken.call(identity: auth_identity, name: "smoke")).ok? }
 
       check.call("auth.api_token_resolves") { token && Auth::ApiToken.find_by_plaintext(token.plaintext)&.id == token.api_token.id }
 
@@ -366,11 +439,38 @@ RSpec.describe "rails new integration", type: :integration_full do
 
       check.call("auth.reset_request") { Auth::ResetPassword.request(email: auth_email).ok? }
 
-      auth_user.reload
+      # Wave 9: Auth::Identity uses Rails 8's has_secure_password reset_token
+      # (a signed_id, NOT a column). Generate a fresh token off the
+      # identity instance and complete the reset with it.
       check.call("auth.reset_complete") {
-        result = Auth::ResetPassword.complete(token: auth_user.password_reset_token, new_password: "newpassword99")
-        raise "reset_complete failed: token=#{auth_user.password_reset_token.inspect} sent_at=#{auth_user.password_reset_token_sent_at.inspect} error=#{result.error.inspect}" unless result.ok?
+        auth_identity.reload
+        token = auth_identity.password_reset_token
+        result = Auth::ResetPassword.complete(token: token, new_password: "newpassword99")
+        raise "reset_complete failed: token=#{token.inspect} error=#{result.error.inspect}" unless result.ok?
         true
+      }
+
+      # ---- ACCOUNTS --------------------------------------------------
+      OwnerStruct = Struct.new(:identity, :name) unless defined?(OwnerStruct)
+      smoke_account = nil
+      smoke_owner_identity = nil
+      check.call("accounts.create_with_owner") {
+        smoke_owner_identity = Auth::Identity.create!(
+          email: "acc-owner-#{Process.pid}-#{SecureRandom.hex(2)}@example.com",
+          password: "verysecret"
+        )
+        smoke_account = Accounts::Account.create_with_owner(
+          account: { name: "Smoke Co. #{Process.pid}" },
+          owner:   OwnerStruct.new(smoke_owner_identity, "Smoke Owner")
+        )
+        smoke_account.persisted?
+      }
+
+      check.call("accounts.system_actor_present") {
+        smoke_account && smoke_account.memberships.where(role: "system").count == 1
+      }
+      check.call("accounts.owner_membership_present") {
+        smoke_account && smoke_account.memberships.where(role: "owner", identity_id: smoke_owner_identity.id).count == 1
       }
 
       # ---- NOTIFICATIONS --------------------------------------------
@@ -379,14 +479,17 @@ RSpec.describe "rails new integration", type: :integration_full do
         Notifications::TypeRegistry.fetch("smoke.test").name == "smoke.test"
       }
 
-      smoke_user = nil
+      smoke_notif_identity = nil
       check.call("notif.created") {
-        smoke_user = User.find_or_create_by!(email: "notif-smoke-#{Process.pid}@example.com")
-        smoke_user.notify(strategy: :in_app, template: "default").persisted?
+        smoke_notif_identity = Auth::Identity.create!(
+          email: "notif-smoke-#{Process.pid}-#{SecureRandom.hex(2)}@example.com",
+          password: "verysecret"
+        )
+        smoke_notif_identity.notify(strategy: :in_app, template: "default").persisted?
       }
-      check.call("notif.unread") { smoke_user && smoke_user.unread_in_app_notifications.count >= 1 }
+      check.call("notif.unread") { smoke_notif_identity && smoke_notif_identity.unread_in_app_notifications.count >= 1 }
       check.call("notif.preference_default_on") {
-        Notifications::NotificationPreference.enabled?(user_id: smoke_user.id, channel: "email") == true
+        Notifications::NotificationPreference.enabled?(identity_id: smoke_notif_identity.id, channel: "email") == true
       }
 
       # ---- BILLING --------------------------------------------------
@@ -403,6 +506,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       check.call("billing.subscription_created") {
         sub = Billing::Subscription.create!(
           gateway_ref: "sub_smoke_#{Process.pid}",
+          account_id:  smoke_account.id,
           customer_ref: "cus_smoke_#{Process.pid}",
           plan_ref: plan.gateway_ref, status: "active",
           current_period_end: 30.days.from_now
@@ -413,6 +517,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       check.call("billing.invoice_paid") {
         Billing::Invoice.create!(
           gateway_ref: "in_smoke_#{Process.pid}",
+          account_id:  smoke_account.id,
           customer_ref: sub.customer_ref, subscription_ref: sub.gateway_ref,
           amount_cents: 1299, currency: "GBP", status: "paid", paid_at: Time.current
         ).paid?
@@ -451,9 +556,10 @@ RSpec.describe "rails new integration", type: :integration_full do
           max_lifetime_units: 1
         )
         ltd_grant_result = Billing::Lifetime::GrantPassService.call(
+          account_id:   smoke_account.id,
           customer_ref: "cus_ltd_smoke_#{Process.pid}",
           plan_ref:     ltd_plan.gateway_ref,
-          granted_by:   nil
+          granted_by:   smoke_owner_identity
         )
         ltd_grant_result.ok?
       }
@@ -470,7 +576,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       check.call("billing.ltd_revoke") {
         Billing::Lifetime::RevokePassService.call(
           pass:       ltd_grant_result.pass,
-          revoked_by: nil
+          revoked_by: smoke_owner_identity
         ).ok?
       }
 
@@ -478,7 +584,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       team = nil
       check.call("teams.team_created") {
         team = Teams::Team.create!(name: "Smoke Co.", slug: "smoke-#{Process.pid}")
-        Teams::Membership.create!(team: team, user_id: smoke_user.id, role: "owner")
+        Teams::Membership.create!(team: team, identity_id: smoke_owner_identity.id, role: "owner")
         team.persisted?
       }
       check.call("teams.invitation_created") {
@@ -487,7 +593,11 @@ RSpec.describe "rails new integration", type: :integration_full do
       check.call("teams.membership_role_owner") { team && team.memberships.where(role: "owner").exists? }
 
       # ---- EVENT REGISTRY -------------------------------------------
-      check.call("events.auth_signed_up")        { Seams::EventRegistry.registered?("user.signed_up.auth") }
+      check.call("events.auth_signed_up")        { Seams::EventRegistry.registered?("identity.signed_up.auth") }
+      check.call("events.accounts_created")      { Seams::EventRegistry.registered?("account.created.accounts") }
+      check.call("events.accounts_membership_created") {
+        Seams::EventRegistry.registered?("membership.created.accounts")
+      }
       check.call("events.billing_invoice_paid")  { Seams::EventRegistry.registered?("invoice.paid.billing") }
       check.call("events.teams_team_created")    { Seams::EventRegistry.registered?("team.created.teams") }
       check.call("events.notif_queued")          { Seams::EventRegistry.registered?("notification.queued.notifications") }
@@ -506,6 +616,9 @@ RSpec.describe "rails new integration", type: :integration_full do
       auth.api_token_revoked=true
       auth.reset_request=true
       auth.reset_complete=true
+      accounts.create_with_owner=true
+      accounts.system_actor_present=true
+      accounts.owner_membership_present=true
       notif.type_registry=true
       notif.created=true
       notif.unread=true
@@ -518,9 +631,12 @@ RSpec.describe "rails new integration", type: :integration_full do
       billing.ltd_grant=true
       billing.ltd_lock_raises=true
       billing.ltd_revoke=true
+      teams.team_created=true
       teams.invitation_created=true
       teams.membership_role_owner=true
       events.auth_signed_up=true
+      events.accounts_created=true
+      events.accounts_membership_created=true
       events.billing_invoice_paid=true
       events.teams_team_created=true
       events.notif_queued=true

@@ -49,6 +49,14 @@ Metrics/AbcSize:
   Exclude:
     - "lib/seams/generators/dummy_app_writer.rb"
 
+Metrics/ParameterLists:
+  Exclude:
+    # The DummyAppWriter helper takes one keyword per slim-app concern
+    # (engine_path, engine_module, schema, mount_at, host_user,
+    # host_user_path). All optional except the first three. A wrapper
+    # struct would just rename the same parameters.
+    - "lib/seams/generators/dummy_app_writer.rb"
+
 RSpec/ExampleLength:
   Max: 15
   Exclude:

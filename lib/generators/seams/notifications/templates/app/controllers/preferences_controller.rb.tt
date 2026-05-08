@@ -3,7 +3,7 @@
 module Notifications
   class PreferencesController < ApplicationController
     def show
-      @preferences = Notifications::NotificationPreference.where(user_id: current_user_id)
+      @preferences = Notifications::NotificationPreference.where(identity_id: current_identity_id)
     end
 
     def update
@@ -18,7 +18,7 @@ module Notifications
 
         type = nil if type == "any"
         pref = Notifications::NotificationPreference.find_or_initialize_by(
-          user_id:           current_user_id,
+          identity_id:       current_identity_id,
           channel:           channel,
           notification_type: type
         )
@@ -38,10 +38,17 @@ module Notifications
       raw.respond_to?(:permit!) ? raw.permit!.to_h : raw.to_h
     end
 
-    def current_user_id
-      return nil unless respond_to?(:current_user)
+    # Resolves the signed-in identity's id from `Auth::Current.identity`
+    # (the Auth engine's per-request namespace). Gated on
+    # `defined?(Auth::Current)` so the controller is safe in hosts
+    # that don't ship the auth engine. Override in your host if you
+    # wire authentication differently.
+    def current_identity_id
+      if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
+        return Auth::Current.identity.id
+      end
 
-      current_user&.id
+      nil
     end
   end
 end

@@ -169,15 +169,19 @@ module Seams
       def post_install_message
         say ""
         say "  Seams is installed. Generate your first engine with:", :green
-        say "    bin/seams engine core   (or bin/rails generate seams:engine core)"
+        say "    bin/seams core          (or bin/rails generate seams:core)"
         say ""
         say "  Other useful commands:", :yellow
         say "    bin/seams list          - list engines + their events"
         say "    bin/seams core          - generate the canonical Core engine (concerns, audit log)"
-        say "    bin/seams auth          - generate the canonical Auth engine"
+        say "    bin/seams auth          - generate the canonical Auth engine (Identity, sessions, OAuth)"
+        say "    bin/seams accounts      - generate the canonical Accounts engine (tenant + Membership + system actor)"
         say "    bin/seams notifications - generate the canonical Notifications engine"
         say "    bin/seams billing       - generate the canonical Billing engine"
         say "    bin/seams teams         - generate the canonical Teams engine"
+        say ""
+        say "  Recommended order: core -> auth -> accounts -> notifications -> billing -> teams.", :yellow
+        say "  See doc/CURRENT_ATTRIBUTES.md (after install) for the per-request namespace cascade.", :yellow
         say ""
       end
     end

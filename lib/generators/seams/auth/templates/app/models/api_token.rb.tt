@@ -4,12 +4,12 @@ require "digest"
 require "securerandom"
 
 module Auth
-  # Bearer-style API token. Issued to a user, presented in the
+  # Bearer-style API token. Issued to an Identity, presented in the
   # Authorization header by API clients.
   #
   # Storage: only a SHA-256 hash of the token lives in the DB —
   # `token_digest`. The plaintext (`token`) is shown ONCE, at
-  # creation time, via the GenerateApiToken service. If the user
+  # creation time, via the GenerateApiToken service. If the identity
   # loses it they must rotate; we cannot recover it.
   #
   # `token_prefix` is the first few characters of the plaintext, kept
@@ -18,7 +18,7 @@ module Auth
   # easy to grep for.
   #
   # Optional `expires_at`. Optional `last_used_at` for activity
-  # tracking. `name` lets the user label the token ("CI deploy key",
+  # tracking. `name` lets the identity label the token ("CI deploy key",
   # "iPhone shortcut").
   class ApiToken < ApplicationRecord
     self.table_name = "auth_api_tokens"
@@ -27,7 +27,7 @@ module Auth
     PLAINTEXT_LENGTH = 32  # bytes → 43 chars urlsafe-base64
     PREFIX_DISPLAY   = 12  # chars stored in token_prefix
 
-    belongs_to :user, class_name: "Auth::User", foreign_key: :user_id
+    belongs_to :identity, class_name: "Auth::Identity", foreign_key: :identity_id
 
     validates :token_digest, presence: true, uniqueness: true
     validates :token_prefix, presence: true

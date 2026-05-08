@@ -43,7 +43,7 @@ RSpec.describe RuboCop::Cop::Seams::NoCrossEngineModelAccess, :config do
       module Auth
         class SignIn
           def call
-            Auth::User.find(1)
+            Auth::Identity.find(1)
           end
         end
       end
@@ -88,6 +88,41 @@ RSpec.describe RuboCop::Cop::Seams::NoCrossEngineModelAccess, :config do
     it "does not flag Billing::ApplicationRecord" do
       expect_no_offenses(<<~RUBY)
         class Subscription < Billing::ApplicationRecord; end
+      RUBY
+    end
+  end
+
+  context "with per-request CurrentAttributes namespaces" do
+    # Every engine ships its own `<Engine>::Current` namespace; they
+    # are intentionally a shared per-request bus and exempt from the
+    # boundary cop. See doc/CURRENT_ATTRIBUTES.md.
+    it "does not flag Billing::Current" do
+      expect_no_offenses(<<~RUBY)
+        module Auth
+          class SignIn
+            def call
+              Billing::Current.account
+            end
+          end
+        end
+      RUBY
+    end
+
+    it "does not flag Notifications::Current" do
+      expect_no_offenses(<<~RUBY)
+        Notifications::Current.recipient
+      RUBY
+    end
+
+    it "does not flag a constant assignment that targets <Engine>::Current" do
+      expect_no_offenses(<<~RUBY)
+        module Auth
+          class Bind
+            def call
+              Billing::Current.account = nil
+            end
+          end
+        end
       RUBY
     end
   end

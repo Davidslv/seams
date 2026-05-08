@@ -20,6 +20,16 @@ module RuboCop
       # (`Controller`, `Job`, `Mailer`, `Helper`, `Component`, `Engine`).
       # Concerns (`Billing::Billable`, `Billing::Concerns::Billable`)
       # are exempt when listed in `ExposedConcerns`.
+      #
+      # `<Engine>::Current` is also exempt by design: every engine ships
+      # its own `ActiveSupport::CurrentAttributes` namespace
+      # (`Auth::Current`, `Accounts::Current`, `Teams::Current`, etc.)
+      # and these per-request state holders are intentionally readable
+      # from anywhere in the host. Treating them as boundary-violations
+      # would force every cross-engine read of per-request identity /
+      # account / team to go through a host-defined shim, which defeats
+      # the purpose of `CurrentAttributes` as a shared per-request bus.
+      # The exception is documented in `doc/CURRENT_ATTRIBUTES.md`.
       class NoCrossEngineModelAccess < Base
         MSG = "Engine `%<own>s` must not access `%<const>s` directly. " \
               "Use an event or a %<other>s-exposed concern instead."
@@ -34,6 +44,7 @@ module RuboCop
           ApplicationHelper
           ApplicationCable
           Routes
+          Current
         ].freeze
 
         DEFAULT_IGNORED_LEAF_SUFFIXES = %w[

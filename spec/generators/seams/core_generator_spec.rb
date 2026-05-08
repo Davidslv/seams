@@ -23,6 +23,11 @@ RSpec.describe Seams::Generators::CoreGenerator do
     yield(File.read(full)) if block_given?
   end
 
+  def assert_no_file(path)
+    full = File.join(destination_root, path)
+    expect(File.exist?(full)).to be(false), "expected #{path} NOT to be created"
+  end
+
   before do
     prepare_destination
     run_generator
@@ -91,6 +96,18 @@ RSpec.describe Seams::Generators::CoreGenerator do
         expect(content).to include("Core::Current.user")
       end
     end
+
+    # Regression: pre-Wave-9 the resolver only fell back to
+    # `current_user`. Auth post-Wave-9 ships `current_identity`, so
+    # `Core::Current.user` was always nil and audit-log writes had
+    # `actor_id = nil`.
+    it "Core::HasCurrentAttributes#resolve_current_user reads Auth::Current.identity first" do
+      assert_file "engines/core/app/controllers/concerns/core/has_current_attributes.rb" do |content|
+        expect(content).to include("Auth::Current")
+        expect(content).to include("current_identity")
+        expect(content).to include("current_user")
+      end
+    end
   end
 
   describe "services + validators" do
@@ -151,9 +168,10 @@ RSpec.describe Seams::Generators::CoreGenerator do
       assert_file "engines/core/spec/dummy/db/schema.rb" do |content|
         expect(content).to include("create_table :core_audit_logs")
       end
-      assert_file "engines/core/spec/dummy/app/models/user.rb" do |content|
-        expect(content).to include("include Core::Auditable")
-      end
+      # Post Wave 9: no host User in core's dummy. The auditable spec
+      # stubs its own `Article` class via `stub_const`; no other spec
+      # consumes a top-level User.
+      assert_no_file "engines/core/spec/dummy/app/models/user.rb"
       assert_file "engines/core/spec/rails_helper.rb"
       assert_file "engines/core/spec/runtime/core_boot_spec.rb"
     end

@@ -5,7 +5,7 @@ module Teams
     before_action :set_team, only: %i[show edit update destroy]
 
     def index
-      @teams = Teams::Team.joins(:memberships).where(memberships: { user_id: current_user_id })
+      @teams = Teams::Team.joins(:memberships).where(memberships: { identity_id: current_identity_id })
     end
 
     def show; end
@@ -19,11 +19,11 @@ module Teams
       @team = Teams::Team.new(team_params)
       Teams::Team.transaction do
         @team.save!
-        @team.memberships.create!(user_id: current_user_id, role: "owner")
+        @team.memberships.create!(identity_id: current_identity_id, role: "owner")
       end
 
       Seams::Events::Publisher.publish(
-        "team.created.teams", team_id: @team.id, owner_id: current_user_id
+        "team.created.teams", team_id: @team.id, creator_identity_id: current_identity_id
       )
       redirect_to @team, notice: "Team created"
     rescue ActiveRecord::RecordInvalid
@@ -53,8 +53,16 @@ module Teams
       params.require(:team).permit(:name, :slug)
     end
 
-    def current_user_id
-      respond_to?(:current_user) && current_user&.id
+    # Resolves the signed-in human's id from `Auth::Current.identity`
+    # (the Auth engine's per-request namespace). Gated on
+    # `defined?(Auth::Current)` so it's safe in hosts that don't ship
+    # auth. Override in your host if you wire auth differently.
+    def current_identity_id
+      if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
+        return Auth::Current.identity.id
+      end
+
+      nil
     end
   end
 end

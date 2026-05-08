@@ -106,11 +106,15 @@ module Seams
       end
 
       def create_dummy_app
+        # Post Wave 9: the dummy app does NOT ship a host User model.
+        # The auditable spec stubs its own `Article` (via stub_const)
+        # and the tenant_scoped/sluggable specs work against the
+        # `articles`/`teams` tables in dummy_schema. There is no
+        # remaining caller for a top-level User class.
         Seams::Generators::DummyAppWriter.write!(
           engine_path: File.join(destination_root, "engines", ENGINE_NAME),
           engine_module: "Core",
-          schema: dummy_schema,
-          host_user: dummy_host_user
+          schema: dummy_schema
         )
         template "spec/runtime/boot_spec.rb.tt",
                  engine_path("spec/runtime/core_boot_spec.rb")
@@ -166,17 +170,6 @@ module Seams
           end
           add_index :teams, :slug, unique: true
         SCHEMA
-      end
-
-      def dummy_host_user
-        <<~RB
-          # frozen_string_literal: true
-
-          # Minimal host User for the engine's spec/dummy app.
-          class User < ApplicationRecord
-            include Core::Auditable
-          end
-        RB
       end
 
       # Core's migration sits AHEAD of the canonical engine offsets

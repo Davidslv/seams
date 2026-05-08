@@ -10,8 +10,8 @@ RSpec.describe "Teams engine boot", type: :integration do
   it "registers the five canonical team events" do
     %w[
       team.created.teams
-      team.member_added.teams
-      team.member_removed.teams
+      team.member_joined.teams
+      team.member_left.teams
       invitation.sent.teams
       invitation.accepted.teams
     ].each do |event|

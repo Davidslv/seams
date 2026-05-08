@@ -20,15 +20,14 @@ module Auth
     def call(api_token:)
       return Result.new(ok?: false, error: "API token not found", code: :not_found) if api_token.nil? || api_token.destroyed?
 
-      user          = api_token.user
+      identity      = api_token.identity
       api_token_id  = api_token.id
       token_prefix  = api_token.token_prefix
       api_token.destroy!
 
       Seams::Events::Publisher.publish(
         "api_token.revoked.auth",
-        auth_user_id: user&.id,
-        host_user_id: user&.host_user_id,
+        identity_id:  identity&.id,
         api_token_id: api_token_id,
         token_prefix: token_prefix
       )

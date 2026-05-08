@@ -1,0 +1,97 @@
+# frozen_string_literal: true
+
+require "active_support/concern"
+
+module Accounts
+  # Mix into any model whose rows belong to a single Account. Adds:
+  #
+  #   - `belongs_to :account, class_name: "Accounts::Account"`
+  #   - a default_scope filtered to `Accounts::Current.account`. When
+  #     `Accounts::Current.account` is unset, the scope returns `none`
+  #     (an empty relation) — see "fail-closed" below.
+  #   - presence validation on `account`
+  #
+  #   class AuditEntry < ApplicationRecord
+  #     include Accounts::AccountScoped
+  #   end
+  #
+  #   Accounts::Current.account = account
+  #   AuditEntry.create!(action: "...")  # account_id auto-assigned
+  #   AuditEntry.all                     # only this account's rows
+  #
+  # ### Fail-closed default
+  #
+  # When `Accounts::Current.account` is nil, the default_scope returns
+  # `none` rather than `all`. Rationale: the alternative (return all
+  # rows across all tenants when no account is bound) is the canonical
+  # multi-tenant data-leak bug. A forgotten `Current.account=` in a
+  # background job, an admin tool, or a Rails console session would
+  # otherwise hand the operator another tenant's data without warning.
+  # Fail-closed surfaces "I have no rows" — a noisy symptom the
+  # developer fixes immediately — instead of a silent leak.
+  #
+  # Opt-out paths (use deliberately):
+  #   * `.unscoped` — full Active Record bypass; loses every default
+  #     scope including soft-delete + sluggable; reserved for
+  #     platform-admin / impersonation flows gated on
+  #     `Auth::Current.identity.staff?`.
+  #   * `.with_no_account_scope` — returns the relation as if the
+  #     model were not account-scoped; preserves any other
+  #     default_scopes the model declares; intended for seed scripts,
+  #     migrations, and platform tooling.
+  #
+  # Background jobs MUST set `Accounts::Current.account =` before
+  # querying, or use `.with_no_account_scope` explicitly. The shape:
+  #
+  #   class IngestionJob < ApplicationJob
+  #     def perform(account_id, payload)
+  #       Accounts::Current.account = Accounts::Account.find(account_id)
+  #       AuditEntry.create!(...)   # auto-scoped
+  #     end
+  #   end
+  module AccountScoped
+    extend ActiveSupport::Concern
+
+    included do
+      belongs_to :account, class_name: "Accounts::Account"
+
+      # The default_scope ALWAYS applies a where(:account_id) clause —
+      # either filtered to the current account or to NULL. The model
+      # validates `account` presence and the `belongs_to` adds a NOT
+      # NULL guard at the application layer, so `where(account_id: nil)`
+      # is a never-matching sentinel — fail-closed without using
+      # `none`. The shape is deliberate: `unscope(where: :account_id)`
+      # in `with_no_account_scope` cleanly reverses this. Using
+      # `none` would create a NullRelation that `unscope` cannot un-do,
+      # which would defeat the documented opt-out path.
+      default_scope -> {
+        account = Accounts::Current.account
+        if account
+          where(account_id: account.id)
+        else
+          where(account_id: nil)
+        end
+      }
+
+      validates :account, presence: true
+
+      before_validation :assign_current_account, on: :create
+    end
+
+    class_methods do
+      # Returns the relation as it would be without the AccountScoped
+      # default_scope, preserving any other default_scopes the model
+      # declares. Use deliberately — name-it-loud opt-out for seed
+      # scripts, migrations, and platform tooling.
+      def with_no_account_scope
+        unscope(where: :account_id)
+      end
+    end
+
+    private
+
+    def assign_current_account
+      self.account_id ||= Accounts::Current.account&.id if Accounts::Current.account
+    end
+  end
+end

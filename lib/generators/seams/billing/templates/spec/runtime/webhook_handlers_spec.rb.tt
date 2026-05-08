@@ -13,7 +13,7 @@ require_relative "../support/stripe_helpers"
 #      upserted with the expected columns (or NOT upserted, for the
 #      stateless payment_intent / charge handlers).
 #   2. The canonical seams event is published with the expected
-#      payload shape.
+#      payload shape (including `account_id` post-Wave-9).
 #
 # Why this exists: a regression in SubscriptionHandlerBase#upsert_subscription
 # or InvoiceHandlerBase#upsert_invoice would not be caught by the
@@ -21,11 +21,23 @@ require_relative "../support/stripe_helpers"
 # upsert silently no-ops. This spec exercises the real ActiveRecord
 # round-trip + the Seams::Events::Publisher contract.
 #
+# Account resolution: post-Wave-9 the upsert requires an `account_id`
+# (the Accounts::Account UUID). The handler resolves it from any
+# pre-existing Billing::Subscription / Billing::Invoice row sharing
+# the same `customer_ref`. Each test seeds a sentinel row with the
+# right customer_ref + a known account_id, then asserts the handler
+# preserved or wrote that account_id on the row it cares about.
+#
 # CheckoutSessionCompletedHandler is covered for both the subscription
 # branch (publishes checkout.session_completed.billing) and the
 # Lifetime Deal branch (forks to Billing::Lifetime::CreatePassFromCheckoutService).
 RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
   include StripeHelpers
+
+  # The known Account that every test references — kept stable so
+  # cross-test assertions (account_id is preserved through upsert,
+  # for instance) stay obvious.
+  TEST_ACCOUNT_ID = "11111111-1111-1111-1111-111111111111"
 
   # Helper: load a fixture and reshape it into the event hash that
   # Billing::Gateways::Stripe#verify_webhook hands to the handler.
@@ -57,10 +69,24 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
     Seams::Events::Publisher.unsubscribe(subscriber) if subscriber
   end
 
+  # Seed a sibling Billing::Subscription on `customer_ref` so the
+  # handler base's resolve_account_id_from_sibling lookup can find
+  # it. Returns the seeded row.
+  def seed_account_on(customer_ref)
+    create(:billing_subscription,
+           account_id:   TEST_ACCOUNT_ID,
+           customer_ref: customer_ref,
+           gateway_ref:  "sub_seed_#{customer_ref}",
+           plan_ref:     "price_seed",
+           status:       "active")
+  end
+
   let(:gateway) { "stripe" }
 
   describe Billing::Webhooks::Handlers::SubscriptionCreatedHandler do
     it "upserts a Billing::Subscription row + publishes subscription.created.billing" do
+      seed_account_on("cus_test_123")
+
       event    = event_for("customer_subscription_created")
       captured = capture_published("subscription.created.billing") do
         described_class.new(event: event, gateway: gateway).call
@@ -68,6 +94,7 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
       subscription = Billing::Subscription.find_by(gateway_ref: "sub_test_123")
       expect(subscription).not_to be_nil
+      expect(subscription.account_id).to eq(TEST_ACCOUNT_ID)
       expect(subscription.customer_ref).to eq("cus_test_123")
       expect(subscription.plan_ref).to eq("price_test_pro")
       expect(subscription.status).to eq("active")
@@ -75,6 +102,7 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
       expect(captured.size).to eq(1)
       expect(captured.first[:gateway]).to eq("stripe")
+      expect(captured.first[:account_id]).to eq(TEST_ACCOUNT_ID)
       expect(captured.first[:customer_ref]).to eq("cus_test_123")
       expect(captured.first[:object_id]).to eq("sub_test_123")
     end
@@ -86,6 +114,7 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
       # of find_or_initialize_by — guards against a regression that
       # accidentally creates duplicates instead of updating.
       create(:billing_subscription,
+             account_id:   TEST_ACCOUNT_ID,
              gateway_ref:  "sub_test_123",
              customer_ref: "cus_test_123",
              plan_ref:     "price_test_pro",
@@ -98,6 +127,7 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
       subscription = Billing::Subscription.find_by(gateway_ref: "sub_test_123")
       expect(Billing::Subscription.where(gateway_ref: "sub_test_123").count).to eq(1)
+      expect(subscription.account_id).to eq(TEST_ACCOUNT_ID)
       expect(subscription.plan_ref).to eq("price_test_pro_annual")
       expect(subscription.current_period_end).to be_within(1.second).of(Time.at(1_735_270_400))
       expect(captured.size).to eq(1)
@@ -107,6 +137,7 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
   describe Billing::Webhooks::Handlers::SubscriptionDeletedHandler do
     it "flips the row status to canceled + publishes subscription.canceled.billing" do
       create(:billing_subscription,
+             account_id:   TEST_ACCOUNT_ID,
              gateway_ref:  "sub_test_123",
              customer_ref: "cus_test_123",
              plan_ref:     "price_test_pro",
@@ -135,12 +166,15 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
       subscription = Billing::Subscription.find_by(gateway_ref: "sub_test_123")
       expect(subscription.status).to eq("canceled")
+      expect(subscription.account_id).to eq(TEST_ACCOUNT_ID)
       expect(captured.size).to eq(1)
     end
   end
 
   describe Billing::Webhooks::Handlers::SubscriptionTrialWillEndHandler do
     it "upserts the row + publishes subscription.trial_will_end.billing" do
+      seed_account_on("cus_test_123")
+
       # The shipped fixture's items.data[0].price intentionally omits
       # `id` (lookup_key only). We add `id` here so plan_ref_from_object_hash
       # returns a value the model's presence validation accepts.
@@ -161,12 +195,15 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
       subscription = Billing::Subscription.find_by(gateway_ref: "sub_test_123")
       expect(subscription).not_to be_nil
       expect(subscription.status).to eq("trialing")
+      expect(subscription.account_id).to eq(TEST_ACCOUNT_ID)
       expect(captured.size).to eq(1)
     end
   end
 
   describe Billing::Webhooks::Handlers::InvoiceCreatedHandler do
     it "upserts a draft Billing::Invoice row + publishes invoice.created.billing" do
+      seed_account_on("cus_test_123")
+
       event    = event_for("invoice_created")
       captured = capture_published("invoice.created.billing") do
         described_class.new(event: event, gateway: gateway).call
@@ -174,6 +211,7 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
       invoice = Billing::Invoice.find_by(gateway_ref: "in_test_123")
       expect(invoice).not_to be_nil
+      expect(invoice.account_id).to eq(TEST_ACCOUNT_ID)
       expect(invoice.customer_ref).to eq("cus_test_123")
       expect(invoice.subscription_ref).to eq("sub_test_123")
       expect(invoice.status).to eq("draft")
@@ -186,6 +224,8 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
   describe Billing::Webhooks::Handlers::InvoicePaidHandler do
     it "marks the invoice paid (status + paid_at) + publishes invoice.paid.billing" do
+      seed_account_on("cus_test_123")
+
       event    = event_for("invoice_paid")
       captured = capture_published("invoice.paid.billing") do
         described_class.new(event: event, gateway: gateway).call
@@ -195,12 +235,15 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
       expect(invoice.status).to eq("paid")
       expect(invoice.paid_at).not_to be_nil
       expect(invoice.amount_cents).to eq(1299)
+      expect(invoice.account_id).to eq(TEST_ACCOUNT_ID)
       expect(captured.size).to eq(1)
     end
   end
 
   describe Billing::Webhooks::Handlers::InvoicePaymentFailedHandler do
     it "leaves the invoice in 'open' + publishes invoice.failed.billing" do
+      seed_account_on("cus_test_123")
+
       event    = event_for("invoice_payment_failed")
       captured = capture_published("invoice.failed.billing") do
         described_class.new(event: event, gateway: gateway).call
@@ -216,6 +259,7 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
   describe Billing::Webhooks::Handlers::InvoiceFinalizedHandler do
     it "promotes draft → open + publishes invoice.finalized.billing" do
       create(:billing_invoice,
+             account_id:  TEST_ACCOUNT_ID,
              gateway_ref: "in_test_123",
              status:      "draft",
              paid_at:     nil)
@@ -233,6 +277,8 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
   describe Billing::Webhooks::Handlers::InvoiceVoidedHandler do
     it "flips status to void + publishes invoice.voided.billing" do
+      seed_account_on("cus_test_123")
+
       event    = event_for("invoice_voided")
       captured = capture_published("invoice.voided.billing") do
         described_class.new(event: event, gateway: gateway).call
@@ -301,7 +347,11 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
       it "forks to CreatePassFromCheckoutService which creates a LifetimePass + emits lifetime.purchased.billing" do
         full = stripe_event_fixture("checkout_session_completed").deep_dup
         full[:data][:object][:mode] = "payment"
-        full[:data][:object][:metadata] = { access_type: "lifetime", plan_ref: "price_test_lifetime_1" }
+        full[:data][:object][:metadata] = {
+          access_type: "lifetime",
+          plan_ref:    "price_test_lifetime_1",
+          account_id:  TEST_ACCOUNT_ID
+        }
         event = {
           id:       full[:id],
           type:     full[:type],
@@ -321,9 +371,11 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
         pass = Billing::LifetimePass.find_by(gateway_ref: "cs_test_123")
         expect(pass).not_to be_nil
+        expect(pass.account_id).to eq(TEST_ACCOUNT_ID)
         expect(pass.customer_ref).to eq("cus_test_123")
         expect(pass.plan_ref).to eq("price_test_lifetime_1")
         expect(captured_lifetime.size).to eq(1)
+        expect(captured_lifetime.first[:account_id]).to eq(TEST_ACCOUNT_ID)
       end
     end
   end

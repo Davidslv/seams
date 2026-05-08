@@ -2,10 +2,11 @@
 
 module Auth
   module OAuth
-    # Links an Auth::User to an external OAuth identity (Google account,
-    # GitHub account, etc.). One row per (user, provider) pair — multiple
-    # rows per user means the user signed in with multiple providers,
-    # and the user can be looked up via either.
+    # Links an Auth::Identity to an external OAuth identity (Google
+    # account, GitHub account, etc.). One row per (identity, provider)
+    # pair — multiple rows per identity means the identity signed in
+    # with multiple providers, and the identity can be looked up via
+    # either.
     #
     # Tokens are encrypted at the database level via Rails 7+
     # ActiveRecord::Encryption. Run `bin/rails db:encryption:init` once
@@ -16,13 +17,13 @@ module Auth
 
       PROVIDERS = %w[google github].freeze
 
-      belongs_to :user, class_name: "Auth::User", foreign_key: :user_id
+      belongs_to :identity, class_name: "Auth::Identity", foreign_key: :identity_id
 
       validates :provider,     presence: true, inclusion: { in: PROVIDERS }
       validates :provider_uid, presence: true,
                                uniqueness: { scope: :provider,
                                              message: "is already linked to another account" }
-      validates :user_id,      presence: true,
+      validates :identity_id,  presence: true,
                                uniqueness: { scope: :provider,
                                              message: "already linked this provider" }
 
@@ -32,7 +33,7 @@ module Auth
       encrypts :access_token
       encrypts :refresh_token
 
-      # provider_uid is the user's stable id at the OAuth provider
+      # provider_uid is the identity's stable id at the OAuth provider
       # (Google `sub`, GitHub user id). It IS personal data under GDPR
       # Article 4 ("online identifier"). Deterministic so the
       # (provider, provider_uid) lookup that powers OAuth sign-in keeps

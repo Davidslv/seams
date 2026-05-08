@@ -81,10 +81,21 @@ engine is added, and seams:remove prunes it.
 
 ## Why ExposedConcerns
 
-Some cross-engine references are intentional. The host's `User`
-should `include Auth::Authenticatable`. The `NoCrossEngineModelAccess`
-cop has an `ExposedConcerns:` allowlist for exactly this — the
-canonical generators add their concerns to it automatically.
+Some cross-engine references are intentional. A host User (if
+present post-Wave-9) can `include Auth::Authenticatable`, and
+the canonical Account class includes `Billing::Billable` so the
+billing engine's lifecycle hooks bind to the tenant. Note that
+`Auth::Identity` is the default human post-Wave-9 — hosts only
+keep a domain User when they want a domain-specific shape on top
+of the credential model.
+
+The `NoCrossEngineModelAccess` cop has an `ExposedConcerns:`
+allowlist for exactly this — the canonical generators add their
+concerns to it automatically. The cop also exempts every engine's
+`<Engine>::Current` namespace from the boundary rule (each engine
+ships its own `ActiveSupport::CurrentAttributes` peer; cross-engine
+reads of per-request state are intentional). See
+`doc/CURRENT_ATTRIBUTES.md`.
 
 ## Adapter pattern
 

@@ -106,7 +106,7 @@ Grep for `[seams] [<engine>]` to filter to a single engine's stream.
 
 Subscribers run synchronously in the publisher's process (the default
 ActiveSupport adapter), so a single web request that publishes
-`user.signed_up.auth` and triggers two subscriber jobs all share the
+`identity.signed_up.auth` and triggers two subscriber jobs all share the
 same `request_id` if `Core::HasCurrentAttributes` is mixed into
 ApplicationController. Pass `Core::Current.request_id` through to
 your APM:

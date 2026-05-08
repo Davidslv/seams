@@ -4,7 +4,7 @@ module Auth
   class Session < ApplicationRecord
     self.table_name = "auth_sessions"
 
-    belongs_to :user, class_name: "Auth::User"
+    belongs_to :identity, class_name: "Auth::Identity"
 
     before_create :assign_token
     before_create :assign_expiry

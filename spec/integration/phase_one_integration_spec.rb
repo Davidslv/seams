@@ -62,7 +62,7 @@ RSpec.describe "Phase 1 integration", type: :integration do
 
     # 4. Simulate Rails boot by registering each engine's events
     Seams::EventRegistry.register("subscription.created.billing", emitted_by: "Billing")
-    Seams::EventRegistry.register("user.signed_up.auth",          emitted_by: "Auth")
+    Seams::EventRegistry.register("identity.signed_up.auth",      emitted_by: "Auth")
 
     # 5. List sees both engines and their events
     output = StringIO.new
@@ -72,7 +72,7 @@ RSpec.describe "Phase 1 integration", type: :integration do
     expect(listed).to match(/\bauth\b/)
     expect(listed).to match(/\bbilling\b/)
     expect(listed).to include("subscription.created.billing")
-    expect(listed).to include("user.signed_up.auth")
+    expect(listed).to include("identity.signed_up.auth")
 
     # 6. Remove auth — billing should still be listed afterwards
     run(Seams::Generators::RemoveGenerator, ["auth", "--force"])

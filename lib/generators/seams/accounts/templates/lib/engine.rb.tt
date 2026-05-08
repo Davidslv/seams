@@ -1,0 +1,50 @@
+# frozen_string_literal: true
+
+module Accounts
+  class Engine < ::Rails::Engine
+    isolate_namespace Accounts
+
+    config.generators do |g|
+      g.test_framework :rspec
+    end
+
+    initializer "accounts.register_events" do
+      Seams::EventRegistry.register("account.created.accounts",            emitted_by: "Accounts")
+      Seams::EventRegistry.register("account.cancelled.accounts",          emitted_by: "Accounts")
+      Seams::EventRegistry.register("membership.created.accounts",         emitted_by: "Accounts")
+      Seams::EventRegistry.register("membership.role_changed.accounts",    emitted_by: "Accounts")
+      Seams::EventRegistry.register("membership.removed.accounts",         emitted_by: "Accounts")
+    end
+
+    initializer "accounts.append_migrations" do |app|
+      unless app.root == root
+        config.paths["db/migrate"].expanded.each do |expanded_path|
+          app.config.paths["db/migrate"] << expanded_path
+        end
+      end
+    end
+
+    # Boot-time dependency assertion. Accounts requires Auth: an
+    # Accounts::Membership with an `identity_id` is meaningless
+    # without an `auth_identities` row to point at. We enforce this
+    # at app boot rather than at first failed query so the operator
+    # gets a clear "install seams:auth" error instead of a deep stack
+    # trace mid-request.
+    config.after_initialize do
+      missing = []
+      missing << "Auth::Identity (run: bin/rails generate seams:auth)" unless defined?(::Auth::Identity)
+
+      if missing.any?
+        raise <<~MSG
+          [seams accounts] missing required cross-engine dependency:
+              #{missing.join("\n              ")}
+
+          The accounts engine joins Auth::Identity rows to
+          Accounts::Account rows; it cannot run without auth. Generate
+          the auth engine and re-run db:migrate, or remove accounts
+          with `bin/rails generate seams:remove accounts --force`.
+        MSG
+      end
+    end
+  end
+end

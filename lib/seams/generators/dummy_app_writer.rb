@@ -15,19 +15,25 @@ module Seams
     # optional host User model, and the routes block.
     #
     #   Seams::Generators::DummyAppWriter.write!(
-    #     engine_path:   "engines/auth",
-    #     engine_module: "Auth",
-    #     mount_at:      "/auth",
-    #     schema:        "<schema body>",
-    #     host_user:     "<class User body>",   # optional
+    #     engine_path:      "engines/auth",
+    #     engine_module:    "Auth",
+    #     mount_at:         "/auth",
+    #     schema:           "<schema body>",
+    #     host_user:        "<class User body>",      # optional
+    #     host_user_path:   "app/models/user.rb",     # optional, defaults to app/models/user.rb
     #   )
+    #
+    # `host_user_path` lets engines whose dummy "user" model lives at a
+    # different autoload path (e.g. `app/models/auth/identity.rb`)
+    # write the file where Zeitwerk will find it.
     module DummyAppWriter
       module_function
 
-      def write!(engine_path:, engine_module:, schema:, mount_at: nil, host_user: nil)
+      def write!(engine_path:, engine_module:, schema:, mount_at: nil, host_user: nil,
+                 host_user_path: "app/models/user.rb")
         ensure_directories(engine_path)
         write_dummy_config(engine_path, engine_module, mount_at)
-        write_dummy_app(engine_path, host_user)
+        write_dummy_app(engine_path, host_user, host_user_path)
         write_dummy_db(engine_path, schema)
         write_dummy_meta(engine_path)
         write_spec_helpers(engine_path)
@@ -57,11 +63,15 @@ module Seams
         write(File.join(engine_path, "spec/dummy/config/routes.rb"), routes_rb(engine_module, mount_at))
       end
 
-      def write_dummy_app(engine_path, host_user)
+      def write_dummy_app(engine_path, host_user, host_user_path)
         write(File.join(engine_path, "spec/dummy/app/models/application_record.rb"), application_record_rb)
         write(File.join(engine_path, "spec/dummy/app/controllers/application_controller.rb"), application_controller_rb)
         write(File.join(engine_path, "spec/dummy/app/mailers/application_mailer.rb"),         application_mailer_rb)
-        write(File.join(engine_path, "spec/dummy/app/models/user.rb"),                        host_user) if host_user
+        return unless host_user
+
+        full_user_path = File.join(engine_path, "spec/dummy", host_user_path)
+        FileUtils.mkdir_p(File.dirname(full_user_path))
+        write(full_user_path, host_user)
       end
 
       def write_dummy_db(engine_path, schema)

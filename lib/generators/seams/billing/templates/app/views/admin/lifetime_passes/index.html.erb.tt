@@ -5,6 +5,7 @@
 <table>
   <thead>
     <tr>
+      <th>Account</th>
       <th>Customer</th>
       <th>Plan</th>
       <th>Type</th>
@@ -16,6 +17,7 @@
   <tbody>
     <%% @passes.each do |pass| %>
       <tr>
+        <td><%%= pass.account_id %></td>
         <td><%%= pass.customer_ref %></td>
         <td><%%= pass.plan_ref %></td>
         <td><%%= pass.paid? ? "Paid" : "Granted" %></td>

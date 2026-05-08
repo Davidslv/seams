@@ -8,10 +8,18 @@ module Billing
   #     c.gateway        = "Billing::Gateways::Stripe"
   #     c.api_key        = ENV.fetch("STRIPE_SECRET_KEY")
   #     c.webhook_secret = ENV.fetch("STRIPE_WEBHOOK_SECRET")
+  #     # The host class that represents the billable tenant. The
+  #     # engine includes `Billing::Billable` into this class at boot
+  #     # so `account.start_subscription!(plan_ref:, email:)` etc are
+  #     # available wherever you handle Account rows. Default is the
+  #     # canonical `Accounts::Account` from the seams accounts engine;
+  #     # set to a different constant name if your tenant lives on a
+  #     # different model.
+  #     c.billable_class = "Accounts::Account"
   #   end
   class Configuration
     attr_accessor :gateway, :api_key, :webhook_secret, :default_currency,
-                  :process_webhooks_async
+                  :process_webhooks_async, :billable_class
 
     def initialize
       @gateway                = "<%= gateway_class_name %>"
@@ -22,6 +30,8 @@ module Billing
       # WebhookEvent insert and Stripe gets to retry. Hosts on Solid
       # Queue (or similar) can flip to async + accept the trade-off.
       @process_webhooks_async = false
+      # The Account-as-billable contract — see class comment.
+      @billable_class         = "Accounts::Account"
     end
 
     # Short identifier used as the `gateway:` field in canonical event

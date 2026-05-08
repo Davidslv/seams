@@ -4,10 +4,10 @@ require "rails_helper"
 
 RSpec.describe Auth::ApiToken do
   describe "validations" do
-    it "requires user, name, token_digest, token_prefix" do
+    it "requires identity, name, token_digest, token_prefix" do
       token = described_class.new
       expect(token).not_to be_valid
-      %i[user name token_digest token_prefix].each do |attr|
+      %i[identity name token_digest token_prefix].each do |attr|
         expect(token.errors[attr]).not_to be_empty
       end
     end

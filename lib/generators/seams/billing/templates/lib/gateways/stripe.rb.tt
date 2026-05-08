@@ -89,16 +89,21 @@ module Billing
       # POST /v1/checkout/sessions  (mode: "payment", LTD path).
       # metadata.access_type=lifetime + metadata.plan_ref=<plan_ref>
       # are duplicated on the session AND payment_intent_data so the
-      # webhook handler can read either one.
-      def create_lifetime_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, **opts)
+      # webhook handler can read either one. Caller-supplied metadata
+      # (typically `account_id` so the webhook handler knows which
+      # tenant the resulting LifetimePass belongs to) is merged in;
+      # `access_type` and `plan_ref` always win to avoid an LTD
+      # session being misclassified.
+      def create_lifetime_checkout_session(customer_ref:, plan_ref:, success_url:, cancel_url:, metadata: {}, **opts)
+        merged_metadata = metadata.merge(access_type: "lifetime", plan_ref: plan_ref)
         session = client.create_checkout_session({
           mode:        "payment",
           line_items:  [{ price: plan_ref, quantity: 1 }],
           customer:    customer_ref,
           success_url: success_url,
           cancel_url:  cancel_url,
-          payment_intent_data: { metadata: { access_type: "lifetime", plan_ref: plan_ref } },
-          metadata:            { access_type: "lifetime", plan_ref: plan_ref }
+          payment_intent_data: { metadata: merged_metadata },
+          metadata:            merged_metadata
         }.merge(opts))
         { id: session["id"], url: session["url"] }
       end

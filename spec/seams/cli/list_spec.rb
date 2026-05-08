@@ -15,7 +15,7 @@ RSpec.describe Seams::CLI::List do
     FileUtils.mkdir_p(File.join(engines_root, "auth", "lib"))
     Seams::EventRegistry.reset!
     Seams::EventRegistry.register("subscription.created.billing", emitted_by: "Billing")
-    Seams::EventRegistry.register("user.signed_up.auth", emitted_by: "Auth")
+    Seams::EventRegistry.register("identity.signed_up.auth", emitted_by: "Auth")
   end
 
   after { FileUtils.rm_rf(engines_root) }
@@ -33,7 +33,7 @@ RSpec.describe Seams::CLI::List do
     it "prints the events emitted by each engine under that engine" do
       list.call
       expect(io.string).to include("subscription.created.billing")
-      expect(io.string).to include("user.signed_up.auth")
+      expect(io.string).to include("identity.signed_up.auth")
     end
 
     it "shows '(no events)' for an engine that hasn't registered any" do
@@ -82,7 +82,7 @@ RSpec.describe Seams::CLI::List do
           module Notifications
             class Engine
               # Cross-engine subscriptions wired in initializer blocks.
-              Publisher.subscribe("user.signed_up.auth")          { |payload| }
+              Publisher.subscribe("identity.signed_up.auth")          { |payload| }
               Publisher.subscribe("subscription.created.billing") { |payload| }
             end
           end
@@ -92,7 +92,7 @@ RSpec.describe Seams::CLI::List do
 
     it "prints `subscribes:` lines for each Publisher.subscribe call in the engine.rb" do
       list.call
-      expect(io.string).to include("subscribes: user.signed_up.auth")
+      expect(io.string).to include("subscribes: identity.signed_up.auth")
       expect(io.string).to include("subscribes: subscription.created.billing")
     end
 
@@ -106,8 +106,8 @@ RSpec.describe Seams::CLI::List do
       File.write(
         File.join(engines_root, "notifications", "lib", "notifications", "engine.rb"),
         <<~RUBY
-          Publisher.subscribe("user.signed_up.auth")    { |p| }
-          Publisher.subscribe("user.signed_in.auth")    { |p| }
+          Publisher.subscribe("identity.signed_up.auth")    { |p| }
+          Publisher.subscribe("identity.signed_in.auth")    { |p| }
           Publisher.subscribe("notification.queued.notifications") { |p| }
         RUBY
       )
@@ -130,14 +130,14 @@ RSpec.describe Seams::CLI::List do
         module Billing
           class AuthSubscriber
             def self.attach!
-              Seams::Events::Publisher.attach_once(:billing_auth_subscriber, "user.signed_up.auth") { |p| }
+              Seams::Events::Publisher.attach_once(:billing_auth_subscriber, "identity.signed_up.auth") { |p| }
             end
           end
         end
       RUBY
 
       list.call
-      expect(io.string).to include("subscribes: user.signed_up.auth")
+      expect(io.string).to include("subscribes: identity.signed_up.auth")
       expect(io.string).to include("depends on: auth")
     end
   end

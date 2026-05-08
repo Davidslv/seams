@@ -67,7 +67,7 @@ RSpec.describe "Host injection integration", type: :integration do
     expect(app_controller).to include("include Auth::Authentication")
   end
 
-  it "seams:billing wires the official stripe gem + mount + Billable into the host" do
+  it "seams:billing wires the official stripe gem + mount but no User edit (Wave 9: Billable lives on Account)" do
     run(Seams::Generators::InstallGenerator)
     run(Seams::Generators::BillingGenerator)
 
@@ -75,25 +75,47 @@ RSpec.describe "Host injection integration", type: :integration do
     # (https://github.com/stripe/stripe-ruby). Wave 8's earlier
     # Faraday-only decision was reversed — see
     # feedback_external_apis.md for the policy.
-    expect(gemfile).to    include('gem "stripe"')
-    expect(routes).to     include('mount Billing::Engine, at: "/billing"')
-    expect(user_model).to include("include Billing::Billable")
+    expect(gemfile).to include('gem "stripe"')
+    expect(routes).to  include('mount Billing::Engine, at: "/billing"')
+    # Post-Wave-9: Billing addresses an Accounts::Account (the
+    # tenant), not a User (the human). The engine includes
+    # Billing::Billable into Billing.configuration.billable_class
+    # (default "Accounts::Account") at boot via a config.to_prepare
+    # hook — there is no host User edit. Hosts on a different
+    # tenant model override the config knob.
+    expect(user_model).not_to include("include Billing::Billable")
   end
 
-  it "seams:notifications wires mount + Notifiable into the host" do
+  it "seams:notifications wires mount + initializer into the host (Wave 9: no auto-include into a host User)" do
     run(Seams::Generators::InstallGenerator)
     run(Seams::Generators::NotificationsGenerator)
 
-    expect(routes).to     include('mount Notifications::Engine, at: "/notifications"')
-    expect(user_model).to include("include Notifications::Notifiable")
+    expect(routes).to include('mount Notifications::Engine, at: "/notifications"')
+
+    # Wave 9 dropped the auto-include of Notifications::Notifiable into
+    # app/models/user.rb. The canonical demo no longer has a host User —
+    # the "human" is Auth::Identity. Hosts opt in by uncommenting one of
+    # the include patterns documented in the initializer template.
+    expect(user_model).not_to include("include Notifications::Notifiable")
+
+    initializer = File.join(host_root, "config/initializers/notifications.rb")
+    expect(File.exist?(initializer)).to be(true)
+
+    initializer_body = File.read(initializer)
+    expect(initializer_body).to include("Auth::Identity.include(Notifications::Notifiable)")
+    expect(initializer_body).to include("Notifications.configure")
   end
 
-  it "seams:teams wires mount + Teamable into the host" do
+  it "seams:teams wires mount but no Teamable include (Wave 9: host User is gone)" do
     run(Seams::Generators::InstallGenerator)
     run(Seams::Generators::TeamsGenerator)
 
-    expect(routes).to     include('mount Teams::Engine, at: "/teams"')
-    expect(user_model).to include("include Teams::Teamable")
+    expect(routes).to         include('mount Teams::Engine, at: "/teams"')
+    # Wave 9 removed Teams::Teamable along with the canonical demo's
+    # host User model. The teams generator no longer touches
+    # app/models/user.rb — hosts that DO maintain a User model are
+    # responsible for any team-membership query helpers themselves.
+    expect(user_model).not_to include("Teams::Teamable")
   end
 
   it "all four canonical generators stack their edits without overwriting each other" do
@@ -107,9 +129,18 @@ RSpec.describe "Host injection integration", type: :integration do
       expect(routes).to include("mount #{klass}")
     end
 
-    %w[Auth::Authenticatable Notifications::Notifiable Billing::Billable Teams::Teamable].each do |concern|
-      expect(user_model).to include("include #{concern}")
-    end
+    # Wave 9: Teams::Teamable, Notifications::Notifiable AND
+    # Billing::Billable auto-includes into the host User are gone.
+    # - notifications: ships an initializer documenting the optional
+    #   include against Auth::Identity.
+    # - teams: no longer touches the host User at all.
+    # - billing: includes Billable into Accounts::Account (the
+    #   tenant) at boot via a config.to_prepare hook.
+    # Only Auth still injects its host User concern.
+    expect(user_model).to     include("include Auth::Authenticatable")
+    expect(user_model).not_to include("Billing::Billable")
+    expect(user_model).not_to include("Teams::Teamable")
+    expect(user_model).not_to include("Notifications::Notifiable")
 
     %w[bcrypt faraday].each { |name| expect(gemfile).to include(%(gem "#{name}")) }
   end
@@ -142,7 +173,11 @@ RSpec.describe "Host injection integration", type: :integration do
     run(Seams::Generators::NotificationsGenerator)
     run(Seams::Generators::RemoveGenerator, ["notifications", "--force"])
 
-    expect(routes).not_to     include("mount Notifications::Engine")
+    expect(routes).not_to include("mount Notifications::Engine")
+    # Wave 9: the notifications generator no longer auto-injects
+    # Notifications::Notifiable into the host User, so there's nothing
+    # to assert removed there. (The user_model line below would always
+    # pass post-Wave-9, but we keep it as a safety net.)
     expect(user_model).not_to include("include Notifications::Notifiable")
     # auth edits survived
     expect(routes).to         include("mount Auth::Engine")

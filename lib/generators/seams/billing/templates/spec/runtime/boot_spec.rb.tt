@@ -20,7 +20,8 @@ RSpec.describe "Billing engine boot", type: :integration do
   end
 
   it "creates the billing tables from the dummy schema" do
-    %i[billing_subscriptions billing_invoices billing_webhook_events billing_plans].each do |t|
+    %i[billing_subscriptions billing_invoices billing_webhook_events billing_plans
+       billing_lifetime_passes accounts].each do |t|
       expect(ActiveRecord::Base.connection.table_exists?(t)).to be(true), "missing #{t}"
     end
   end
@@ -29,5 +30,9 @@ RSpec.describe "Billing engine boot", type: :integration do
     expect(defined?(Billing::Billable)).to          eq("constant")
     expect(defined?(Billing::Gateways::Stripe)).to  eq("constant")
     expect(defined?(Billing::Configuration)).to     eq("constant")
+  end
+
+  it "Billing::Configuration ships an Account-default billable_class" do
+    expect(Billing.configuration.billable_class).to eq("Accounts::Account")
   end
 end

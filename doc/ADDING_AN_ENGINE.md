@@ -7,10 +7,12 @@ build your own on top of `seams:engine`.
 
 | Generator | Engine             | What it ships |
 | ---       | ---                | --- |
-| `bin/seams auth`           | Auth          | User + Session + sign-in/out, Authenticatable + Authentication concerns |
-| `bin/seams notifications`  | Notifications | DeliverEmailJob/DeliverSmsJob, ActionMailer + NullSms adapters, Notifiable concern |
-| `bin/seams billing`        | Billing       | Subscription + Invoice, Stripe gateway, webhook controller with dedupe, Billable concern |
-| `bin/seams teams`          | Teams         | Team + Membership + Invitation, Teamable + Authorization concerns |
+| `bin/seams core`           | Core          | `Auditable` / `SoftDeletable` / `Sluggable` / `TenantScoped` / `HasCurrentAttributes` concerns, audit log, `Core::EventPublisher` |
+| `bin/seams auth`           | Auth          | `Auth::Identity` + Session + sign-in/out, `Authenticatable` + `Authentication` concerns, OAuth + API tokens |
+| `bin/seams accounts`       | Accounts      | `Accounts::Account` + `Accounts::Membership`, `AccountScoped` + `Authorization` concerns, system-actor seeding |
+| `bin/seams notifications`  | Notifications | DeliverEmailJob/DeliverSmsJob, ActionMailer + NullSms adapters, optional Notifiable concern |
+| `bin/seams billing`        | Billing       | Subscription + Invoice + LifetimePass, Stripe gateway, webhook controller with dedupe, Billable concern auto-included on `Accounts::Account` |
+| `bin/seams teams`          | Teams         | Team + Membership + Invitation, AccountScoped + Authorization concerns |
 
 Run any of them. The generator:
 
@@ -70,7 +72,7 @@ class CreateAnalyticsEvents < ActiveRecord::Migration[7.1]
   def change
     create_table :analytics_events do |t|
       t.string :name, null: false
-      t.bigint :user_id
+      t.bigint :identity_id   # FK-by-id to auth_identities; no DB-level FK across engines
       t.jsonb  :props, null: false, default: {}
       t.timestamps
     end
@@ -103,7 +105,7 @@ event name from two different engines raises
 ## Publish from your code
 
 ```ruby
-Seams::Events::Publisher.publish("event.tracked.analytics", user_id: 42, name: "viewed_pricing")
+Seams::Events::Publisher.publish("event.tracked.analytics", identity_id: 42, name: "viewed_pricing")
 ```
 
 Publisher validates the name format (`resource.action.engine`) and
@@ -124,8 +126,8 @@ module Analytics
       def attach!
         return if attached?
 
-        Seams::Events::Publisher.subscribe("user.signed_up.auth") do |payload|
-          TrackEventJob.perform_later(name: "signed_up", user_id: payload[:user_id])
+        Seams::Events::Publisher.subscribe("identity.signed_up.auth") do |payload|
+          TrackEventJob.perform_later(name: "signed_up", identity_id: payload[:identity_id])
         end
 
         self.attached = true
@@ -158,7 +160,7 @@ module Analytics
     extend ActiveSupport::Concern
 
     def track(event_name, **props)
-      Analytics::Event.create!(name: event_name, user_id: id, props: props)
+      Analytics::Event.create!(name: event_name, identity_id: id, props: props)
     end
   end
 end

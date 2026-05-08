@@ -4,7 +4,7 @@ module Teams
   class Team < ApplicationRecord
     self.table_name = "teams"
 
-    has_many :memberships, class_name: "Teams::Membership", dependent: :destroy
+    has_many :memberships, class_name: "Teams::Membership", foreign_key: :team_id, dependent: :destroy
     has_many :invitations, class_name: "Teams::Invitation", dependent: :destroy
 
     validates :name, presence: true, length: { maximum: 100 }
@@ -17,8 +17,10 @@ module Teams
       memberships.find_by(role: "owner")
     end
 
-    def member?(host_user_id)
-      memberships.exists?(user_id: host_user_id)
+    # Predicate for "is this Identity a member of this team?". Pass the
+    # Auth::Identity's id (the team_memberships.identity_id column).
+    def member?(identity_id)
+      memberships.exists?(identity_id: identity_id)
     end
 
     private

@@ -6,13 +6,19 @@ module Billing
     # Validates inventory + plan-is-lifetime before round-tripping to
     # the gateway so a sold-out plan doesn't burn a Stripe API call.
     #
+    # The `account_id:` arg is the Accounts::Account id that will own
+    # the LifetimePass once the buyer completes Checkout. It's
+    # threaded into Stripe's session metadata so the webhook handler
+    # (CreatePassFromCheckoutService) can write the correct
+    # `account_id` on the resulting LifetimePass row.
+    #
     # Concurrency note (the reason this service is not "just call Stripe"):
     # `Billing::Plan#max_lifetime_units` is enforced by counting issued
     # `LifetimePass` rows. A plain count is racey — two browsers clicking
     # "Buy lifetime" within the same second on a plan with one seat left
     # will both pass the check, both hit Stripe Checkout, both pay, and
-    # the unique index on `(customer_ref, plan_ref)` does not save us
-    # because the buyers have different customer refs. We end up with
+    # the unique index on `(account_id, plan_ref)` does not save us
+    # because the buyers are on different accounts. We end up with
     # `count > max_lifetime_units` and an oversold promo.
     #
     # The fix: open a transaction, take a `SELECT ... FOR UPDATE`
@@ -34,7 +40,7 @@ module Billing
 
       module_function
 
-      def call(customer_ref:, plan_ref:, success_url:, cancel_url:)
+      def call(account_id:, customer_ref:, plan_ref:, success_url:, cancel_url:)
         url = Billing::Plan.transaction do
           plan = Billing::Plan.find_by(gateway_ref: plan_ref)
           raise PlanLookupError, "Plan #{plan_ref.inspect} not found" unless plan
@@ -51,7 +57,8 @@ module Billing
             customer_ref: customer_ref,
             plan_ref:     plan_ref,
             success_url:  success_url,
-            cancel_url:   cancel_url
+            cancel_url:   cancel_url,
+            metadata:     { account_id: account_id }
           )
           session[:url]
         end

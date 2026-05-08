@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Billing
-  # Self-service subscription management for the signed-in user.
+  # Self-service subscription management for the current Account.
   # Backed by the Phase 3 (2/4) service objects — every action is a
   # thin wrapper that calls a service and renders / redirects on the
   # ServiceResult.
@@ -15,9 +15,8 @@ module Billing
   #   POST   /billing/subscriptions/:id/change_plan
   #
   # The host's authentication concern decides who `current_user` is —
-  # this controller assumes the host has wired one up (Auth engine or
-  # Devise or hand-rolled). Subscriptions are scoped to the user's
-  # billing customer_ref.
+  # this controller scopes by the current Account (the tenant), not
+  # the human. Subscriptions belong to Accounts::Account post-Wave-9.
   class SubscriptionsController < ApplicationController
     before_action :require_subscription, only: %i[show cancel reactivate change_plan]
 
@@ -73,9 +72,10 @@ module Billing
 
     private
 
-    # Override in the host (or here) to scope by current_user's
-    # billing customer_ref. The default below assumes current_user
-    # responds to #billing_customer_ref — adjust to match your model.
+    # Override in the host (or here) to scope by the current Account's
+    # billing rows. The default scopes by `current_billing_customer_ref`
+    # — the Stripe `cus_*` id resolved from the current Account — which
+    # is correct whenever the controller has an Account in scope.
     def scoped_subscriptions
       Billing::Subscription.where(customer_ref: current_billing_customer_ref)
     end
@@ -87,12 +87,25 @@ module Billing
       redirect_to subscriptions_path, alert: "Subscription not found."
     end
 
+    # Reads the Stripe customer id off the current Account. Hosts on
+    # a pre-Wave-9 user-keyed flow can override this method to point
+    # at their User's own `billing_customer_ref` accessor.
     def current_billing_customer_ref
-      return current_user.billing_customer_ref if current_user.respond_to?(:billing_customer_ref)
+      account = current_billing_account
+      return nil unless account
 
-      raise NotImplementedError,
-            "Override #current_billing_customer_ref in your host SubscriptionsController " \
-            "to point at your User's billing customer reference."
+      account.billing_subscriptions.pick(:customer_ref) ||
+        account.billing_invoices.pick(:customer_ref) ||
+        account.billing_lifetime_passes.pick(:customer_ref)
+    end
+
+    def current_billing_account
+      return @current_billing_account if defined?(@current_billing_account)
+
+      @current_billing_account =
+        if defined?(Accounts::Current) && Accounts::Current.respond_to?(:account)
+          Accounts::Current.account
+        end
     end
 
     def respond_to_result(result, success:)

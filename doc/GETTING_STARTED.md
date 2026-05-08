@@ -86,6 +86,7 @@ bin/rails db:migrate
 ## 4. Generate more engines
 
 ```bash
+bin/seams accounts          # tenant boundary + Membership + system actor
 bin/seams notifications     # outbound email/SMS, swappable adapters
 bin/seams billing           # Stripe subscriptions + webhooks
 bin/seams teams             # multi-tenant teams + invitations
@@ -94,6 +95,11 @@ bin/seams teams             # multi-tenant teams + invitations
 Every time you generate a new engine the existing engines'
 `.rubocop.yml` files are auto-updated so the boundary cops cover
 the new engine without manual edits.
+
+The recommended order is `core → auth → accounts → notifications →
+billing → teams`. Some engines depend on each other (accounts on
+auth, billing on accounts) — see each engine's README for the
+"Requires:" line.
 
 ## 5. Inspect what you have
 
@@ -125,5 +131,7 @@ of them in parallel (one job per engine).
 
 - [ADDING_AN_ENGINE.md](ADDING_AN_ENGINE.md) — Build your own engine on top of the generic generator.
 - [WRITING_AN_ADAPTER.md](WRITING_AN_ADAPTER.md) — Swap in Mailgun, Twilio, Paddle, etc.
-- [ENGINE_CATALOGUE.md](ENGINE_CATALOGUE.md) — The four canonical engines in detail.
+- [ENGINE_CATALOGUE.md](ENGINE_CATALOGUE.md) — The six canonical engines in detail.
+- [CURRENT_ATTRIBUTES.md](CURRENT_ATTRIBUTES.md) — Per-request namespaces (Auth::Current, Accounts::Current, Teams::Current).
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Why Seams is built this way.
+- [UPGRADING_FROM_WAVE_8.md](UPGRADING_FROM_WAVE_8.md) — If you adopted seams pre-Wave-9.

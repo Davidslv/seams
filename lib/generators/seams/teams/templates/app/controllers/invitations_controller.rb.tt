@@ -53,13 +53,15 @@ module Teams
           return redirect_to root_path, alert: "Invitation expired"
         end
 
-        @invitation.team.memberships.create!(user_id: current_user_id, role: @invitation.role)
+        @invitation.team.memberships.create!(identity_id: current_identity_id, role: @invitation.role)
         @invitation.update!(accepted_at: Time.current)
       end
 
       Seams::Events::Publisher.publish(
         "invitation.accepted.teams",
-        team_id: @invitation.team_id, email: @invitation.email, user_id: current_user_id
+        team_id:       @invitation.team_id,
+        identity_id:   current_identity_id,
+        invitation_id: @invitation.id
       )
       redirect_to team_path(@invitation.team), notice: "Joined #{@invitation.team.name}"
     rescue ActiveRecord::RecordNotUnique
@@ -83,6 +85,18 @@ module Teams
     def safe_role
       candidate = params.dig(:invitation, :role).to_s
       Teams::Membership::ROLES.include?(candidate) ? candidate : "member"
+    end
+
+    # Resolves the signed-in human's id from `Auth::Current.identity`
+    # (the Auth engine's per-request namespace). Gated on
+    # `defined?(Auth::Current)` so it's safe in hosts that don't ship
+    # auth. Override in your host if you wire auth differently.
+    def current_identity_id
+      if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
+        return Auth::Current.identity.id
+      end
+
+      nil
     end
   end
 end

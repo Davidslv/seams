@@ -3,7 +3,6 @@
 require "teams/version"
 require "teams/configuration"
 require "teams/engine"
-require "teams/concerns/teamable"
 require "teams/concerns/authorization"
 
 module Teams

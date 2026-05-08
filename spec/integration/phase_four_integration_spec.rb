@@ -42,8 +42,10 @@ RSpec.describe "Phase 4 integration", type: :integration do
     teams_yml = YAML.safe_load_file(File.join(host_root, "engines/teams/.rubocop.yml"))
     expect(teams_yml.dig("Seams/NoCrossEngineModelAccess", "OtherEngines"))
       .to match_array(%w[Auth Billing Notifications])
+    # Wave 9 dropped Teams::Teamable along with the host User model;
+    # the engine now exposes only AccountScoped + Authorization.
     expect(teams_yml.dig("Seams/NoCrossEngineModelAccess", "ExposedConcerns"))
-      .to eq(["Teams::Teamable", "Teams::AccountScoped", "Teams::Authorization"])
+      .to eq(["Teams::AccountScoped", "Teams::Authorization"])
   end
 
   it "every generated teams Ruby file parses without syntax errors" do
@@ -75,11 +77,11 @@ RSpec.describe "Phase 4 integration", type: :integration do
   it "registering all engines' events does not collide" do
     Seams::EventRegistry.reset!
 
-    auth_events    = %w[user.signed_up.auth user.signed_in.auth user.signed_out.auth session.expired.auth]
+    auth_events    = %w[identity.signed_up.auth identity.signed_in.auth identity.signed_out.auth session.expired.auth]
     notif_events   = %w[notification.queued.notifications notification.delivered.notifications notification.failed.notifications]
     billing_events = %w[subscription.created.billing subscription.updated.billing
                         subscription.canceled.billing invoice.paid.billing invoice.failed.billing]
-    teams_events   = %w[team.created.teams team.member_added.teams team.member_removed.teams
+    teams_events   = %w[team.created.teams team.member_joined.teams team.member_left.teams
                         invitation.sent.teams invitation.accepted.teams]
 
     auth_events.each    { |e| Seams::EventRegistry.register(e, emitted_by: "Auth") }

@@ -12,8 +12,8 @@ module Auth
   #     before_action :authenticate_api_token!
   #   end
   #
-  # Sets `current_api_token` (the ApiToken row) and `current_user`
-  # (the Auth::User) on success. Renders 401 with a JSON body on
+  # Sets `current_api_token` (the ApiToken row) and `current_identity`
+  # (the Auth::Identity) on success. Renders 401 with a JSON body on
   # failure. last_used_at is bumped on every successful auth.
   module ApiAuthenticatable
     extend ActiveSupport::Concern
@@ -27,12 +27,13 @@ module Auth
       return unless token
 
       @current_api_token = token
-      @current_user      = token.user
+      @current_identity  = token.identity
+      Auth::Current.identity = @current_identity if defined?(Auth::Current)
       token.touch_last_used!
     end
 
-    def current_user
-      @current_user
+    def current_identity
+      @current_identity
     end
 
     private

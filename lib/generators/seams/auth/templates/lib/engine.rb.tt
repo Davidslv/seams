@@ -21,13 +21,13 @@ module Auth
     end
 
     initializer "auth.register_events" do
-      Seams::EventRegistry.register("user.signed_up.auth",   emitted_by: "Auth")
-      Seams::EventRegistry.register("user.signed_in.auth",   emitted_by: "Auth")
-      Seams::EventRegistry.register("user.signed_out.auth",  emitted_by: "Auth")
-      Seams::EventRegistry.register("session.expired.auth",  emitted_by: "Auth")
+      Seams::EventRegistry.register("identity.signed_up.auth",   emitted_by: "Auth")
+      Seams::EventRegistry.register("identity.signed_in.auth",   emitted_by: "Auth")
+      Seams::EventRegistry.register("identity.signed_out.auth",  emitted_by: "Auth")
+      Seams::EventRegistry.register("session.expired.auth",      emitted_by: "Auth")
       # API token lifecycle (issue #2 section 2A)
-      Seams::EventRegistry.register("api_token.issued.auth", emitted_by: "Auth")
-      Seams::EventRegistry.register("api_token.revoked.auth", emitted_by: "Auth")
+      Seams::EventRegistry.register("api_token.issued.auth",     emitted_by: "Auth")
+      Seams::EventRegistry.register("api_token.revoked.auth",    emitted_by: "Auth")
     end
 
     initializer "auth.append_migrations" do |app|

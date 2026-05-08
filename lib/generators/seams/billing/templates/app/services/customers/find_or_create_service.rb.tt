@@ -4,14 +4,14 @@ require "digest"
 
 module Billing
   module Customers
-    # Resolves a Stripe customer for the host's user. Looks up by
+    # Resolves a Stripe customer for an Accounts::Account. Looks up by
     # `email` first via /v1/customers/search; creates a new one if no
     # match is found. Returns ServiceResult with `value: customer_ref`
     # (the Stripe `cus_*` id).
     #
     #   result = Billing::Customers::FindOrCreateService.call(
-    #     email: "ada@example.com",
-    #     metadata: { host_user_id: 42 }
+    #     email: "owner@acme.com",
+    #     metadata: { account_id: "5e3b...", account_name: "Acme Inc" }
     #   )
     #   result.ok?         # => true
     #   result.value       # => "cus_xyz"
@@ -26,8 +26,9 @@ module Billing
     # protection that produces two `cus_*` rows for the same person.
     #
     # We defend against that with a deterministic Stripe
-    # `Idempotency-Key` header derived from the email plus an optional
-    # caller-supplied scope (e.g. `host_user_id`). Per
+    # `Idempotency-Key` header derived from the email plus the
+    # caller-supplied scope (typically `account_id` — the tenant the
+    # customer represents). Per
     # https://docs.stripe.com/api/idempotent_requests Stripe caches
     # the response for at least 24h and replays it for the same key,
     # so two concurrent calls with the same key produce one customer.
@@ -61,9 +62,10 @@ module Billing
       # (https://docs.stripe.com/api/idempotent_requests). The
       # `seams:billing:customer:` prefix namespaces the key so it
       # cannot collide with other engines that share the same Stripe
-      # account.
+      # account. Scope defaults to the caller-supplied `account_id`
+      # (the tenant the Stripe customer represents post-Wave-9).
       def idempotency_key
-        scope = @metadata[:host_user_id] || @metadata["host_user_id"] || ""
+        scope = @metadata[:account_id] || @metadata["account_id"] || ""
         Digest::SHA256.hexdigest("seams:billing:customer:#{@email}:#{scope}")
       end
     end

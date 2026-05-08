@@ -135,7 +135,8 @@ module Notifications
       return unless due?
 
       Seams::Events::Publisher.publish(
-        "notification.queued.notifications", id: id, type: type, owner_id: owner_id
+        "notification.queued.notifications",
+        id: id, type: type, owner_type: owner_type, owner_id: owner_id
       )
 
       dispatch!
@@ -145,7 +146,8 @@ module Notifications
       end
 
       Seams::Events::Publisher.publish(
-        "notification.delivered.notifications", id: id, type: type, owner_id: owner_id
+        "notification.delivered.notifications",
+        id: id, type: type, owner_type: owner_type, owner_id: owner_id
       )
     rescue StandardError => e
       Seams::Events::Publisher.publish(

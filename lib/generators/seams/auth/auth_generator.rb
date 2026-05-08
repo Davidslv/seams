@@ -12,16 +12,16 @@ module Seams
     # Generates a canonical Auth engine on top of the generic engine
     # scaffold. Adds:
     #
-    #   - User and Session ActiveRecord models (has_secure_password).
+    #   - Identity and Session ActiveRecord models (has_secure_password).
     #   - SessionsController + RegistrationsController with sign in /
     #     sign up / sign out.
     #   - Authenticatable concern that the host application's user-like
     #     model can `include Auth::Authenticatable` (added to the
-    #     engine's ExposedConcerns automatically).
-    #   - Migrations for auth_users and auth_sessions.
-    #   - lib/auth/engine.rb registers the four canonical events:
-    #     user.signed_up.auth, user.signed_in.auth, user.signed_out.auth,
-    #     session.expired.auth.
+    #     engine's ExposedConcerns automatically) — OPTIONAL post-Wave-9.
+    #   - Migrations for auth_identities and auth_sessions.
+    #   - lib/auth/engine.rb registers the canonical events:
+    #     identity.signed_up.auth, identity.signed_in.auth,
+    #     identity.signed_out.auth, session.expired.auth.
     #
     # Run with: bin/rails generate seams:auth
     # rubocop:disable Metrics/ClassLength
@@ -49,10 +49,12 @@ module Seams
       def create_models
         template "app/models/application_record.rb.tt",
                  engine_path("app/models/auth/application_record.rb")
-        template "app/models/user.rb.tt",
-                 engine_path("app/models/auth/user.rb")
+        template "app/models/identity.rb.tt",
+                 engine_path("app/models/auth/identity.rb")
         template "app/models/session.rb.tt",
                  engine_path("app/models/auth/session.rb")
+        template "app/models/current.rb.tt",
+                 engine_path("app/models/auth/current.rb")
         # OAuth identity link table — issue #2 section 2A. Lives under
         # the Auth::OAuth namespace alongside the lib/ adapter classes
         # (Abstract, Google, Github) so the Zeitwerk inflector only
@@ -76,10 +78,10 @@ module Seams
       end
 
       def create_services
-        template "app/services/register_user.rb.tt",
-                 engine_path("app/services/auth/register_user.rb")
-        template "app/services/authenticate_user.rb.tt",
-                 engine_path("app/services/auth/authenticate_user.rb")
+        template "app/services/register_identity.rb.tt",
+                 engine_path("app/services/auth/register_identity.rb")
+        template "app/services/authenticate_identity.rb.tt",
+                 engine_path("app/services/auth/authenticate_identity.rb")
         template "app/services/reset_password.rb.tt",
                  engine_path("app/services/auth/reset_password.rb")
         template "app/services/oauth/authenticator.rb.tt",
@@ -145,21 +147,19 @@ module Seams
       end
 
       def create_migrations
-        template "db/migrate/create_auth_users.rb.tt",
-                 engine_path("db/migrate/#{timestamp(0)}_create_auth_users.rb")
+        template "db/migrate/create_auth_identities.rb.tt",
+                 engine_path("db/migrate/#{timestamp(0)}_create_auth_identities.rb")
         template "db/migrate/create_auth_sessions.rb.tt",
                  engine_path("db/migrate/#{timestamp(1)}_create_auth_sessions.rb")
-        template "db/migrate/add_password_reset_to_auth_users.rb.tt",
-                 engine_path("db/migrate/#{timestamp(2)}_add_password_reset_to_auth_users.rb")
         template "db/migrate/create_auth_oauth_providers.rb.tt",
-                 engine_path("db/migrate/#{timestamp(3)}_create_auth_oauth_providers.rb")
+                 engine_path("db/migrate/#{timestamp(2)}_create_auth_oauth_providers.rb")
         template "db/migrate/create_auth_api_tokens.rb.tt",
-                 engine_path("db/migrate/#{timestamp(4)}_create_auth_api_tokens.rb")
+                 engine_path("db/migrate/#{timestamp(3)}_create_auth_api_tokens.rb")
       end
 
       def create_specs
-        template "spec/models/user_spec.rb.tt",
-                 engine_path("spec/models/auth/user_spec.rb")
+        template "spec/models/identity_spec.rb.tt",
+                 engine_path("spec/models/auth/identity_spec.rb")
         template "spec/models/session_spec.rb.tt",
                  engine_path("spec/models/auth/session_spec.rb")
         # Phase 2A finish — coverage for the new Wave-9/10 models.
@@ -188,12 +188,16 @@ module Seams
       end
 
       def create_dummy_app
+        # Post Wave 9: the dummy app no longer ships a host User
+        # model. Auth::Identity is the human now, and the auth specs
+        # don't need a host User to exercise the engine. Hosts that
+        # keep a User model can include Auth::Authenticatable in their
+        # own test fixture.
         Seams::Generators::DummyAppWriter.write!(
           engine_path: File.join(destination_root, "engines", ENGINE_NAME),
           engine_module: "Auth",
           mount_at: "/auth",
-          schema: dummy_schema,
-          host_user: dummy_host_user
+          schema: dummy_schema
         )
         template "spec/runtime/boot_spec.rb.tt",
                  engine_path("spec/runtime/auth_boot_spec.rb")
@@ -214,6 +218,10 @@ module Seams
         # in the host's test group only.
         host_inject_gem("factory_bot_rails", "~> 6.4", group: :test)
         host_inject_mount(engine_class: "Auth::Engine", at: "/auth")
+        # NB: post-Wave-9 the canonical host has no `app/models/user.rb`,
+        # so this call is a best-effort no-op (the helper logs `skip`
+        # and moves on). Hosts that DO maintain a domain User on top
+        # of `Auth::Identity` get the include wired automatically.
         host_inject_include_in_user("Auth::Authenticatable")
         host_inject_include_in_application_controller("Auth::Authentication")
       end
@@ -247,20 +255,17 @@ module Seams
 
       def dummy_schema
         <<~SCHEMA
-          create_table :auth_users do |t|
+          create_table :auth_identities do |t|
             t.text    :email,            null: false
             t.string  :password_digest,  null: false
-            t.bigint  :host_user_id
-            t.string  :password_reset_token
-            t.datetime :password_reset_token_sent_at
+            t.boolean :staff,            null: false, default: false
             t.timestamps
           end
-          add_index :auth_users, :email, unique: true
-          add_index :auth_users, :password_reset_token, unique: true,
-                                                        where: "password_reset_token IS NOT NULL"
+          add_index :auth_identities, :email, unique: true
+          add_index :auth_identities, :staff, where: "staff = true"
 
           create_table :auth_sessions do |t|
-            t.references :user,       null: false, foreign_key: { to_table: :auth_users }
+            t.references :identity,   null: false, foreign_key: { to_table: :auth_identities }
             t.string     :token,      null: false
             t.datetime   :expires_at, null: false
             t.timestamps
@@ -268,7 +273,7 @@ module Seams
           add_index :auth_sessions, :token, unique: true
 
           create_table :auth_oauth_providers do |t|
-            t.references :user,         null: false, foreign_key: { to_table: :auth_users }
+            t.references :identity,     null: false, foreign_key: { to_table: :auth_identities }
             t.string     :provider,     null: false
             t.text       :provider_uid, null: false
             t.text       :access_token
@@ -279,10 +284,10 @@ module Seams
             t.timestamps
           end
           add_index :auth_oauth_providers, %i[provider provider_uid], unique: true
-          add_index :auth_oauth_providers, %i[user_id provider],      unique: true
+          add_index :auth_oauth_providers, %i[identity_id provider],  unique: true
 
           create_table :auth_api_tokens do |t|
-            t.references :user,         null: false, foreign_key: { to_table: :auth_users }
+            t.references :identity,     null: false, foreign_key: { to_table: :auth_identities }
             t.string     :name,         null: false
             t.string     :token_digest, null: false
             t.string     :token_prefix, null: false
@@ -292,17 +297,6 @@ module Seams
           end
           add_index :auth_api_tokens, :token_digest, unique: true
         SCHEMA
-      end
-
-      def dummy_host_user
-        <<~RB
-          # frozen_string_literal: true
-
-          class User < ApplicationRecord
-            self.table_name = "auth_users"
-            include Auth::Authenticatable
-          end
-        RB
       end
     end
     # rubocop:enable Metrics/ClassLength

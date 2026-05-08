@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # What: creates auth_api_tokens — Bearer-style API tokens issued to
-#       Auth::User rows for programmatic access.
+#       Auth::Identity rows for programmatic access.
 # Why:  the engine ships native API token support so hosts don't
 #       roll their own. Plaintext is shown once at creation; only the
 #       SHA-256 digest is persisted.
@@ -11,7 +11,7 @@
 class CreateAuthApiTokens < ActiveRecord::Migration[7.1]
   def change
     create_table :auth_api_tokens do |t|
-      t.references :user,         null: false, foreign_key: { to_table: :auth_users }
+      t.references :identity,     null: false, foreign_key: { to_table: :auth_identities }
       t.string     :name,         null: false   # human label ("CI deploy key")
       t.string     :token_digest, null: false   # SHA-256 of the plaintext
       t.string     :token_prefix, null: false   # first ~12 chars for display

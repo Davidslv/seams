@@ -34,9 +34,10 @@ module Billing
 
       def create
         result = Billing::Lifetime::GrantPassService.call(
+          account_id:   params.require(:account_id),
           customer_ref: params.require(:customer_ref),
           plan_ref:     params.require(:plan_ref),
-          granted_by:   current_admin_user_id,
+          granted_by:   current_admin_identity,
           notes:        params[:notes]
         )
 
@@ -53,7 +54,7 @@ module Billing
         pass   = Billing::LifetimePass.find(params[:id])
         result = Billing::Lifetime::RevokePassService.call(
           pass:       pass,
-          revoked_by: current_admin_user_id,
+          revoked_by: current_admin_identity,
           notes:      params[:notes]
         )
 
@@ -68,10 +69,15 @@ module Billing
 
       private
 
-      # Override in the host. The default reads `current_user&.id` if
-      # the host's admin gate uses the same `current_user` helper.
-      def current_admin_user_id
-        respond_to?(:current_user) ? current_user&.id : nil
+      # Override in the host. The default reads `current_user` if the
+      # host's admin gate uses the same `current_user` helper — for a
+      # post-Wave-9 host that means the Auth::Identity row currently
+      # signed in. Pre-Wave-9 hosts (host User present) override this
+      # to return the User; the GrantPassService coerces both shapes.
+      def current_admin_identity
+        return nil unless respond_to?(:current_user)
+
+        current_user
       end
     end
   end

@@ -1,20 +1,20 @@
 # Auth
 
 > Email + password authentication for a Seams-powered host application.
+> The canonical "human" record is `Auth::Identity` (post-Wave-9). Other
+> engines address the human via Identity, not via a host User.
 
 ## Events emitted
 
 | Event name | Payload | Emitted when |
 | --- | --- | --- |
-| `user.signed_up.auth`   | `{ auth_user_id:, host_user_id:, email: }`      | RegistrationsController#create succeeds |
-| `user.signed_in.auth`   | `{ auth_user_id:, host_user_id:, session_id: }` | SessionsController#create succeeds |
-| `user.signed_out.auth`  | `{ auth_user_id:, host_user_id:, session_id: }` | SessionsController#destroy runs |
-| `session.expired.auth`  | `{ auth_user_id:, host_user_id:, session_id: }` | (future) sweeper job revokes a stale session |
+| `identity.signed_up.auth`   | `{ identity_id:, email: }`              | RegistrationsController#create succeeds |
+| `identity.signed_in.auth`   | `{ identity_id:, session_id: }`         | SessionsController#create succeeds |
+| `identity.signed_out.auth`  | `{ identity_id:, session_id: }`         | SessionsController#destroy runs |
+| `session.expired.auth`      | `{ identity_id:, session_id: }`         | sweeper job revokes a stale session |
 
-> `auth_user_id` is the row id in the engine's `auth_users` table.
-> `host_user_id` is the host application's user id (may be nil if the
-> auth record isn't linked to a host User yet). Subscribers that
-> resolve host models should always use `host_user_id`.
+> `identity_id` is the row id in the engine's `auth_identities` table.
+> Subscribers that resolve identities should use `identity_id`.
 
 ## Events consumed
 
@@ -24,13 +24,30 @@ This engine does not subscribe to any other engine's events.
 
 | Concern | Purpose |
 | --- | --- |
-| `Auth::Authenticatable` | Mix into the host's user-facing model to get session-aware helpers (`signed_in?`, `sign_out_everywhere!`) without coupling to `Auth::User`. |
+| `Auth::Authenticatable` | Optional post-Wave-9. Mix into a host User (if you keep one) to add session-aware helpers (`signed_in?`, `sign_out_everywhere!`); the host model needs an `identity_id` column. Most hosts skip this — `Auth::Identity` is the canonical human. |
+| `Auth::Authentication`  | Mix into the host's ApplicationController to get `current_identity`, `signed_in?`, `authenticate_identity!` plus a per-request `Auth::Current.identity`. |
 
 ## Adapters
 
 Password hashing is provided by `bcrypt` via Rails' `has_secure_password`.
-To swap in a different hasher, override `Auth::User`'s `password_digest=`
-setter in your host application.
+To swap in a different hasher, override `Auth::Identity`'s
+`password_digest=` setter in your host application.
+
+## Password reset (Rails 8 has_secure_password reset_token)
+
+`Auth::Identity` uses Rails 8's built-in reset token machinery — a
+signed_id with a 15-minute default expiry, generated on demand,
+verified via `find_by_password_reset_token`. **No `password_reset_token`
+column, no `password_reset_token_sent_at`, no sweep job.** Token
+expiry is a property of the signature, not a database row.
+
+To configure the expiry:
+
+```ruby
+class Auth::Identity < ApplicationRecord
+  has_secure_password reset_token: { expires_in: 30.minutes }
+end
+```
 
 ## OAuth (Sign in with Google / GitHub)
 
@@ -107,13 +124,13 @@ Verified against:
 ## API tokens (Bearer auth)
 
 `Auth::ApiToken` ships with the engine for programmatic access. Tokens
-are issued via `Auth::GenerateApiToken.call(user:, name:, expires_at:)`
+are issued via `Auth::GenerateApiToken.call(identity:, name:, expires_at:)`
 which returns a `Result` carrying both the persisted record and the
 **plaintext token** — the plaintext is shown ONCE and never recoverable
 from the DB (only a SHA-256 digest is stored).
 
 ```ruby
-result = Auth::GenerateApiToken.call(user: current_user, name: "CI key")
+result = Auth::GenerateApiToken.call(identity: current_identity, name: "CI key")
 result.plaintext  # => "seam_tF9...xQ" — display once, then discard
 result.api_token  # => Auth::ApiToken row
 ```
@@ -129,15 +146,15 @@ end
 ```
 
 Clients send `Authorization: Bearer seam_<token>`. On success the
-concern sets `current_user` + `current_api_token` and bumps the token's
-`last_used_at`. On failure it renders 401 JSON.
+concern sets `current_identity` + `current_api_token` and bumps the
+token's `last_used_at`. On failure it renders 401 JSON.
 
 Events emitted:
 
 | Event name | Payload |
 | --- | --- |
-| `api_token.issued.auth`  | `{ auth_user_id:, host_user_id:, api_token_id:, token_prefix: }` |
-| `api_token.revoked.auth` | `{ auth_user_id:, host_user_id:, api_token_id:, token_prefix: }` |
+| `api_token.issued.auth`  | `{ identity_id:, api_token_id:, token_prefix: }` |
+| `api_token.revoked.auth` | `{ identity_id:, api_token_id:, token_prefix: }` |
 
 ## Rate limiting
 
@@ -166,19 +183,35 @@ auth_cleanup_expired_sessions:
   schedule: "every 1 hour"
 ```
 
+## Platform admin (`staff?`)
+
+`Auth::Identity` ships with a `staff` boolean (default false) — an
+Identity-level platform-admin flag that host admin tooling can use to
+bypass account scoping. NOT related to per-account roles (those live
+on `Accounts::Membership`, owned by the accounts engine).
+
+```ruby
+identity.staff?       # => false (default)
+identity.update!(staff: true)
+identity.staff?       # => true
+```
+
+Promotion is an admin operation only — `Auth::RegisterIdentity` does
+NOT honour `staff:` from sign-up params.
+
 ## GDPR / data protection
 
 Personal data the engine stores and how it's protected at rest:
 
-| Column                                  | At rest        | Why                                                  |
-| ---                                     | ---            | ---                                                  |
-| `auth_users.email`                      | encrypted (deterministic) | PII (Article 4); deterministic so `find_by(email:)` and the uniqueness index keep working |
-| `auth_users.password_digest`            | bcrypt one-way hash | not PII — never reversible to a password         |
-| `auth_oauth_providers.access_token`     | encrypted (non-deterministic) | credential                                |
-| `auth_oauth_providers.refresh_token`    | encrypted (non-deterministic) | credential                                |
-| `auth_oauth_providers.provider_uid`     | encrypted (deterministic) | online identifier (Article 4); deterministic so `(provider, provider_uid)` lookup + unique index keep working |
-| `auth_api_tokens.token_digest`          | SHA-256 hash   | not reversible to the plaintext token                |
-| `auth_api_tokens.token_prefix`          | plaintext      | first 12 chars only — display label, not a secret    |
+| Column                                   | At rest        | Why                                                  |
+| ---                                      | ---            | ---                                                  |
+| `auth_identities.email`                  | encrypted (deterministic) | PII (Article 4); deterministic so `find_by(email:)` and the uniqueness index keep working |
+| `auth_identities.password_digest`        | bcrypt one-way hash | not PII — never reversible to a password         |
+| `auth_oauth_providers.access_token`      | encrypted (non-deterministic) | credential                                |
+| `auth_oauth_providers.refresh_token`     | encrypted (non-deterministic) | credential                                |
+| `auth_oauth_providers.provider_uid`      | encrypted (deterministic) | online identifier (Article 4); deterministic so `(provider, provider_uid)` lookup + unique index keep working |
+| `auth_api_tokens.token_digest`           | SHA-256 hash   | not reversible to the plaintext token                |
+| `auth_api_tokens.token_prefix`           | plaintext      | first 12 chars only — display label, not a secret    |
 
 ### One-time host setup
 
@@ -217,17 +250,17 @@ no-op. Fresh hosts skip steps 1 and 3 entirely.
 ### Right to erasure (Article 17)
 
 ```ruby
-Auth::User.find_by(email: "user@example.com").destroy
+Auth::Identity.find_by(email: "user@example.com").destroy
 ```
 
 cascades to `sessions`, `api_tokens`, and `oauth_providers` via
-`dependent: :destroy`. Hosts must additionally erase rows in their own
-`User` table (linked by `host_user_id`) — the engine does not own that
-schema.
+`dependent: :destroy`. Hosts that keep their own user-domain records
+linked by `identity_id` must additionally erase those rows — the
+engine does not own that schema.
 
 ### Logging
 
-Don't log `email`. Log `auth_user_id` instead. Encryption protects the
+Don't log `email`. Log `identity_id` instead. Encryption protects the
 DB at rest but is moot if PII leaks into log files. Add the column to
 `config.filter_parameters` in your host:
 
@@ -237,8 +270,8 @@ config.filter_parameters += %i[email password password_digest]
 
 ### Right to access / portability (Article 15 / 20)
 
-Not yet shipped — `Auth::ExportUserData` is on the roadmap. For now,
-hosts can export with a direct query against the user's rows.
+Not yet shipped — `Auth::ExportIdentityData` is on the roadmap. For
+now, hosts can export with a direct query against the identity's rows.
 
 ## Mounting
 

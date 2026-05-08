@@ -93,6 +93,17 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
+    it "Email strategy resolves recipient via try-chain (concern OR email_address OR email)" do
+      assert_file "engines/notifications/app/models/notifications/strategies/email.rb" do |content|
+        # The polymorphic owner might be Auth::Identity (uses :email),
+        # a host User (uses :email_address or :email), or any AR model
+        # via the optional Notifiable concern (#email_notification_recipient).
+        expect(content).to include("try(:email_notification_recipient)")
+        expect(content).to include("try(:email_address)")
+        expect(content).to include("try(:email)")
+      end
+    end
+
     it "creates the Sms strategy that delegates to the sms adapter" do
       assert_file "engines/notifications/app/models/notifications/strategies/sms.rb" do |content|
         expect(content).to include("class Sms < Notification")
@@ -184,13 +195,24 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
   end
 
   describe "subscriber" do
-    it "AuthSubscriber subscribes to user.signed_up.auth and enqueues CreateNotificationJob (no inline DB writes)" do
+    it "AuthSubscriber subscribes to identity.signed_up.auth and enqueues CreateNotificationJob (no inline DB writes)" do
       assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
         expect(content).to include("Seams::Events::Publisher.attach_class(")
-        expect(content).to include('"user.signed_up.auth"')
+        expect(content).to include('"identity.signed_up.auth"')
         expect(content).to include('class_name:  "Notifications::AuthSubscriber"')
         expect(content).to include("method_name: :handle_signed_up")
         expect(content).to include("Notifications::CreateNotificationJob.perform_later")
+      end
+    end
+
+    it "AuthSubscriber resolves the welcome notification owner via Auth::Identity (the canonical Wave-9 owner)" do
+      assert_file "engines/notifications/app/subscribers/notifications/auth_subscriber.rb" do |content|
+        expect(content).to include('OWNER_CLASS_NAME = "Auth::Identity"')
+        expect(content).to include("identity_id = payload[:identity_id]")
+        # Old payload keys are gone — Wave 9 dropped host_user_id /
+        # auth_user_id from the auth event payload.
+        expect(content).not_to include("host_user_id")
+        expect(content).not_to include("auth_user_id")
       end
     end
 
@@ -221,16 +243,22 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
-    it "BillingSubscriber enqueues CreateNotificationJob and resolves the host User by stripe_customer_id" do
+    it "BillingSubscriber enqueues CreateNotificationJob and resolves the recipient via Wave-9 account_id" do
       assert_file "engines/notifications/app/subscribers/notifications/billing_subscriber.rb" do |content|
         expect(content).to include("Notifications::CreateNotificationJob.perform_later")
-        expect(content).to include("stripe_customer_id")
+        # Wave 9: the canonical billing payload carries account_id directly;
+        # there's no host-User lookup by stripe_customer_id any more.
+        expect(content).to include("payload[:account_id]")
+        expect(content).not_to include("stripe_customer_id")
       end
     end
 
-    it "BillingSubscriber reads customer_ref from the canonical payload (not from a local Invoice lookup)" do
+    it "BillingSubscriber addresses the Notification owner via the configured billable_class" do
       assert_file "engines/notifications/app/subscribers/notifications/billing_subscriber.rb" do |content|
-        expect(content).to include("payload[:customer_ref]")
+        # Default `Accounts::Account` (the canonical Wave-9 tenant), but
+        # respects a host's `Billing.configuration.billable_class` override.
+        expect(content).to include("Billing.configuration.billable_class")
+        expect(content).to include("Accounts::Account")
         expect(content).not_to include("Billing::Invoice")
       end
     end
@@ -270,6 +298,16 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
         expect(content).to include("def self.enabled?")
       end
     end
+
+    it "NotificationPreference keys off identity_id (Wave 9 rename — channel prefs live with the human)" do
+      assert_file "engines/notifications/app/models/notifications/notification_preference.rb" do |content|
+        expect(content).to include("validates :identity_id")
+        expect(content).to include("def self.enabled?(identity_id:")
+        expect(content).to include("find_by(identity_id: identity_id")
+        # No leftovers from the pre-Wave-9 user_id key.
+        expect(content).not_to match(/\buser_id\b/)
+      end
+    end
   end
 
   describe "read-side controllers" do
@@ -282,10 +320,33 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
+    # Regression: pre-Wave-9 the controller resolved `current_user`, but
+    # Auth::Authentication ships `current_identity` post-Wave-9 — every
+    # action was returning empty / failing to find notifications.
+    it "NotificationsController#current_recipient prefers Auth::Current.identity" do
+      assert_file "engines/notifications/app/controllers/notifications/notifications_controller.rb" do |content|
+        expect(content).to include("def current_recipient")
+        expect(content).to include("Auth::Current")
+      end
+    end
+
     it "creates PreferencesController with show + update" do
       assert_file "engines/notifications/app/controllers/notifications/preferences_controller.rb" do |content|
         expect(content).to include("def show")
         expect(content).to include("def update")
+      end
+    end
+
+    # Regression: pre-Wave-9 the controller queried `user_id`, but the
+    # migration creates `identity_id` — every GET / PATCH was raising
+    # ActiveRecord::StatementInvalid in canonical hosts.
+    it "PreferencesController queries identity_id (not user_id) and reads Auth::Current.identity" do
+      assert_file "engines/notifications/app/controllers/notifications/preferences_controller.rb" do |content|
+        expect(content).to include("identity_id: current_identity_id")
+        expect(content).to include("def current_identity_id")
+        expect(content).to include("Auth::Current")
+        expect(content).not_to match(/\buser_id\b/)
+        expect(content).not_to include("def current_user_id")
       end
     end
   end
@@ -299,7 +360,11 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
     it "creates the per-recipient ActionCable channel" do
       assert_file "engines/notifications/app/channels/notifications/notification_channel.rb" do |content|
         expect(content).to include("class NotificationChannel")
-        expect(content).to include("stream_for current_user")
+        expect(content).to include("stream_for current_recipient")
+        # Wave 9: prefer Auth's `current_identity` exposed by the
+        # ApplicationCable connection. Old `current_user` is the
+        # legacy fallback only.
+        expect(content).to include("connection.current_identity")
       end
     end
 
@@ -337,7 +402,10 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       [
         "create_table :notifications",
         "t.string  :type",
-        "t.references :owner",
+        # Wave 9: polymorphic owner stored as string columns so the
+        # column holds both bigint Identity IDs and UUID Account IDs.
+        "t.string  :owner_type",
+        "t.string  :owner_id",
         "schedule_data",
         "next_delivery_at"
       ]
@@ -359,6 +427,19 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
                           "engines/notifications/db/migrate",
                           "*_create_notification_preferences.rb")
       expect(Dir[pattern].first).not_to be_nil
+    end
+
+    it "create_notification_preferences keys off identity_id (Wave 9 rename)" do
+      pattern = File.join(destination_root,
+                          "engines/notifications/db/migrate",
+                          "*_create_notification_preferences.rb")
+      file    = Dir[pattern].first
+      expect(file).not_to be_nil
+
+      content = File.read(file)
+      expect(content).to include(":identity_id")
+      expect(content).to include("%i[identity_id channel notification_type]")
+      expect(content).not_to match(/:user_id\b/)
     end
 
     it "creates create_notification_deliveries (audit) with notification_id + sent_at" do
@@ -403,7 +484,7 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       %w[
         engines/notifications/spec/dummy/config/application.rb
         engines/notifications/spec/dummy/db/schema.rb
-        engines/notifications/spec/dummy/app/models/user.rb
+        engines/notifications/spec/dummy/app/models/auth/identity.rb
         engines/notifications/spec/dummy/app/controllers/application_controller.rb
         engines/notifications/spec/rails_helper.rb
       ].each do |path|
@@ -426,8 +507,18 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
           "factory :sms_notification",
           "factory :notification_delivery",
           "factory :notification_preference",
+          # Wave 9: :auth_identity is the canonical owner factory; the
+          # legacy :notifications_user alias points at it.
+          "factory :auth_identity",
           "factory :notifications_user"
         ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "the :notification_preference factory keys off identity_id (post-Wave-9)" do
+      assert_file "engines/notifications/spec/factories/notifications.rb" do |content|
+        expect(content).to include("sequence(:identity_id)")
+        expect(content).not_to include("sequence(:user_id)")
       end
     end
 
@@ -473,6 +564,24 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       content = File.read(gen_path)
       expect(content).to include('host_inject_gem("factory_bot_rails"')
       expect(content).to include("group: :test")
+    end
+
+    it "wire_into_host no longer auto-includes Notifiable into a host User (Wave 9 dropped that)" do
+      gen_path = File.expand_path(
+        "../../../lib/generators/seams/notifications/notifications_generator.rb",
+        __dir__
+      )
+      content = File.read(gen_path)
+      # The auto-include was the source of the host-User coupling
+      # Wave 9 removed; hosts now opt in via the initializer template.
+      expect(content).not_to include("host_inject_include_in_user")
+    end
+
+    it "ships a host config/initializers/notifications.rb that documents the optional Notifiable include" do
+      assert_file "config/initializers/notifications.rb" do |content|
+        expect(content).to include("Auth::Identity.include(Notifications::Notifiable)")
+        expect(content).to include("Notifications.configure")
+      end
     end
   end
 

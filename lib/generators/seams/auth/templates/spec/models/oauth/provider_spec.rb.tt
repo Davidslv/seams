@@ -4,10 +4,10 @@ require "rails_helper"
 
 RSpec.describe Auth::OAuth::Provider do
   describe "validations" do
-    it "requires provider, provider_uid, user_id" do
+    it "requires provider, provider_uid, identity_id" do
       record = described_class.new
       expect(record).not_to be_valid
-      %i[provider provider_uid user_id].each do |attr|
+      %i[provider provider_uid identity_id].each do |attr|
         expect(record.errors[attr]).not_to be_empty
       end
     end
@@ -25,12 +25,12 @@ RSpec.describe Auth::OAuth::Provider do
       expect(dup.errors[:provider_uid].join).to match(/already linked/)
     end
 
-    it "rejects a user being linked to the same provider twice" do
-      user = create(:auth_user)
-      create(:auth_oauth_provider, user: user, provider: "google", provider_uid: "uid-1")
-      dup = build(:auth_oauth_provider, user: user, provider: "google", provider_uid: "uid-2")
+    it "rejects an identity being linked to the same provider twice" do
+      identity = create(:auth_identity)
+      create(:auth_oauth_provider, identity: identity, provider: "google", provider_uid: "uid-1")
+      dup = build(:auth_oauth_provider, identity: identity, provider: "google", provider_uid: "uid-2")
       expect(dup).not_to be_valid
-      expect(dup.errors[:user_id].join).to match(/already linked/)
+      expect(dup.errors[:identity_id].join).to match(/already linked/)
     end
   end
 

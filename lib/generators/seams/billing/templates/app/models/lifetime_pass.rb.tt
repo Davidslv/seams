@@ -7,14 +7,20 @@ module Billing
   # semantics diverge enough (no current_period_end, no renewal
   # webhook, no proration) that mixing them invites bugs.
   #
+  # Belongs to an Accounts::Account (the tenant the entitlement
+  # applies to). The "granted_by" / "revoked_by" columns reference
+  # an Auth::Identity (the human who pressed the button) — Identity
+  # rather than Account because they track human action, not
+  # tenant-level data.
+  #
   # Two creation paths:
   #   1. Public — host's pricing page → Stripe Checkout (mode: payment)
   #      → `checkout.session.completed` webhook → CreatePassFromCheckoutService.
-  #      `gateway_ref` is the Stripe Checkout Session id; `granted_by_user_id`
+  #      `gateway_ref` is the Stripe Checkout Session id; `granted_by_identity_id`
   #      is nil (paid, not granted).
   #   2. Private grant — admin form → GrantPassService.
-  #      `gateway_ref` is nil (no Stripe charge); `granted_by_user_id` is
-  #      the admin who issued it.
+  #      `gateway_ref` is nil (no Stripe charge); `granted_by_identity_id`
+  #      is the admin Identity who issued it.
   #
   # Active passes can be revoked via RevokePassService (refunded,
   # ToS violation, etc.) — sets `revoked_at` rather than deleting so
@@ -26,9 +32,9 @@ module Billing
                       foreign_key: :plan_ref, primary_key: :gateway_ref,
                       optional: true
 
-    validates :customer_ref, :plan_ref, :granted_at, presence: true
-    validates :customer_ref, uniqueness: { scope: :plan_ref,
-                                           message: "already has a lifetime pass for this plan" }
+    validates :account_id, :customer_ref, :plan_ref, :granted_at, presence: true
+    validates :account_id, uniqueness: { scope: :plan_ref,
+                                         message: "already has a lifetime pass for this plan" }
 
     scope :active,  -> { where(revoked_at: nil) }
     scope :revoked, -> { where.not(revoked_at: nil) }
@@ -40,7 +46,7 @@ module Billing
     end
 
     def granted?
-      granted_by_user_id.present?
+      granted_by_identity_id.present?
     end
 
     def revoked?
