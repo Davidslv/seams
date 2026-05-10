@@ -1,0 +1,85 @@
+name: Release
+
+# Triggered by pushing a `v<MAJOR>.<MINOR>.<PATCH>` tag — publishes the
+# matching gem version to rubygems.org via OIDC trusted publishing.
+# No long-lived API key in the repo or in CI secrets.
+#
+# To cut a release:
+#   git tag -a v0.2.0 -m "v0.2.0 — <summary>"
+#   git push origin v0.2.0
+#
+# This workflow then:
+#   1. Verifies the tag matches `Seams::VERSION` (refuses if drifted).
+#   2. Runs `bin/audit --fast` (rubocop + rspec + brakeman + bundle-audit).
+#   3. Mints a short-lived rubygems.org token via OIDC.
+#   4. Builds + pushes the gem.
+#
+# One-time setup on rubygems.org (the only step that needs human hands):
+#   https://rubygems.org/profile/oidc/trusted_publishers/new
+#   GitHub Actions → repository: Davidslv/seams
+#                   → workflow filename: release.yml
+#                   → environment (optional): rubygems
+#
+# Once the Trusted Publisher is registered, the personal API key can
+# be revoked.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  # `contents: read` to checkout. `id-token: write` so the runner can
+  # mint an OIDC token that rubygems.org accepts in lieu of an API key.
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    name: Publish seams to rubygems.org
+    runs-on: ubuntu-latest
+    environment:
+      name: rubygems
+      url: https://rubygems.org/gems/seams
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ".ruby-version"
+          bundler-cache: true
+
+      - name: Verify the tag matches Seams::VERSION
+        # A drift between tag and `lib/seams/version.rb` would publish
+        # a gem labelled differently from the tag — confusing at best,
+        # bad-supply-chain at worst. Fail fast.
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF#refs/tags/v}"
+          gem_version=$(ruby -Ilib -r seams/version -e 'print Seams::VERSION')
+          if [ "$tag_version" != "$gem_version" ]; then
+            echo "::error title=Version drift::tag is v$tag_version but Seams::VERSION = $gem_version. Fix one of them and re-tag."
+            exit 1
+          fi
+          echo "Tag $tag_version matches Seams::VERSION."
+
+      - name: Run bin/audit (rubocop + rspec + brakeman + bundle-audit)
+        run: bin/audit --fast
+
+      - name: Configure rubygems trusted publishing
+        # Mints a short-lived rubygems.org token from the workflow's
+        # OIDC identity and writes it to ~/.gem/credentials. Requires
+        # the one-time Trusted Publisher registration on rubygems.org
+        # (see header comment).
+        uses: rubygems/release-gem@v1
+
+      # `rubygems/release-gem@v1` already builds + pushes by default.
+      # Keep the explicit `gem build` + `gem push` block COMMENTED here
+      # in case a future release flow wants to split the steps (e.g.
+      # to attach the .gem to a GitHub Release artefact list before
+      # pushing). Today the action handles both.
+      #
+      # - name: Build and push the gem
+      #   run: |
+      #     gem build seams.gemspec
+      #     gem push "seams-${GITHUB_REF#refs/tags/v}.gem"
