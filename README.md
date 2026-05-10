@@ -7,6 +7,12 @@ boundaries, independent testing, team autonomy — without the
 operational cost. You ship a single Rails app. You think in
 independent engines.
 
+> Seams materialises the patterns David Silva teaches in **[Modular
+> Rails: Architecture for the Long Game](https://davidslv.uk/modular-rails/)**.
+> The book is the artefact; this gem is the executable shorthand. See
+> [seams-example](https://github.com/Davidslv/seams-example) for a
+> reference host that wires every canonical engine end-to-end.
+
 ## Quick start
 
 ```ruby
