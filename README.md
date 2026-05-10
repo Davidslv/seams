@@ -69,6 +69,7 @@ hidden behind the gem.
 - [doc/WRITING_AN_ADAPTER.md](doc/WRITING_AN_ADAPTER.md)
 - [doc/TESTING.md](doc/TESTING.md)
 - [doc/UPGRADING_FROM_WAVE_8.md](doc/UPGRADING_FROM_WAVE_8.md) — if you adopted seams pre-Wave-9
+- [RELEASING.md](RELEASING.md) — for maintainers: how to cut a new gem release
 
 ## Why Seams instead of...
 
