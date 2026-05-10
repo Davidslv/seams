@@ -1,0 +1,33 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Accounts::Account. The single Account row
+    # the admin can see is their own. Filter on `id`, not `account_id`,
+    # because Account is the tenant root.
+    #
+    # `record_in_tenant_scope?` is overridden here because the parent
+    # default reads `record.account_id`, which doesn't exist on
+    # Account. The matching column on Account is `id`.
+    class AccountPolicy < ApplicationPolicy
+      class Scope < ApplicationPolicy::Scope
+        def resolve
+          return scope.all if staff?
+          return scope.none if account_id.nil?
+
+          scope.where(id: account_id)
+        end
+      end
+
+      private
+
+      def record_in_tenant_scope?
+        return true if user&.identity&.staff?
+        return true if record.nil? || record.is_a?(Class)
+        return false if account_id.nil?
+
+        record.id == account_id
+      end
+    end
+  end
+end

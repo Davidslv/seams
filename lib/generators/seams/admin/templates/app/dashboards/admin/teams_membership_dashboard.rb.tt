@@ -1,0 +1,43 @@
+# frozen_string_literal: true
+
+require "administrate/base_dashboard"
+
+# Administrate dashboard for Teams::Membership — joins a Teams::Team
+# to an Auth::Identity with a role.
+#
+# Class name is `Admin::TeamsMembershipDashboard` to disambiguate from
+# `Admin::AccountsMembershipDashboard`; both engines ship a Membership
+# model and Administrate's dashboard lookup resolves by class name.
+#
+# `identity_id` is a bare bigint FK — cross-engine model access is
+# forbidden by the NoCrossEngineModelAccess cop, so the admin surface
+# treats it as a typed integer reference rather than a belongs_to.
+module Admin
+  class TeamsMembershipDashboard < Administrate::BaseDashboard
+    ATTRIBUTE_TYPES = {
+      id:          Field::Number,
+      team:        Field::BelongsTo.with_options(class_name: "Teams::Team"),
+      identity_id: Field::Number,
+      role:        Field::Select.with_options(collection: %w[owner admin member]),
+      created_at:  Field::DateTime,
+      updated_at:  Field::DateTime
+    }.freeze
+
+    COLLECTION_ATTRIBUTES = %i[id team role created_at].freeze
+
+    SHOW_PAGE_ATTRIBUTES = %i[
+      id
+      team
+      identity_id
+      role
+      created_at
+      updated_at
+    ].freeze
+
+    FORM_ATTRIBUTES = %i[team identity_id role].freeze
+
+    def display_resource(membership)
+      "Team Membership ##{membership.id} (#{membership.role})"
+    end
+  end
+end

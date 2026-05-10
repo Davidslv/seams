@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+require "administrate/base_dashboard"
+
+# Administrate dashboard for Teams::Team — the unit of multi-tenant
+# ownership inside the teams engine. Teams are peers to Accounts in
+# the Wave 9 architecture; the join from Team to Identity is direct
+# (Teams::Membership), not via Accounts::Membership.
+module Admin
+  class TeamDashboard < Administrate::BaseDashboard
+    ATTRIBUTE_TYPES = {
+      id:          Field::Number,
+      name:        Field::String,
+      slug:        Field::String,
+      memberships: Field::HasMany.with_options(class_name: "Teams::Membership"),
+      invitations: Field::HasMany.with_options(class_name: "Teams::Invitation"),
+      created_at:  Field::DateTime,
+      updated_at:  Field::DateTime
+    }.freeze
+
+    COLLECTION_ATTRIBUTES = %i[id name slug created_at].freeze
+
+    SHOW_PAGE_ATTRIBUTES = %i[
+      id
+      name
+      slug
+      memberships
+      invitations
+      created_at
+      updated_at
+    ].freeze
+
+    FORM_ATTRIBUTES = %i[name slug].freeze
+
+    def display_resource(team)
+      team.name.presence || "Team ##{team.id}"
+    end
+  end
+end

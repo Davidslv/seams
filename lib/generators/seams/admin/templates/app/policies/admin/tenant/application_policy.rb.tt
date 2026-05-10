@@ -1,0 +1,169 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Abstract base for every tenant-mode admin policy. Tenant mode
+    # gates on `Accounts::Membership.role` for the currently-resolved
+    # membership (`Seams::Admin::Context#membership`). Staff Identities
+    # always pass the gate too — a platform staff member can drop into
+    # any tenant's admin without rejoining as an account-admin.
+    #
+    # The `Scope` inner class is overridden per-policy; this base
+    # returns `scope.none` so a subclass that forgets to override gets
+    # an empty list rather than leaking another tenant's data. Fail
+    # closed.
+    #
+    # `user` is `Seams::Admin::Context.new(identity, membership)`.
+    # `user.identity`   — Auth::Identity (carries `staff?`)
+    # `user.membership` — Accounts::Membership for the current account
+    #                     (carries `account_id` and `role`)
+    #
+    # ## Two-stage gate (`permitted?` + Scope)
+    #
+    # `permitted?` here returns true when the user holds an
+    # admin/owner membership in ANY account; the per-resource `Scope`
+    # then filters the visible record set to that user's `account_id`.
+    # The split is intentional:
+    #   - `permitted?` answers "is this human allowed in the admin
+    #     surface at all?" (gate semantics).
+    #   - `Scope` answers "which rows can this human see?" (row-level
+    #     filter).
+    #
+    # The user-visible consequence: a tenant admin requesting
+    # `/admin/accounts/<other_account_id>` passes `permitted?` but the
+    # Scope filters out that row, so the controller raises
+    # `ActiveRecord::RecordNotFound` (rendered as a 404). The trade-off
+    # is that the admin surface doesn't leak the existence of another
+    # tenant's data via a different status code — both "row doesn't
+    # exist" and "row belongs to another tenant" produce a 404.
+    class ApplicationPolicy
+      attr_reader :user, :record
+
+      def initialize(user, record)
+        @user   = user
+        @record = record
+      end
+
+      def index?
+        permitted?
+      end
+
+      def show?
+        permitted? && record_in_tenant_scope?
+      end
+
+      def new?
+        permitted?
+      end
+
+      def create?
+        permitted? && record_in_tenant_scope?
+      end
+
+      def edit?
+        permitted? && record_in_tenant_scope?
+      end
+
+      def update?
+        permitted? && record_in_tenant_scope?
+      end
+
+      def destroy?
+        permitted? && record_in_tenant_scope?
+      end
+
+      class Scope
+        attr_reader :user, :scope
+
+        def initialize(user, scope)
+          @user  = user
+          @scope = scope
+        end
+
+        # Default fail-closed scope. Every concrete tenant policy
+        # overrides this to filter by `account_id`. Returning `none`
+        # here means a forgotten override never leaks another tenant's
+        # data — the worst case is "admin sees an empty list" rather
+        # than "admin sees everyone's data".
+        def resolve
+          scope.none
+        end
+
+        private
+
+        def account_id
+          user&.membership&.account_id
+        end
+
+        def staff?
+          user&.identity&.staff?
+        end
+
+        # Helper for subclasses: hosts may have ejected the
+        # `account_id` column off a model (or never had one — the
+        # canonical seams schema doesn't put `account_id` on
+        # `teams`, `team_memberships`, `team_invitations`,
+        # `notifications`, or `notification_preferences`).
+        # Subclasses that filter by `account_id` should consult this
+        # before issuing the where-clause; if the column is absent the
+        # safe fall-back is `scope.none` (refusing to leak rows we
+        # can't tenant-scope).
+        def account_id_column_present?
+          model = scope.respond_to?(:klass) ? scope.klass : scope
+          return false unless model.respond_to?(:column_names)
+
+          model.column_names.include?("account_id")
+        end
+      end
+
+      private
+
+      # Permitted when (a) the Identity is staff (platform admins drop
+      # into every tenant), or (b) the resolved Accounts::Membership
+      # carries an admin/owner role for the current Account.
+      def permitted?
+        return true if user&.identity&.staff?
+
+        membership = user&.membership
+        return false if membership.nil?
+
+        %w[owner admin].include?(membership.role.to_s)
+      end
+
+      def account_id
+        user&.membership&.account_id
+      end
+
+      # Per-record tenant guard. The `Scope` filters list views, but a
+      # show/update/destroy lookup of a record from another tenant
+      # (constructed by id-tampering) bypasses the Scope unless we
+      # check the record itself. Subclasses that filter by
+      # `record.account_id` get this default; subclasses with custom
+      # tenant boundaries (Account itself, Plan, Identity) override
+      # this method.
+      #
+      # Staff Identities always satisfy the per-record check — they
+      # admin every tenant.
+      def record_in_tenant_scope?
+        return true if user&.identity&.staff?
+        return true if record.nil? || record.is_a?(Class)
+        return false if account_id.nil?
+
+        record_account_id = if record.respond_to?(:account_id)
+                              record.account_id
+                            else
+                              # Record class doesn't carry an
+                              # account_id column. Fall through to
+                              # `true` so policies that override
+                              # `record_in_tenant_scope?` (Account,
+                              # Identity, Plan) handle this — and so
+                              # the default doesn't fail-closed for
+                              # global resources.
+                              return true
+                            end
+
+        record_account_id == account_id
+      end
+    end
+  end
+end

@@ -1,0 +1,266 @@
+# Seams Admin
+
+> Mountable admin engine for a Seams-powered host. Built on
+> [Administrate](https://github.com/thoughtbot/administrate) for the
+> dashboard surface and [Pundit](https://github.com/varvet/pundit) for
+> per-record authorisation. Read-only over the existing seams tables —
+> ships no migrations of its own.
+
+## 30-second elevator pitch
+
+`bin/rails generate seams:admin` writes an `engines/admin/` engine into
+your host that mounts at `/admin` and ships:
+
+- Twelve Administrate dashboards covering the canonical seams models
+  (Identity, Account, Membership × 2, Team, TeamMembership, Invitation,
+  Notification, NotificationPreference, Plan, Subscription, Invoice,
+  LifetimePass).
+- Two operating modes — **platform** (admins see everything) and
+  **tenant** (admins are scoped to their own Account) — selected by a
+  single config knob.
+- Pundit policies under `Admin::Platform::*` and `Admin::Tenant::*`,
+  selected at request time by `Seams::Admin.config.tenancy_scope`.
+- Audit-log auto-write — every successful create/update/destroy emits a
+  `Core::AuditLog` row keyed on `Auth::Current.identity`.
+- Four config knobs (`authenticator`, `tenancy_scope`, `theme_css_path`,
+  `before_admin_action`) for the predictable customisation surface.
+
+No migrations, no new tables, no admin-only User model — see
+"[Why `staff?` on Identity, not a separate `AdminUser` table?](#why-staff-on-identity-not-a-separate-adminuser-table)"
+below.
+
+## First sign-in (do this first)
+
+After `bundle install` picks up `administrate` + `pundit`, promote
+yourself to a platform admin from the Rails console (or via runner):
+
+```ruby
+Auth::Identity.find_by(email: "you@example.com").update!(staff: true)
+```
+
+Then boot the host and visit `/admin`:
+
+```bash
+bin/rails server
+open http://localhost:3000/admin
+```
+
+You should land on the Identities index with sidebar entries for all
+twelve canonical models. If you see "Access denied" instead, the
+authenticator returned a falsey value — double-check `staff` is set on
+your Identity row (`Auth::Identity.find_by(email: ...).staff?` should
+return `true`).
+
+## Two-mode operation
+
+The admin surface supports two tenancy modes, switched via a single
+config knob:
+
+### `:platform` mode (default)
+
+```ruby
+# config/initializers/seams_admin.rb
+Seams::Admin.configure { |c| c.tenancy_scope = :platform }
+```
+
+- **Gate:** `Auth::Identity#staff?` (boolean column on
+  `auth_identities`).
+- **Visibility:** every Account's data, unfiltered.
+- **Use case:** internal operator console — support staff
+  impersonation, cross-account search, billing reconciliation.
+- **Policies:** `Admin::Platform::*Policy` namespace.
+
+### `:tenant` mode
+
+```ruby
+# config/initializers/seams_admin.rb
+Seams::Admin.configure { |c| c.tenancy_scope = :tenant }
+```
+
+- **Gate:** `Accounts::Membership#role == "admin"` (read off
+  `Accounts::Current.membership`).
+- **Visibility:** only the current Account's data — every Pundit
+  `Scope` filters by `account_id`.
+- **Use case:** a tenant-facing admin surface where each customer's
+  admin sees their own users / invoices / teams only.
+- **Policies:** `Admin::Tenant::*Policy` namespace.
+- **Requires:** the `accounts` engine. Without it the admin engine
+  fails fast at boot with a clear error message.
+
+Switching modes is a config flip — no schema change, no regenerate.
+The `policy_namespace` lookup on `Seams::Admin::ApplicationController`
+reads `Seams::Admin.config.tenancy_scope` on every request.
+
+## Configuration
+
+Four knobs, deliberately small:
+
+```ruby
+# config/initializers/seams_admin.rb
+Seams::Admin.configure do |c|
+  # 1. authenticator — Callable taking the controller, returning truthy
+  # when the request is allowed in. Default: ->(ctrl) { ctrl.current_identity&.staff? }
+  c.authenticator = ->(ctrl) { ctrl.current_identity&.staff? }
+
+  # 2. tenancy_scope — :platform | :tenant. Selects the policy namespace
+  # at request time. See "Two-mode operation" above.
+  c.tenancy_scope = :platform
+
+  # 3. theme_css_path — Optional path to a host-supplied CSS file loaded
+  # on top of Administrate's stock styling. nil = use Administrate's
+  # defaults.
+  c.theme_css_path = nil
+
+  # 4. before_admin_action — Optional callable that runs before every
+  # admin action. The recommended hook for 2FA enforcement, IP
+  # allow-listing, audit-trail entry-point logging, etc. Receives the
+  # controller; raise to halt the request.
+  c.before_admin_action = nil
+end
+```
+
+Follow-up generators that ship new knobs splice their `attr_accessor`
+into the `admin.configuration.attributes` insertion point in
+`engines/admin/lib/admin/configuration.rb` and the matching default
+into `admin.configuration.defaults`.
+
+## Why `staff?` on Identity, not a separate `AdminUser` table?
+
+Classic Rails apps separate `User` and `AdminUser` because `User`
+carries customer-facing concerns (orders, billing, notifications, etc.)
+that you do not want admins to inherit. **In seams Wave 9
+`Auth::Identity` is *already* the credential-only object** — it has no
+customer concerns to inherit from. Customer-facing data lives on
+`Accounts::Membership` (account-scoped) and the host's own domain
+models. A boolean `staff?` flag on Identity is the right granularity.
+
+The seams "User and AdminUser must live on separate tables" rule is
+**reinterpreted, not violated**: the rule's intent (no customer state
+on the admin authentication object) is fully satisfied by the Wave 9
+credential-only Identity. Flagging it explicitly here so future
+contributors don't read this engine and assume the rule was forgotten.
+
+Hosts that need hard isolation (regulatory compliance, separate auth
+flow, dedicated SSO for admins) override the authenticator:
+
+```ruby
+Seams::Admin.configure do |c|
+  c.authenticator = ->(ctrl) { ctrl.current_admin_user.present? }
+end
+```
+
+…and bring their own `current_admin_user` resolution from a separate
+auth surface.
+
+## Customising a dashboard (Ejecting)
+
+The seams pattern: **eject the dashboard, then edit your local copy**.
+Future `bin/seams admin` runs leave ejected files alone.
+
+```bash
+bin/seams resolve --eject admin/app/dashboards/admin/identity_dashboard.rb
+# Now edit engines/admin/app/dashboards/admin/identity_dashboard.rb freely.
+```
+
+For new dashboards covering host-specific models, generate via
+Administrate, then move the result under the `Admin::*` namespace:
+
+```bash
+bin/rails generate administrate:dashboard MyHost::Project
+# Move app/dashboards/my_host/project_dashboard.rb to
+# engines/admin/app/dashboards/admin/project_dashboard.rb
+# Move the controller similarly under app/controllers/admin/.
+# Add `resources :projects, controller: "admin/projects"` to
+# engines/admin/config/routes.rb (or splice via the
+# admin.routes.after_resources insertion point in a follow-up generator).
+```
+
+Administrate's full dashboard / field / controller surface is documented
+at <https://administrate-demo.herokuapp.com/>.
+
+## Error messages a host operator will see
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| `[seams admin] missing required dependency: Auth::Identity ...` at boot | The auth engine isn't installed. | `bin/rails generate seams:auth` |
+| `[seams admin] missing required dependency: Administrate ...` at boot | `gem "administrate"` not in the host Gemfile. | `bundle install` (the admin generator wires it; if you regenerated and skipped, add `gem "administrate", "~> 1.0"` manually). |
+| `[seams admin] missing required dependency: Pundit ...` at boot | `gem "pundit"` not in the host Gemfile. | Same fix — the generator wires it. |
+| 403 "Access denied. The seams admin surface is gated on `Seams::Admin.config.authenticator`..." on every request | The configured gate returned falsey for the signed-in Identity. | Default gate is `current_identity&.staff?`. Set `staff: true` on your Identity row, or override the authenticator. |
+| `Pundit::NotAuthorizedError` mid-request | A per-action policy denied the request. | Eject the relevant policy under `engines/admin/app/policies/admin/{platform,tenant}/<resource>_policy.rb` and override the action predicate (e.g. `def destroy?; false; end`). |
+
+## What's not shipped (deferred)
+
+- **2FA / IP allow-list for `/admin`.** Not shipped. Wire your own via
+  `Seams::Admin.config.before_admin_action`.
+- **Branded UI.** Stock Administrate CSS only in v1. Override via
+  `theme_css_path`.
+- **Search beyond Administrate's stock.** Administrate ships a basic
+  Ransack-backed search; rich filtering / faceted search is your job.
+- **Batch actions.** Not in Administrate's surface; not shipped here.
+  Override the relevant controller's `index` action and emit your own
+  bulk-action button if you need them.
+
+## Insertion-point markers
+
+This engine ships five Wave-10 insertion-point markers that follow-up
+generators target:
+
+| Marker | File | Purpose |
+| --- | --- | --- |
+| `admin.engine.events` | `lib/admin/engine.rb` | Register new admin events (e.g. `admin.action.taken.admin`). |
+| `admin.routes.before_resources` | `config/routes.rb` | Ahead-of-resource routes (impersonation entry points, bulk-action endpoints). |
+| `admin.routes.after_resources` | `config/routes.rb` | New top-level admin routes (custom collection routes, JSON-only endpoints). |
+| `admin.configuration.attributes` | `lib/admin/configuration.rb` | New configuration knobs. |
+| `admin.configuration.defaults` | `lib/admin/configuration.rb` | Defaults for the new knobs. |
+
+`bin/seams resolve --list-markers admin` prints the live list against
+the engine source.
+
+## Audit log
+
+Every successful create/update/destroy on an admin dashboard writes a
+`Core::AuditLog` row via the `record_admin_audit` after_action. The
+row carries:
+
+- `action` — `"create"`, `"update"`, or `"destroy"`.
+- `auditable_type` / `auditable_id` — the resource Administrate
+  resolved.
+- `actor_id` — `Auth::Current.identity&.id`.
+- `payload` — for updates, `record.saved_changes.transform_values(&:last)`;
+  for create/destroy, attributes minus timestamps.
+
+If the core engine isn't installed (and `Core::AuditLog` is therefore
+undefined), the after_action no-ops cleanly — admin still works,
+audit log is silently absent.
+
+## Why Administrate?
+
+Considered: ActiveAdmin, Avo, Trestle, Motor Admin, RailsAdmin, and
+hand-rolling on top of Rails 8 scaffolds. Administrate wins because:
+
+- Dashboards are plain Ruby classes (`Admin::IdentityDashboard <
+  Administrate::BaseDashboard`). No DSL, no Arbre. Matches seams' house
+  style.
+- Custom fields are `rails g administrate:field foo` — a class + an ERB
+  partial. Perfect for masking encrypted columns and rendering Stripe
+  IDs.
+- ORM-agnostic.
+- Pundit-aware via documented `policy_namespace` integration. Clean
+  surface for the platform-vs-tenant policy split.
+- thoughtbot maintains it.
+- Easiest of the surveyed frameworks to embed inside another engine —
+  no assumption that the host owns `/admin`.
+
+The full per-framework comparison lives in
+`proposals/admin_engine_administrate.md` (the Wave 11A research
+report).
+
+## Running the specs
+
+```bash
+bin/rails seams:test[admin]
+```
+
+The boot spec asserts the engine loads, the four config knobs default
+correctly, every dashboard + policy class is reachable, and both
+tenancy modes route to the right policy namespace.

@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Teams::Membership dashboard.
+# Routed under `teams_memberships` (engine-prefixed) to disambiguate
+# from `accounts_memberships`.
+module Admin
+  class TeamsMembershipsController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Teams::Membership
+    end
+
+    def dashboard
+      @dashboard ||= TeamsMembershipDashboard.new
+    end
+  end
+end

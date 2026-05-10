@@ -1,0 +1,68 @@
+# frozen_string_literal: true
+
+module Seams
+  module Admin
+    class Engine < ::Rails::Engine
+      isolate_namespace Seams::Admin
+
+      # Engine is rooted at engines/admin/. Rails picks up app/, config/,
+      # db/migrate/ etc. from the engine root by convention. lib/ is on
+      # $LOAD_PATH but not Zeitwerk-managed — sub-files under lib/admin/
+      # are explicit `require`s from lib/admin.rb.
+      config.generators do |g|
+        g.test_framework :rspec
+      end
+
+      initializer "admin.register_events" do
+        # Phase 1 ships no admin-specific events. Phase 3 adds an
+        # `admin.action.taken.admin` event when the audit-log auto-write
+        # lands. Follow-up generators (e.g. seams:admin:add_dashboard)
+        # may register events here.
+        # Follow-up generators that emit new admin events register them here.
+        # seams:insertion-point admin.engine.events
+      end
+
+      initializer "admin.append_migrations" do |app|
+        unless app.root == root
+          config.paths["db/migrate"].expanded.each do |expanded_path|
+            app.config.paths["db/migrate"] << expanded_path
+          end
+        end
+      end
+
+      # Boot-time dependency assertion. The admin engine's default
+      # authenticator reads `current_identity&.staff?`, and Phase 2
+      # dashboards target Auth::Identity / Accounts::Account /
+      # Accounts::Membership. Without auth, the engine cannot gate; we
+      # fail loud at boot rather than at first request so the operator
+      # gets a clear "install seams:auth" error instead of a deep
+      # NameError mid-request.
+      #
+      # Administrate is checked too: the engine's ApplicationController
+      # subclasses Administrate::ApplicationController — without the
+      # gem in the host's Gemfile the constant doesn't exist.
+      config.after_initialize do
+        missing = []
+        missing << "Auth::Identity (run: bin/rails generate seams:auth)" unless defined?(::Auth::Identity)
+        missing << "Administrate (add `gem \"administrate\"` to Gemfile)" unless defined?(::Administrate)
+        missing << "Pundit (add `gem \"pundit\"` to Gemfile)" unless defined?(::Pundit)
+
+        if missing.any?
+          raise <<~MSG
+            [seams admin] missing required dependency:
+                #{missing.join("\n              ")}
+
+            The admin engine builds dashboards on top of Administrate,
+            gates them on Auth::Identity#staff?, and authorises
+            individual records via Pundit policies under
+            Admin::Platform::* and Admin::Tenant::*. It cannot run
+            without all three. Generate the auth engine and ensure
+            both administrate + pundit are in the host Gemfile, or
+            remove admin with
+            `bin/rails generate seams:remove admin --force`.
+          MSG
+        end
+      end
+    end
+  end
+end

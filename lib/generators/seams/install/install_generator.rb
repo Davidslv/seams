@@ -180,6 +180,11 @@ module Seams
         say "    bin/seams billing       - Billing engine"
         say "    bin/seams teams         - Teams engine"
         say ""
+        say "  Optional engines (generate after the canonical six are in place):", :yellow
+        say "    bin/seams admin         - Admin engine (Administrate-backed dashboards"
+        say "                              for the canonical models, Pundit-gated,"
+        say "                              audit-log auto-write). Requires auth + accounts."
+        say ""
         say "  Follow-up generators (extend an already-installed engine):", :yellow
         say "    bin/rails generate seams:auth:add_oauth_provider <name>"
         say "                            - add a new OAuth provider adapter"
@@ -195,6 +200,7 @@ module Seams
         say "    bin/seams resolve --list-ejected        - list every ejected file under engines/"
         say ""
         say "  Recommended order: core -> auth -> accounts -> notifications -> billing -> teams.", :yellow
+        say "  Optional: append `admin` last for an Administrate-backed admin surface.", :yellow
         say "  See doc/CURRENT_ATTRIBUTES.md (after install) for the per-request namespace cascade.", :yellow
         say "  See doc/WRITING_FOLLOW_UP_GENERATORS.md to write your own follow-up generator.", :yellow
         say ""

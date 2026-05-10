@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Notifications::Notification. Filters by
+    # `account_id`. The canonical seams `notifications` table is
+    # polymorphically owned (`owner_type`/`owner_id`) and doesn't
+    # carry `account_id`. The default falls back to `scope.none` if
+    # the column is absent — fail-closed. Hosts whose Notification
+    # model uses the polymorphic shape (or a custom direct
+    # `account_id` column) eject this policy and rewrite `resolve` to
+    # join through the owning model.
+    class NotificationPolicy < ApplicationPolicy
+      class Scope < ApplicationPolicy::Scope
+        def resolve
+          return scope.all if staff?
+          return scope.none if account_id.nil?
+          return scope.none unless account_id_column_present?
+
+          scope.where(account_id: account_id)
+        end
+      end
+    end
+  end
+end

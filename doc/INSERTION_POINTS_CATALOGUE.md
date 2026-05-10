@@ -21,9 +21,12 @@ Marker count summary:
 | teams | 5 | engine.rb, routes.rb, configuration.rb |
 | notifications | 7 | engine.rb, configuration.rb, notifiable.rb, type registry |
 | billing | 7 | engine.rb, routes.rb, configuration.rb, webhook router |
+| admin | 5 | engine.rb, routes.rb, configuration.rb |
 
-After Phase 2A retrofit: 32 markers shipping in templates; 1 deferred
-(`core.configuration.attributes`) pending Wave 12.
+Post-Wave-11A: 37 markers shipping in templates; 1 deferred
+(`core.configuration.attributes`) pending Wave 12. Phase 2A
+(Wave 10) shipped 32 markers across the canonical six engines;
+Wave 11A added 5 more on the new admin engine.
 
 Every marker biases toward one of three high-leverage areas: **events**
 (register one more), **routes** (add one more endpoint), or
@@ -364,16 +367,66 @@ deliberately omitted — the eject CLI handles non-extensible needs.
 
 ---
 
-## Total: 33 markers across 6 engines
+---
+
+## admin engine (Wave 11A)
+
+### admin.engine.events
+
+- **File:** `engines/admin/lib/admin/engine.rb`
+- **Inside:** the `initializer "admin.register_events"` block.
+- **Purpose:** Phase 1 ships no admin events; Phase 3 adds
+  `admin.action.taken.admin` when the audit-log auto-write lands.
+  Follow-up generators (`seams:admin:add_dashboard <model>`) that emit
+  new admin events register them here.
+
+### admin.routes.before_resources
+
+- **File:** `engines/admin/config/routes.rb`
+- **Inside:** the `Seams::Admin::Engine.routes.draw` block, before the
+  Phase 2 dashboard `resources` declarations.
+- **Purpose:** follow-up generators that ship admin sections needing
+  routing precedence (impersonation entry points, bulk-action
+  endpoints) splice their routes here.
+
+### admin.routes.after_resources
+
+- **File:** `engines/admin/config/routes.rb`
+- **Inside:** the `Seams::Admin::Engine.routes.draw` block, after the
+  Phase 2 dashboard resources, before the closing `end`.
+- **Purpose:** follow-up generators that add NEW route surfaces (custom
+  collection routes, JSON-only endpoints, status-page integrations)
+  splice their routes here.
+
+### admin.configuration.attributes
+
+- **File:** `engines/admin/lib/admin/configuration.rb`
+- **Inside:** the `Configuration` class body, after the
+  `attr_accessor` line listing the four Phase 1 knobs.
+- **Purpose:** follow-up generators that add knobs (impersonation
+  audit logger, session timeout, custom theme paths, etc.) declare
+  their `attr_accessor` here.
+
+### admin.configuration.defaults
+
+- **File:** `engines/admin/lib/admin/configuration.rb`
+- **Inside:** the `initialize` method body, after the four Phase 1
+  default assignments.
+- **Purpose:** matches `admin.configuration.attributes` — defaults
+  for the new attributes go here.
+
+---
+
+## Total: 38 markers across 7 engines
 
 Distribution:
 
-- **events:** 6 (one per engine)
+- **events:** 7 (one per engine)
 - **initializers:** 4 (core, auth, accounts, billing)
 - **subscribers:** 2 (teams, notifications)
-- **routes:** 6 (auth × 2, teams × 2, notifications, billing)
-- **configuration attributes:** 6 (one per engine that has Configuration)
-- **configuration defaults:** 5
+- **routes:** 8 (auth × 2, teams × 2, notifications, billing, admin × 2)
+- **configuration attributes:** 7 (one per engine that has Configuration)
+- **configuration defaults:** 6
 - **registry-style:** 4 (auth.configuration.oauth_providers,
   notifications.notifiable.strategies, notifications.type_registry.defaults,
   billing.event_router.handlers, billing.gateways.adapters)

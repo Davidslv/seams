@@ -1,0 +1,66 @@
+# frozen_string_literal: true
+
+require "active_support/concern"
+
+module Seams
+  module Admin
+    # Controller concern mixed into the admin engine's
+    # `Seams::Admin::ApplicationController`. Gates every admin request
+    # on `Seams::Admin.config.authenticator` and runs the optional
+    # `before_admin_action` hook (2FA, IP allow-list, etc.) before the
+    # action itself.
+    #
+    # This is the public seam Phase 3 builds Pundit policies on top of.
+    # Phase 1 ships the gate only; Phase 3 fills in the
+    # `pundit_user` / `policy_namespace` cooperation so resource-level
+    # authorisation kicks in after the gate.
+    module Authenticator
+      extend ActiveSupport::Concern
+
+      included do
+        before_action :authenticate_admin!
+        before_action :run_before_admin_action_hook
+      end
+
+      private
+
+      def authenticate_admin!
+        return if admin_authenticator_call
+
+        respond_with_admin_forbidden(<<~MSG.strip)
+          Access denied. The seams admin surface is gated on
+          `Seams::Admin.config.authenticator`; the configured callable
+          returned a falsey value for this request. Default gate:
+          `current_identity&.staff?`. Override the authenticator in
+          config/initializers/seams_admin.rb if your host uses a
+          different signal.
+        MSG
+      end
+
+      def run_before_admin_action_hook
+        hook = ::Seams::Admin.config.before_admin_action
+        return if hook.nil?
+
+        hook.call(self)
+      end
+
+      def admin_authenticator_call
+        gate = ::Seams::Admin.config.authenticator
+        # Defensive: a misconfigured host that nils the gate locks
+        # admin closed rather than wide-open. "Fail-closed" is the
+        # only sane default for an admin surface.
+        return false unless gate.respond_to?(:call)
+
+        gate.call(self)
+      end
+
+      def respond_with_admin_forbidden(message)
+        if respond_to?(:render)
+          render plain: message, status: :forbidden
+        else
+          head :forbidden
+        end
+      end
+    end
+  end
+end

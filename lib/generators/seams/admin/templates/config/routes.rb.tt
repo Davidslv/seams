@@ -1,0 +1,38 @@
+# frozen_string_literal: true
+
+# Routes for the seams admin engine. Phase 2 ships full CRUD route
+# surfaces for the twelve canonical seams models. Each `resources`
+# line points at a controller under `app/controllers/admin/<plural>`
+# (single-namespace `Admin::*` controllers, matching Administrate's
+# convention) — the controllers themselves subclass
+# Seams::Admin::ApplicationController so the gate, the pundit_user
+# hook, and Phase 3's audit-log auto-write apply uniformly.
+Seams::Admin::Engine.routes.draw do
+  # Follow-up generators that add admin sections (impersonation, bulk-action endpoints, etc.) splice their routes here, ahead of the dashboard resources Phase 2 ships.
+  # seams:insertion-point admin.routes.before_resources
+
+  # Phase 2 dashboards. Per Administrate convention, each resource
+  # gets a full CRUD route surface (index, show, new, create, edit,
+  # update, destroy). The `controller:` option points at the
+  # engine-prefixed controllers under app/controllers/admin/.
+  resources :identities,             controller: "admin/identities"
+  resources :accounts,               controller: "admin/accounts"
+  resources :accounts_memberships,   controller: "admin/accounts_memberships"
+  resources :teams,                  controller: "admin/teams"
+  resources :teams_memberships,      controller: "admin/teams_memberships"
+  resources :invitations,            controller: "admin/invitations"
+  resources :notifications,          controller: "admin/notifications"
+  resources :notification_preferences, controller: "admin/notification_preferences"
+  resources :plans,                  controller: "admin/plans"
+  resources :subscriptions,          controller: "admin/subscriptions"
+  resources :invoices,               controller: "admin/invoices"
+  resources :lifetime_passes,        controller: "admin/lifetime_passes"
+
+  # Follow-up generators that add NEW route surfaces (custom collection routes, JSON-only endpoints) splice their resources here.
+  # seams:insertion-point admin.routes.after_resources
+
+  # Default landing page so visiting `/admin` lands somewhere
+  # meaningful. Identities is the natural index — the operator
+  # console use case starts with "find this user".
+  root to: "admin/identities#index"
+end

@@ -73,6 +73,15 @@ module Seams
         "accounts" => {
           mount: "Accounts::Engine",
           user_includes: %w[]
+        },
+        # Wave 11A — admin engine. Mounts under Seams::Admin::Engine.
+        # The generator injects `gem "administrate"` and `gem "pundit"`
+        # into the host Gemfile but the remover does NOT prune them
+        # (the host may have other dashboards depending on either).
+        # Unmounting + dropping the engine dir is enough.
+        "admin" => {
+          mount: "Seams::Admin::Engine",
+          user_includes: %w[]
         }
       }.freeze
 

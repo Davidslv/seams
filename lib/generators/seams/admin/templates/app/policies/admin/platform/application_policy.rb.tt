@@ -1,0 +1,85 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Abstract base for every platform-mode admin policy. Platform mode
+    # gates on `Auth::Identity#staff?` — a single boolean on the
+    # credential-only Identity model. There is no per-tenant scoping;
+    # the Scope inner class returns `scope.all`.
+    #
+    # `user` here is the value returned from
+    # `Seams::Admin::ApplicationController#pundit_user`. Phase 3 chose
+    # the `Seams::Admin::Context` Struct (identity + membership) as the
+    # pundit_user — both fields are nil-safe so the platform policies
+    # only need to read `user.identity&.staff?`.
+    #
+    # Hosts that need granular per-action gates (e.g. "non-staff support
+    # users may read but not destroy") eject the relevant per-model
+    # policy and override `destroy?` etc. there. The default surface
+    # here is intentionally uniform: any staff Identity can do anything.
+    class ApplicationPolicy
+      attr_reader :user, :record
+
+      def initialize(user, record)
+        @user   = user
+        @record = record
+      end
+
+      def index?
+        staff?
+      end
+
+      def show?
+        staff?
+      end
+
+      def new?
+        staff?
+      end
+
+      def create?
+        staff?
+      end
+
+      def edit?
+        staff?
+      end
+
+      def update?
+        staff?
+      end
+
+      def destroy?
+        staff?
+      end
+
+      class Scope
+        attr_reader :user, :scope
+
+        def initialize(user, scope)
+          @user  = user
+          @scope = scope
+        end
+
+        # Platform admins see every tenant's data — no account_id
+        # filter. The returned scope is the same `scope` Pundit handed
+        # in (typically `Model.all` or an Administrate-prepared scope),
+        # untouched.
+        def resolve
+          scope.all
+        end
+      end
+
+      private
+
+      # Reads `staff?` from the wrapped Identity. The pundit_user is a
+      # `Seams::Admin::Context` Struct in Phase 3 — `user.identity` is
+      # the actual Auth::Identity. Nil-safe so an unauthenticated
+      # request (which the gate already rejected) returns false instead
+      # of NoMethodError.
+      def staff?
+        user&.identity&.staff?
+      end
+    end
+  end
+end

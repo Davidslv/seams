@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Billing::Invoice. Filters by `account_id`
+    # — `billing_invoices` carries the column directly in the canonical
+    # seams schema. The column-presence guard is defensive for hosts
+    # whose schema differs.
+    class InvoicePolicy < ApplicationPolicy
+      class Scope < ApplicationPolicy::Scope
+        def resolve
+          return scope.all if staff?
+          return scope.none if account_id.nil?
+          return scope.none unless account_id_column_present?
+
+          scope.where(account_id: account_id)
+        end
+      end
+    end
+  end
+end

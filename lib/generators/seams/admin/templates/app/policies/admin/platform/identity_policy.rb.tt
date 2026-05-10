@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Platform-mode policy for Auth::Identity.
+    #
+    # Defaults from Admin::Platform::ApplicationPolicy: every predicate
+    # gates on `staff?`. Scope returns `scope.all`. Platform admins see
+    # every Identity in the system — there is no per-tenant filter
+    # because Identity is global.
+    #
+    # Hosts that need a finer gate (e.g. "only senior-staff Identities
+    # can destroy other Identities") eject this file and override
+    # `destroy?`.
+    class IdentityPolicy < ApplicationPolicy
+    end
+  end
+end

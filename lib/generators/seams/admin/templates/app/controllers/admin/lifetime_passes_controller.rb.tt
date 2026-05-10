@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Billing::LifetimePass dashboard.
+module Admin
+  class LifetimePassesController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Billing::LifetimePass
+    end
+
+    def dashboard
+      @dashboard ||= LifetimePassDashboard.new
+    end
+  end
+end

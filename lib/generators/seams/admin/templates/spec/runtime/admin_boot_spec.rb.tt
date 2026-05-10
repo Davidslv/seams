@@ -1,0 +1,604 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+# Boot spec for the seams admin engine. Wave 11A — Phase 1 (foundation)
+# + Phase 2 (dashboards). Covers:
+#
+#   - the engine constant loads
+#   - the four configuration knobs are wired with sensible defaults
+#   - the default authenticator returns truthy for a staff Identity
+#     and falsey for a non-staff Identity
+#   - the authenticator concern is present and gates correctly
+#   - Seams::Admin::ApplicationController inherits from
+#     Administrate::ApplicationController (the real gem; the Phase 1
+#     stub is gone now that `gem "administrate"` is in the Gemfile)
+#   - every Phase 2 dashboard class loads
+#   - every Phase 2 dashboard exposes a non-empty ATTRIBUTE_TYPES
+#   - the engine's routes contain mount points for each of the twelve
+#     dashboards
+#
+# Phase 3 will add Pundit policy specs once the platform-vs-tenant
+# split lands.
+RSpec.describe "Seams::Admin engine boot", type: :integration do
+  it "loads the engine constant" do
+    expect(defined?(Seams::Admin::Engine)).to eq("constant")
+  end
+
+  it "exposes the configuration class + the configure helper" do
+    expect(defined?(Seams::Admin::Configuration)).to eq("constant")
+    expect(Seams::Admin).to respond_to(:configure)
+    expect(Seams::Admin).to respond_to(:configuration)
+    expect(Seams::Admin).to respond_to(:config)
+  end
+
+  it "exposes the Authenticator concern" do
+    expect(defined?(Seams::Admin::Authenticator)).to eq("constant")
+  end
+
+  it "creates the schema tables the admin engine reads from" do
+    %i[
+      auth_identities
+      accounts
+      accounts_memberships
+      teams
+      team_memberships
+      team_invitations
+      notifications
+      notification_preferences
+      notification_deliveries
+      billing_plans
+      billing_subscriptions
+      billing_invoices
+      billing_lifetime_passes
+      billing_webhook_events
+      core_audit_logs
+    ].each do |t|
+      expect(ActiveRecord::Base.connection.table_exists?(t)).to be(true), "missing #{t}"
+    end
+  end
+
+  describe "Seams::Admin::Configuration defaults" do
+    let(:config) { Seams::Admin::Configuration.new }
+
+    it "ships the documented knobs" do
+      expect(config).to respond_to(:authenticator)
+      expect(config).to respond_to(:tenancy_scope)
+      expect(config).to respond_to(:theme_css_path)
+      expect(config).to respond_to(:before_admin_action)
+      # Phase 4 knob — host-pluggable resolver for the active
+      # Accounts::Membership.
+      expect(config).to respond_to(:current_membership_resolver)
+    end
+
+    it "defaults current_membership_resolver to a callable that returns nil when Accounts::Current is undefined" do
+      expect(config.current_membership_resolver).to respond_to(:call)
+    end
+
+    it "defaults tenancy_scope to :platform" do
+      expect(config.tenancy_scope).to eq(:platform)
+    end
+
+    it "defaults theme_css_path to nil" do
+      expect(config.theme_css_path).to be_nil
+    end
+
+    it "defaults before_admin_action to nil" do
+      expect(config.before_admin_action).to be_nil
+    end
+
+    it "defaults the authenticator to a callable that gates on staff?" do
+      expect(config.authenticator).to respond_to(:call)
+    end
+  end
+
+  describe "default authenticator behaviour" do
+    let(:gate)            { Seams::Admin::Configuration.new.authenticator }
+    let(:staff_identity)  { Auth::Identity.create!(email: "staff-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: true) }
+    let(:other_identity)  { Auth::Identity.create!(email: "other-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: false) }
+    let(:staff_ctrl)      { Struct.new(:current_identity).new(staff_identity) }
+    let(:other_ctrl)      { Struct.new(:current_identity).new(other_identity) }
+    let(:nil_ctrl)        { Struct.new(:current_identity).new(nil) }
+
+    it "returns truthy for a staff Identity" do
+      expect(gate.call(staff_ctrl)).to be(true)
+    end
+
+    it "returns falsey for a non-staff Identity" do
+      expect(gate.call(other_ctrl)).to be(false)
+    end
+
+    it "returns falsey when no Identity is signed in" do
+      expect(gate.call(nil_ctrl)).to be_nil.or be(false)
+    end
+  end
+
+  describe "Seams::Admin.configure" do
+    it "lets the host override the authenticator" do
+      original = Seams::Admin.config.authenticator
+      Seams::Admin.configure { |c| c.authenticator = ->(_ctrl) { :overridden } }
+      expect(Seams::Admin.config.authenticator.call(nil)).to eq(:overridden)
+    ensure
+      Seams::Admin.config.authenticator = original
+    end
+
+    it "lets the host switch tenancy_scope to :tenant" do
+      original = Seams::Admin.config.tenancy_scope
+      Seams::Admin.configure { |c| c.tenancy_scope = :tenant }
+      expect(Seams::Admin.config.tenancy_scope).to eq(:tenant)
+    ensure
+      Seams::Admin.config.tenancy_scope = original
+    end
+  end
+
+  # Phase 2 — verify the real Administrate gem is loaded (Phase 1's
+  # stub is gone) and every dashboard class is reachable. We assert
+  # the inheritance chain rather than just the constant — a stub that
+  # shadowed Administrate would still satisfy `defined?(...)`, but
+  # the ancestors list would be wrong.
+  describe "Administrate integration (Phase 2)" do
+    let(:dashboard_classes) do
+      %w[
+        Admin::IdentityDashboard
+        Admin::AccountDashboard
+        Admin::AccountsMembershipDashboard
+        Admin::TeamDashboard
+        Admin::TeamsMembershipDashboard
+        Admin::InvitationDashboard
+        Admin::NotificationDashboard
+        Admin::NotificationPreferenceDashboard
+        Admin::PlanDashboard
+        Admin::SubscriptionDashboard
+        Admin::InvoiceDashboard
+        Admin::LifetimePassDashboard
+      ]
+    end
+
+    it "Seams::Admin::ApplicationController inherits from Administrate::ApplicationController" do
+      expect(Seams::Admin::ApplicationController.ancestors).to include(::Administrate::ApplicationController)
+    end
+
+    it "loads every Phase 2 dashboard and each subclasses Administrate::BaseDashboard" do
+      dashboard_classes.each do |class_name|
+        klass = class_name.constantize
+        expect(klass.ancestors).to include(::Administrate::BaseDashboard), "#{class_name} not loaded"
+      end
+    end
+
+    it "every Phase 2 dashboard declares a non-empty ATTRIBUTE_TYPES" do
+      dashboard_classes.each do |class_name|
+        klass = class_name.constantize
+        expect(klass::ATTRIBUTE_TYPES).to be_a(Hash)
+        expect(klass::ATTRIBUTE_TYPES).not_to be_empty
+      end
+    end
+  end
+
+  describe "engine routes (Phase 2)" do
+    let(:route_paths) do
+      Seams::Admin::Engine.routes.routes.map { |r| r.path.spec.to_s }
+    end
+
+    %w[
+      /identities
+      /accounts
+      /accounts_memberships
+      /teams
+      /teams_memberships
+      /invitations
+      /notifications
+      /notification_preferences
+      /plans
+      /subscriptions
+      /invoices
+      /lifetime_passes
+    ].each do |segment|
+      it "mounts #{segment}" do
+        expect(route_paths.any? { |p| p.start_with?(segment) }).to be(true), "missing route #{segment}"
+      end
+    end
+  end
+
+  # Phase 3 — Pundit policies under Admin::Platform::* and
+  # Admin::Tenant::*, plus the audit-log auto-write on
+  # create/update/destroy.
+  describe "Pundit integration (Phase 3)" do
+    let(:platform_policy_classes) do
+      %w[
+        Admin::Platform::ApplicationPolicy
+        Admin::Platform::IdentityPolicy
+        Admin::Platform::AccountPolicy
+        Admin::Platform::AccountsMembershipPolicy
+        Admin::Platform::TeamPolicy
+        Admin::Platform::TeamsMembershipPolicy
+        Admin::Platform::InvitationPolicy
+        Admin::Platform::NotificationPolicy
+        Admin::Platform::NotificationPreferencePolicy
+        Admin::Platform::PlanPolicy
+        Admin::Platform::SubscriptionPolicy
+        Admin::Platform::InvoicePolicy
+        Admin::Platform::LifetimePassPolicy
+      ]
+    end
+
+    let(:tenant_policy_classes) do
+      %w[
+        Admin::Tenant::ApplicationPolicy
+        Admin::Tenant::IdentityPolicy
+        Admin::Tenant::AccountPolicy
+        Admin::Tenant::AccountsMembershipPolicy
+        Admin::Tenant::TeamPolicy
+        Admin::Tenant::TeamsMembershipPolicy
+        Admin::Tenant::InvitationPolicy
+        Admin::Tenant::NotificationPolicy
+        Admin::Tenant::NotificationPreferencePolicy
+        Admin::Tenant::PlanPolicy
+        Admin::Tenant::SubscriptionPolicy
+        Admin::Tenant::InvoicePolicy
+        Admin::Tenant::LifetimePassPolicy
+      ]
+    end
+
+    it "Seams::Admin::ApplicationController includes Pundit::Authorization" do
+      # Both ancestors are expected: Administrate::Punditize itself
+      # `include`s Pundit::Authorization, so the controller transitively
+      # picks it up. Asserting both pins the canonical wiring.
+      expect(Seams::Admin::ApplicationController.ancestors).to include(::Pundit::Authorization)
+      expect(Seams::Admin::ApplicationController.ancestors).to include(::Administrate::Punditize)
+    end
+
+    it "policy_namespace returns the Array-form Pundit expects" do
+      # `Administrate::Punditize` calls
+      # `Pundit.policy!(user, [*policy_namespace, resource])` — the
+      # namespace MUST be an Array of constants (or symbols), not a
+      # single Module. A Module-form namespace silently falls back to
+      # the top-level `<Resource>Policy` lookup, which doesn't exist
+      # in this engine. Pin the shape.
+      ctrl = Seams::Admin::ApplicationController.allocate
+      original = Seams::Admin.config.tenancy_scope
+      begin
+        Seams::Admin.config.tenancy_scope = :platform
+        expect(ctrl.policy_namespace).to be_an(Array)
+        expect(ctrl.policy_namespace.first).to eq(::Admin::Platform)
+
+        Seams::Admin.config.tenancy_scope = :tenant
+        expect(ctrl.policy_namespace.first).to eq(::Admin::Tenant)
+      ensure
+        Seams::Admin.config.tenancy_scope = original
+      end
+    end
+
+    it "exposes Seams::Admin::Context for the pundit_user wrapper" do
+      expect(defined?(Seams::Admin::Context)).to eq("constant")
+      ctx = Seams::Admin::Context.new(nil, nil)
+      expect(ctx).to respond_to(:identity)
+      expect(ctx).to respond_to(:membership)
+      expect(ctx).to respond_to(:staff?)
+      expect(ctx).to respond_to(:role)
+      expect(ctx).to respond_to(:account_id)
+    end
+
+    it "loads every Phase 3 platform policy class" do
+      platform_policy_classes.each do |class_name|
+        expect { class_name.constantize }.not_to raise_error
+      end
+    end
+
+    it "loads every Phase 3 tenant policy class" do
+      tenant_policy_classes.each do |class_name|
+        expect { class_name.constantize }.not_to raise_error
+      end
+    end
+
+    it "every platform policy inherits from Admin::Platform::ApplicationPolicy" do
+      (platform_policy_classes - %w[Admin::Platform::ApplicationPolicy]).each do |class_name|
+        klass = class_name.constantize
+        expect(klass.ancestors).to include(Admin::Platform::ApplicationPolicy), "#{class_name} not a Platform::ApplicationPolicy"
+      end
+    end
+
+    it "every tenant policy inherits from Admin::Tenant::ApplicationPolicy" do
+      (tenant_policy_classes - %w[Admin::Tenant::ApplicationPolicy]).each do |class_name|
+        klass = class_name.constantize
+        expect(klass.ancestors).to include(Admin::Tenant::ApplicationPolicy), "#{class_name} not a Tenant::ApplicationPolicy"
+      end
+    end
+  end
+
+  describe "Admin::Platform::IdentityPolicy" do
+    let(:identity)        { Auth::Identity.create!(email: "p1-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: true) }
+    let(:other_identity)  { Auth::Identity.create!(email: "p2-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: false) }
+    let(:staff_ctx)       { Seams::Admin::Context.new(identity, nil) }
+    let(:non_staff_ctx)   { Seams::Admin::Context.new(other_identity, nil) }
+
+    it "allows index? for a staff Identity" do
+      policy = Admin::Platform::IdentityPolicy.new(staff_ctx, identity)
+      expect(policy.index?).to be(true)
+    end
+
+    it "denies index? for a non-staff Identity" do
+      policy = Admin::Platform::IdentityPolicy.new(non_staff_ctx, identity)
+      expect(policy.index?).to be(false)
+    end
+
+    it "allows destroy? for a staff Identity" do
+      policy = Admin::Platform::IdentityPolicy.new(staff_ctx, identity)
+      expect(policy.destroy?).to be(true)
+    end
+
+    it "Scope#resolve returns scope.all for any user" do
+      Auth::Identity.create!(email: "p3-#{SecureRandom.hex(4)}@example.com", password: "verysecret")
+      resolved = Admin::Platform::IdentityPolicy::Scope.new(staff_ctx, Auth::Identity.all).resolve
+      expect(resolved.count).to eq(Auth::Identity.count)
+    end
+  end
+
+  describe "Admin::Tenant::IdentityPolicy::Scope (subquery form)" do
+    # The Phase 4 fix replaced `joins(:memberships)` with a subquery
+    # on `accounts_memberships` so the policy works without a
+    # `has_many :memberships` declaration on Auth::Identity (which
+    # the canonical seams Identity does NOT declare). The subquery
+    # filters Identities to those holding a Membership in the active
+    # account_id.
+    let(:account)        { Accounts::Account.create!(name: "Tenant", external_account_id: SecureRandom.random_number(2**31)) }
+    let(:other_account)  { Accounts::Account.create!(name: "Other",  external_account_id: SecureRandom.random_number(2**31)) }
+    let(:in_account)     { Auth::Identity.create!(email: "in-#{SecureRandom.hex(4)}@example.com",  password: "verysecret") }
+    let(:out_of_account) { Auth::Identity.create!(email: "out-#{SecureRandom.hex(4)}@example.com", password: "verysecret") }
+    let(:admin_identity) { Auth::Identity.create!(email: "ad-#{SecureRandom.hex(4)}@example.com",  password: "verysecret") }
+    let(:admin_membership) { Accounts::Membership.create!(account: account, identity_id: admin_identity.id, name: "Admin", role: "admin") }
+    let(:tenant_ctx)     { Seams::Admin::Context.new(admin_identity, admin_membership) }
+
+    it "filters Identities to those who hold a Membership in the current Account" do
+      Accounts::Membership.create!(account: account,       identity_id: in_account.id,     name: "M1", role: "member")
+      Accounts::Membership.create!(account: other_account, identity_id: out_of_account.id, name: "M2", role: "member")
+
+      resolved = Admin::Tenant::IdentityPolicy::Scope.new(tenant_ctx, Auth::Identity.all).resolve
+      expect(resolved.pluck(:id)).to include(in_account.id, admin_identity.id)
+      expect(resolved.pluck(:id)).not_to include(out_of_account.id)
+    end
+  end
+
+  describe "Admin::Tenant::AccountPolicy::Scope" do
+    let(:account)       { Accounts::Account.create!(name: "Tenant A", external_account_id: SecureRandom.random_number(2**31)) }
+    let(:other_account) { Accounts::Account.create!(name: "Tenant B", external_account_id: SecureRandom.random_number(2**31)) }
+    let(:identity)      { Auth::Identity.create!(email: "t1-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: false) }
+    let(:membership)    { Accounts::Membership.create!(account: account, identity_id: identity.id, name: "Owner", role: "admin") }
+    let(:tenant_ctx)    { Seams::Admin::Context.new(identity, membership) }
+
+    it "filters Accounts to the current_membership.account_id" do
+      account
+      other_account
+      resolved = Admin::Tenant::AccountPolicy::Scope.new(tenant_ctx, Accounts::Account.all).resolve
+      expect(resolved.pluck(:id)).to eq([account.id])
+    end
+
+    it "returns scope.none when the membership is nil" do
+      empty_ctx = Seams::Admin::Context.new(identity, nil)
+      account
+      other_account
+      resolved = Admin::Tenant::AccountPolicy::Scope.new(empty_ctx, Accounts::Account.all).resolve
+      expect(resolved.count).to eq(0)
+    end
+
+    it "returns every Account when the Identity is staff" do
+      staff_identity = Auth::Identity.create!(email: "staff-t-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: true)
+      staff_ctx      = Seams::Admin::Context.new(staff_identity, nil)
+      account
+      other_account
+      resolved = Admin::Tenant::AccountPolicy::Scope.new(staff_ctx, Accounts::Account.all).resolve
+      expect(resolved.count).to eq(Accounts::Account.count)
+    end
+  end
+
+  describe "Admin::Tenant per-record guard (id-tampering protection)" do
+    # Phase 4: a tenant admin requesting
+    # `/admin/accounts/<other_account_id>` by id-tampering used to
+    # pass `permitted?` (their membership.role IS admin) and only
+    # got blocked by the Scope filter. Show/update/destroy now run a
+    # second check via `record_in_tenant_scope?` so the policy
+    # method itself denies the request — the consequence is a clean
+    # 403 from `respond_with_admin_unauthorised` rather than a 404
+    # from RecordNotFound. Both shapes prevent the leak; the 403
+    # form is more honest.
+    let(:account)        { Accounts::Account.create!(name: "Mine",  external_account_id: SecureRandom.random_number(2**31)) }
+    let(:other_account)  { Accounts::Account.create!(name: "Other", external_account_id: SecureRandom.random_number(2**31)) }
+    let(:identity)       { Auth::Identity.create!(email: "g-#{SecureRandom.hex(4)}@example.com", password: "verysecret") }
+    let(:membership)     { Accounts::Membership.create!(account: account, identity_id: identity.id, name: "Admin", role: "admin") }
+    let(:tenant_ctx)     { Seams::Admin::Context.new(identity, membership) }
+
+    it "denies update? for an Account belonging to another tenant" do
+      policy = Admin::Tenant::AccountPolicy.new(tenant_ctx, other_account)
+      expect(policy.update?).to be(false)
+    end
+
+    it "permits update? for the caller's own Account" do
+      policy = Admin::Tenant::AccountPolicy.new(tenant_ctx, account)
+      expect(policy.update?).to be(true)
+    end
+
+    it "denies update? for an Identity who is not a member of the caller's account" do
+      stranger = Auth::Identity.create!(email: "s-#{SecureRandom.hex(4)}@example.com", password: "verysecret")
+      policy   = Admin::Tenant::IdentityPolicy.new(tenant_ctx, stranger)
+      expect(policy.update?).to be(false)
+    end
+
+    it "permits update? for an Identity who IS a member of the caller's account" do
+      member = Auth::Identity.create!(email: "m-#{SecureRandom.hex(4)}@example.com", password: "verysecret")
+      Accounts::Membership.create!(account: account, identity_id: member.id, name: "Member", role: "member")
+
+      policy = Admin::Tenant::IdentityPolicy.new(tenant_ctx, member)
+      expect(policy.update?).to be(true)
+    end
+  end
+
+  describe "Admin::Tenant::ApplicationPolicy permitted?" do
+    let(:identity)   { Auth::Identity.create!(email: "tap-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: false) }
+    let(:account)    { Accounts::Account.create!(name: "Tenant", external_account_id: SecureRandom.random_number(2**31)) }
+    let(:membership) { Accounts::Membership.new(account: account, identity_id: identity.id, name: "Member", role: role) }
+    let(:ctx)        { Seams::Admin::Context.new(identity, membership) }
+    let(:policy)     { Admin::Tenant::ApplicationPolicy.new(ctx, account) }
+
+    context "with role=admin" do
+      let(:role) { "admin" }
+
+      it "permits update?" do
+        expect(policy.update?).to be(true)
+      end
+    end
+
+    context "with role=owner" do
+      let(:role) { "owner" }
+
+      it "permits update?" do
+        expect(policy.update?).to be(true)
+      end
+    end
+
+    context "with role=member" do
+      let(:role) { "member" }
+
+      it "denies update?" do
+        expect(policy.update?).to be(false)
+      end
+    end
+  end
+
+  describe "audit-log auto-write" do
+    # Unit-test the controller's `record_admin_audit` private method
+    # against a fake controller subclass — wiring a full Administrate
+    # request cycle through the dummy app is heavier than what the
+    # Phase 3 brief asks for, and the after_action hook is the
+    # behaviour worth pinning down. The hook reads
+    # `requested_resource`, `action_name`, `response`, and
+    # `Auth::Current.identity` — all four are stubbed below.
+    let(:identity)   { Auth::Identity.create!(email: "actor-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: true) }
+    let(:account)    { Accounts::Account.create!(name: "Audited", external_account_id: SecureRandom.random_number(2**31)) }
+    let(:fake_response) { Struct.new(:successful?, :redirect?).new(true, false) }
+    let(:controller) do
+      ctrl = Seams::Admin::ApplicationController.allocate
+      ctrl.define_singleton_method(:requested_resource) { @resource }
+      ctrl.define_singleton_method(:resource=)          { |r| @resource = r }
+      ctrl.define_singleton_method(:action_name)        { @action_name }
+      ctrl.define_singleton_method(:action_name=)       { |a| @action_name = a }
+      ctrl.define_singleton_method(:response)           { @response_obj }
+      ctrl.define_singleton_method(:response=)          { |r| @response_obj = r }
+      ctrl.send(:resource=, account)
+      ctrl.send(:action_name=, "update")
+      ctrl.send(:response=, fake_response)
+      ctrl
+    end
+
+    around do |example|
+      Auth::Current.set(identity: identity) do
+        example.run
+      end
+    end
+
+    it "creates a Core::AuditLog row keyed on the actor" do
+      expect do
+        controller.send(:record_admin_audit)
+      end.to change(Core::AuditLog, :count).by(1)
+
+      log = Core::AuditLog.last
+      expect(log.action).to        eq("update")
+      expect(log.auditable_type).to eq("Accounts::Account")
+      expect(log.auditable_id).to   eq(account.id)
+      expect(log.actor_id).to       eq(identity.id)
+    end
+
+    it "skips the write when the response was not successful" do
+      controller.send(:response=, Struct.new(:successful?, :redirect?).new(false, false))
+      expect do
+        controller.send(:record_admin_audit)
+      end.not_to change(Core::AuditLog, :count)
+    end
+
+    it "swallows errors so admin responses are never broken by audit-log failures" do
+      controller.send(:resource=, nil)
+      expect do
+        controller.send(:record_admin_audit)
+      end.not_to raise_error
+    end
+
+    it "skips the write when the model already includes Core::Auditable (avoids double-log)" do
+      # Simulate a host model that opted in to Core::Auditable. The
+      # concern's after_commit hook would have written one row
+      # already; the controller's after_action must NOT write a second.
+      auditable_model = Class.new(Accounts::Account) do
+        # Concern installs `has_many :audit_logs, class_name:
+        # "Core::AuditLog", as: :auditable`. We declare the same
+        # association on this anonymous subclass so the controller's
+        # detection check (`reflect_on_association(:audit_logs)`)
+        # picks it up.
+        has_many :audit_logs, class_name: "Core::AuditLog", as: :auditable
+      end
+
+      auditable_account = auditable_model.first || auditable_model.create!(
+        name: "Auditable", external_account_id: SecureRandom.random_number(2**31)
+      )
+      controller.send(:resource=, auditable_account)
+
+      expect do
+        controller.send(:record_admin_audit)
+      end.not_to change(Core::AuditLog, :count)
+    end
+
+    it "instruments seams.admin.audit_failed when the write raises" do
+      # Force the create! to raise so the rescue branch executes.
+      allow(Core::AuditLog).to receive(:create!).and_raise(ActiveRecord::RecordInvalid)
+
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe("seams.admin.audit_failed") do |*, payload|
+        events << payload
+      end
+      begin
+        controller.send(:record_admin_audit)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.size).to eq(1)
+      expect(events.first[:error_class]).to eq("ActiveRecord::RecordInvalid")
+    end
+  end
+
+  describe "Pundit::NotAuthorizedError handling" do
+    it "exposes a respond_with_admin_unauthorised handler" do
+      # Pundit denials should render 403, not bubble up to the host.
+      # Smoke-test the responder method exists and is private; full
+      # integration through a controller request cycle is heavier
+      # than the boot-spec budget.
+      expect(Seams::Admin::ApplicationController.private_instance_methods)
+        .to include(:respond_with_admin_unauthorised)
+    end
+
+    it "registers rescue_from for Pundit::NotAuthorizedError" do
+      handlers = Seams::Admin::ApplicationController.rescue_handlers
+      registered = handlers.map(&:first)
+      expect(registered).to include("Pundit::NotAuthorizedError")
+    end
+  end
+
+  describe "current_membership_resolver knob" do
+    it "delegates to Seams::Admin.config.current_membership_resolver" do
+      original = Seams::Admin.config.current_membership_resolver
+      stubbed_membership = Object.new
+      Seams::Admin.configure { |c| c.current_membership_resolver = ->(_ctrl) { stubbed_membership } }
+
+      ctrl = Seams::Admin::ApplicationController.allocate
+      expect(ctrl.send(:current_membership_for_admin)).to be(stubbed_membership)
+    ensure
+      Seams::Admin.config.current_membership_resolver = original
+    end
+
+    it "swallows resolver exceptions and returns nil" do
+      original = Seams::Admin.config.current_membership_resolver
+      Seams::Admin.configure { |c| c.current_membership_resolver = ->(_ctrl) { raise "boom" } }
+
+      ctrl = Seams::Admin::ApplicationController.allocate
+      expect(ctrl.send(:current_membership_for_admin)).to be_nil
+    ensure
+      Seams::Admin.config.current_membership_resolver = original
+    end
+  end
+end

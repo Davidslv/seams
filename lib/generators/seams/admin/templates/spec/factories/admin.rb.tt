@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+# Factories for the seams admin engine. Phase 1 ships no factories —
+# the boot spec uses Auth::Identity directly via `create!`. Phase 2
+# adds factories per dashboard if specs need fixture variants
+# (an Identity with staff: true, a Membership with role: admin, etc.)
+# beyond what the auth + accounts engines already ship.
+FactoryBot.define do
+  # Phase 2: factories go here.
+end

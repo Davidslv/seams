@@ -1,0 +1,90 @@
+# frozen_string_literal: true
+
+module Seams
+  module Admin
+    # Engine-scoped configuration for the admin surface. Override in
+    # config/initializers/seams_admin.rb of the host application:
+    #
+    #   Seams::Admin.configure do |c|
+    #     c.authenticator       = ->(ctrl) { ctrl.current_identity&.platform_admin? }
+    #     c.tenancy_scope       = :tenant       # default :platform
+    #     c.theme_css_path      = "admin/seams_brand.css"
+    #     c.before_admin_action = ->(ctrl) { ctrl.require_2fa! }
+    #   end
+    #
+    # Four knobs, deliberately small:
+    #
+    # - `authenticator` — callable taking the controller, returning
+    #   truthy when the request is allowed into the admin engine.
+    #   Default: `staff?` on the current Identity. Hosts that don't
+    #   carry `staff?` on Identity (custom flags, role tables, etc.)
+    #   override this.
+    #
+    # - `tenancy_scope` — `:platform` (Wave 11A default — see all
+    #   accounts) or `:tenant` (scope to `current_membership.account_id`,
+    #   wired in Phase 3 via Pundit policy_namespace). Phase 1 only
+    #   stores the value; Phase 3 reads it.
+    #
+    # - `theme_css_path` — host-supplied admin restyle. Loaded on top
+    #   of Administrate's stock CSS so the admin UI carries the host's
+    #   brand. nil means "use Administrate's defaults".
+    #
+    # - `before_admin_action` — callable that runs before every admin
+    #   action. The recommended hook for 2FA enforcement, IP allow-list
+    #   checks, audit-trail entry-point logging, etc. Phase 1 calls it
+    #   if set; Phase 1 ships no default behaviour beyond the gate.
+    #
+    # - `current_membership_resolver` — callable taking the controller,
+    #   returning the active `Accounts::Membership` for tenant-mode
+    #   policy decisions. Default reads `Accounts::Current.membership`
+    #   (Wave 9's CurrentAttributes object). Hosts that resolve the
+    #   active membership differently (custom membership classes, a
+    #   Devise/Doorkeeper-style "current_account" pattern, multiple
+    #   memberships per request, etc.) override this in the host
+    #   initializer rather than ejecting the application controller.
+    class Configuration
+      attr_accessor :authenticator,
+                    :tenancy_scope,
+                    :theme_css_path,
+                    :before_admin_action,
+                    :current_membership_resolver
+      # Follow-up generators that add knobs (impersonation_audit_logger,
+      # session_timeout, etc.) declare their attr_accessor here.
+      # seams:insertion-point admin.configuration.attributes
+
+      def initialize
+        # Default authenticator: the current Identity must carry the
+        # `staff` flag. Hosts that need a finer-grained gate (per-
+        # account admin role, IP allow-list, etc.) override this.
+        @authenticator = ->(controller) { controller.current_identity&.staff? }
+
+        # :platform → admins see every Account's data. :tenant → admins
+        # are scoped to the Account they're a member of. Phase 3 reads
+        # this; Phase 1 just stores it.
+        @tenancy_scope = :platform
+
+        # nil → Administrate's stock CSS only.
+        @theme_css_path = nil
+
+        # nil → no extra before-action; only the authenticator gate
+        # runs. Hosts wire 2FA / IP allow-list here.
+        @before_admin_action = nil
+
+        # Default current-membership resolver: read
+        # `Accounts::Current.membership` (Wave 9). Returns nil when
+        # the constant isn't loaded so platform-only hosts (no accounts
+        # engine) don't NameError. Hosts that store the active
+        # membership elsewhere assign their own callable here.
+        @current_membership_resolver = lambda do |_controller|
+          next nil unless defined?(::Accounts::Current)
+
+          ::Accounts::Current.membership
+        rescue NoMethodError
+          nil
+        end
+        # Follow-up generators that add defaults for new attributes (matching admin.configuration.attributes) splice them here.
+        # seams:insertion-point admin.configuration.defaults
+      end
+    end
+  end
+end

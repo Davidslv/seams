@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Platform-mode policy for Teams::Team.
+    class TeamPolicy < ApplicationPolicy
+    end
+  end
+end

@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Platform-mode policy for Teams::Invitation.
+    class InvitationPolicy < ApplicationPolicy
+    end
+  end
+end

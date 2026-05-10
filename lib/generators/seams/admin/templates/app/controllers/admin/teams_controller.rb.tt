@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Teams::Team dashboard.
+module Admin
+  class TeamsController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Teams::Team
+    end
+
+    def dashboard
+      @dashboard ||= TeamDashboard.new
+    end
+  end
+end

@@ -1,0 +1,72 @@
+# frozen_string_literal: true
+
+require "administrate/base_dashboard"
+
+# Administrate dashboard for Billing::Plan — local mirror of a Stripe
+# Price (or other gateway's recurring billable thing).
+#
+# `amount_cents` is rendered as Field::Number for now; a custom
+# Money field that formats "$12.34" with currency awareness is
+# deferred to Wave 12 polish.
+# TODO: Wave 12 — ship a Field::Money custom field that reads
+# `currency` from the same row and formats accordingly.
+module Admin
+  class PlanDashboard < Administrate::BaseDashboard
+    ATTRIBUTE_TYPES = {
+      id:                  Field::Number,
+      gateway_ref:         Field::String,
+      name:                Field::String,
+      description:         Field::Text,
+      # TODO: format as currency (Wave 12 — custom Money field)
+      amount_cents:        Field::Number,
+      currency:            Field::String,
+      interval:            Field::Select.with_options(collection: %w[day week month year lifetime]),
+      trial_period_days:   Field::Number,
+      max_lifetime_units:  Field::Number,
+      active:              Field::Boolean,
+      features:            Field::String.with_options(searchable: false),
+      created_at:          Field::DateTime,
+      updated_at:          Field::DateTime
+    }.freeze
+
+    COLLECTION_ATTRIBUTES = %i[id name gateway_ref interval amount_cents active].freeze
+
+    SHOW_PAGE_ATTRIBUTES = %i[
+      id
+      gateway_ref
+      name
+      description
+      amount_cents
+      currency
+      interval
+      trial_period_days
+      max_lifetime_units
+      active
+      features
+      created_at
+      updated_at
+    ].freeze
+
+    FORM_ATTRIBUTES = %i[
+      gateway_ref
+      name
+      description
+      amount_cents
+      currency
+      interval
+      trial_period_days
+      max_lifetime_units
+      active
+    ].freeze
+
+    COLLECTION_FILTERS = {
+      active:    ->(resources) { resources.where(active: true) },
+      lifetime:  ->(resources) { resources.where(interval: "lifetime") },
+      recurring: ->(resources) { resources.where.not(interval: "lifetime") }
+    }.freeze
+
+    def display_resource(plan)
+      plan.name.presence || plan.gateway_ref
+    end
+  end
+end

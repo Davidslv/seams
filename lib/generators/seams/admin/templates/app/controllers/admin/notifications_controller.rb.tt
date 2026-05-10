@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Notifications::Notification
+# dashboard. Note: Notification is an STI base — the table contains
+# rows for InApp / Email / Sms subclasses. The admin index lists
+# every subclass; the form lets admins set `type` to any of the
+# permitted STI subclasses.
+module Admin
+  class NotificationsController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Notifications::Notification
+    end
+
+    def dashboard
+      @dashboard ||= NotificationDashboard.new
+    end
+  end
+end

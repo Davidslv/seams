@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Billing::Invoice dashboard.
+module Admin
+  class InvoicesController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Billing::Invoice
+    end
+
+    def dashboard
+      @dashboard ||= InvoiceDashboard.new
+    end
+  end
+end

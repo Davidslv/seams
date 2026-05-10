@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Platform-mode policy for Accounts::Account. Inherits the staff?
+    # gate from the base; Scope returns every Account in the system.
+    class AccountPolicy < ApplicationPolicy
+    end
+  end
+end

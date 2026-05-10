@@ -1,0 +1,67 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Auth::Identity.
+    #
+    # Identity is the only canonical model that is NOT directly
+    # account-scoped — it has no `account_id` column, because an
+    # Identity can belong to multiple Accounts via Accounts::Membership.
+    # In tenant mode the admin should only see the Identities that hold
+    # a Membership in the current Account; everyone else is invisible.
+    #
+    # ## Why a subquery, not an association join
+    #
+    # The canonical `Auth::Identity` model in seams does NOT declare
+    # `has_many :memberships` (the auth engine deliberately keeps
+    # Identity credential-only and avoids reaching across the engine
+    # boundary into accounts). A policy that joined an association
+    # named `memberships` would raise
+    # `ActiveRecord::ConfigurationError` on a vanilla seams host.
+    #
+    # The subquery shape below depends on the `accounts_memberships`
+    # table existing and carrying `identity_id` + `account_id` columns
+    # — both canonical in the accounts engine since Wave 9 — without
+    # depending on any association being declared on `Auth::Identity`.
+    #
+    # Hosts whose Identity DOES declare an associations join to
+    # memberships may eject this policy and prefer an association
+    # join for index-friendly SQL; the subquery form is the safe
+    # default that works against a fresh seams install.
+    class IdentityPolicy < ApplicationPolicy
+      class Scope < ApplicationPolicy::Scope
+        def resolve
+          return scope.all if staff?
+          return scope.none if account_id.nil?
+
+          # Subquery on the accounts_memberships table — works
+          # without a `has_many :memberships` declaration on the
+          # Identity model. Distinct guards against an Identity
+          # appearing twice if the host model schema ever permitted
+          # duplicate (account_id, identity_id) pairs.
+          membership_subquery = ::Accounts::Membership
+                                .where(account_id: account_id)
+                                .select(:identity_id)
+          scope.where(id: membership_subquery).distinct
+        end
+      end
+
+      private
+
+      # Identity has no `account_id` column. Per-record tenant guard
+      # checks instead that the Identity holds a membership in the
+      # current Account.
+      def record_in_tenant_scope?
+        return true if user&.identity&.staff?
+        return true if record.nil? || record.is_a?(Class)
+        return false if account_id.nil?
+        return false unless record.respond_to?(:id) && record.id
+
+        ::Accounts::Membership.exists?(
+          account_id:  account_id,
+          identity_id: record.id
+        )
+      end
+    end
+  end
+end

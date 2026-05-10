@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Platform-mode policy for Notifications::Notification.
+    class NotificationPolicy < ApplicationPolicy
+    end
+  end
+end

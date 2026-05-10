@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Billing::Subscription dashboard.
+module Admin
+  class SubscriptionsController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Billing::Subscription
+    end
+
+    def dashboard
+      @dashboard ||= SubscriptionDashboard.new
+    end
+  end
+end

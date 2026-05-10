@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+# Administrate controller for the
+# Notifications::NotificationPreference dashboard.
+module Admin
+  class NotificationPreferencesController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Notifications::NotificationPreference
+    end
+
+    def dashboard
+      @dashboard ||= NotificationPreferenceDashboard.new
+    end
+  end
+end

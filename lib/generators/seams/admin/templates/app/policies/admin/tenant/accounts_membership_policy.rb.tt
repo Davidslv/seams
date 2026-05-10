@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Accounts::Membership. Filter by
+    # `account_id` so admins only see Memberships in their own Account.
+    #
+    # `accounts_memberships` is one of the canonical seams tables that
+    # carries `account_id` directly. The column-presence guard is
+    # defensive: a host whose schema differs gets `scope.none` rather
+    # than `PG::UndefinedColumn`.
+    class AccountsMembershipPolicy < ApplicationPolicy
+      class Scope < ApplicationPolicy::Scope
+        def resolve
+          return scope.all if staff?
+          return scope.none if account_id.nil?
+          return scope.none unless account_id_column_present?
+
+          scope.where(account_id: account_id)
+        end
+      end
+    end
+  end
+end

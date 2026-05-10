@@ -1,0 +1,58 @@
+# frozen_string_literal: true
+
+require "administrate/base_dashboard"
+
+# Administrate dashboard for Accounts::Membership — joins an
+# Auth::Identity to an Accounts::Account with a role.
+#
+# Class name is `Admin::AccountsMembershipDashboard` (with the engine
+# prefix) to disambiguate from `Admin::TeamsMembershipDashboard` —
+# both engines ship a Membership model and Administrate resolves
+# dashboards by class name, so the prefixed form is necessary to keep
+# them distinct in the same admin namespace.
+#
+# UUID primary key (matches Accounts::Account). identity_id is a bare
+# bigint FK with no DB-level FK because cross-engine model access is
+# forbidden by the seams architecture (NoCrossEngineModelAccess cop) —
+# the admin surface treats identity_id as a typed integer reference.
+module Admin
+  class AccountsMembershipDashboard < Administrate::BaseDashboard
+    ATTRIBUTE_TYPES = {
+      # UUID PK — Field::String, not Field::Number.
+      id:          Field::String,
+      account:     Field::BelongsTo.with_options(class_name: "Accounts::Account"),
+      identity_id: Field::Number,
+      name:        Field::String,
+      role:        Field::Select.with_options(collection: %w[owner admin member system]),
+      active:      Field::Boolean,
+      verified_at: Field::DateTime,
+      created_at:  Field::DateTime,
+      updated_at:  Field::DateTime
+    }.freeze
+
+    COLLECTION_ATTRIBUTES = %i[id account name role active created_at].freeze
+
+    SHOW_PAGE_ATTRIBUTES = %i[
+      id
+      account
+      identity_id
+      name
+      role
+      active
+      verified_at
+      created_at
+      updated_at
+    ].freeze
+
+    FORM_ATTRIBUTES = %i[account identity_id name role active].freeze
+
+    COLLECTION_FILTERS = {
+      active: ->(resources) { resources.where(active: true).where.not(role: "system") },
+      system: ->(resources) { resources.where(role: "system") }
+    }.freeze
+
+    def display_resource(membership)
+      "#{membership.role}: #{membership.name}"
+    end
+  end
+end

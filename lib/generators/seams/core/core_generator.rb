@@ -150,7 +150,7 @@ module Seams
           create_table :core_audit_logs do |t|
             t.string  :action,         null: false
             t.string  :auditable_type
-            t.bigint  :auditable_id
+            t.string  :auditable_id
             t.bigint  :actor_id
             t.jsonb   :payload,        null: false, default: {}
             t.timestamps

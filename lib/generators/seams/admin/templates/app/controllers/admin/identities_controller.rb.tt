@@ -1,0 +1,26 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Auth::Identity dashboard.
+#
+# Subclasses Seams::Admin::ApplicationController (Phase 1's
+# gate-bearing parent) so the authenticator concern, the
+# `pundit_user` hook, and Phase 3's audit-log auto-write apply
+# uniformly across every dashboard. Do NOT inherit directly from
+# Administrate::ApplicationController — that bypasses the gate.
+#
+# Administrate resolves `resource_class` from the controller name
+# automatically via its inflector hook, but we override it explicitly
+# here because the Identity model lives under the Auth namespace
+# (Auth::Identity) and the default inflection would resolve to a
+# top-level Identity constant that does not exist.
+module Admin
+  class IdentitiesController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Auth::Identity
+    end
+
+    def dashboard
+      @dashboard ||= IdentityDashboard.new
+    end
+  end
+end

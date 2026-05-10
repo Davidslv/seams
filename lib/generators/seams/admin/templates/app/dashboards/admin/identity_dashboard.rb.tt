@@ -1,0 +1,48 @@
+# frozen_string_literal: true
+
+require "administrate/base_dashboard"
+
+# Administrate dashboard for Auth::Identity. Identity is the canonical
+# "who is logging in" record — credentials only, no customer-facing
+# concerns. The encrypted email column is rendered with truncation and
+# an "(encrypted at rest)" annotation so admins know they are looking
+# at a column ActiveRecord::Encryption decrypts on read.
+#
+# Form fields deliberately exclude `password_digest` — admin should
+# never see or set the bcrypt hash. Password resets go through the
+# auth engine's reset flow, not through the admin surface.
+module Admin
+  class IdentityDashboard < Administrate::BaseDashboard
+    # ATTRIBUTE_TYPES describes how Administrate renders each column.
+    # Administrate auto-discovers attributes from the model; declaring
+    # them explicitly here makes the rendering deterministic and lets
+    # us mark encrypted columns specially.
+    ATTRIBUTE_TYPES = {
+      id:         Field::Number,
+      # email is encrypted at rest via ActiveRecord::Encryption (see
+      # Auth::Identity#encrypts). Truncated to 32 chars so a long
+      # ciphertext-padded email doesn't blow up the index column.
+      email:      Field::String.with_options(searchable: true, truncate: 32), # (encrypted at rest)
+      staff:      Field::Boolean,
+      created_at: Field::DateTime,
+      updated_at: Field::DateTime
+    }.freeze
+
+    COLLECTION_ATTRIBUTES = %i[id email staff created_at].freeze
+
+    SHOW_PAGE_ATTRIBUTES = %i[id email staff created_at updated_at].freeze
+
+    # password is intentionally absent — admin must not set the password
+    # directly. Hosts that need a "force-reset" admin action ship it as
+    # a custom action, not as a form field.
+    FORM_ATTRIBUTES = %i[email staff].freeze
+
+    COLLECTION_FILTERS = {
+      staff: ->(resources) { resources.where(staff: true) }
+    }.freeze
+
+    def display_resource(identity)
+      "Identity ##{identity.id}"
+    end
+  end
+end

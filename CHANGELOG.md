@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Wave 11A — Admin engine (Administrate-backed)
+
+Ships `bin/rails generate seams:admin` as an opt-in canonical engine.
+Hosts that have the canonical six in place (core, auth, accounts,
+notifications, billing, teams) can mount an Administrate-backed admin
+surface at `/admin` covering all twelve canonical seams models with a
+single command. Dashboards, two-mode authorization, audit-log
+auto-write, and the four config knobs all ship out of the box. See
+[`doc/ARCHITECTURE_WAVE_11.md`](doc/ARCHITECTURE_WAVE_11.md) for the
+new architecture material; the framework selection rationale lives in
+[`proposals/admin_engine_administrate.md`](proposals/admin_engine_administrate.md).
+
+#### Added
+
+- **`bin/seams admin` generator + canonical engine.** Writes an
+  `engines/admin/` engine into the host with twelve Administrate
+  dashboards covering `Auth::Identity`, `Accounts::Account`,
+  `Accounts::Membership`, `Teams::Team`, `Teams::Membership`,
+  `Teams::Invitation`, `Notifications::Notification`,
+  `Notifications::NotificationPreference`, `Billing::Plan`,
+  `Billing::Subscription`, `Billing::Invoice`, and
+  `Billing::LifetimePass`. Each dashboard subclasses
+  `Administrate::BaseDashboard`; each controller subclasses
+  `Seams::Admin::ApplicationController` (NOT Administrate's directly)
+  so it inherits the gate, the `pundit_user` hook, and the audit-log
+  auto-write. Engine ships **no migrations** — read-only over existing
+  tables.
+- **Two-mode authorization via Pundit `policy_namespace`.** Twelve
+  policies under `Admin::Platform::*` (gate: `Auth::Identity#staff?`,
+  no tenant filter) and twelve under `Admin::Tenant::*` (gate:
+  `Accounts::Membership#role == "admin"`, scope filtered by
+  `account_id` from `Accounts::Current.membership`). Plus two base
+  `ApplicationPolicy` classes — 26 policy files total.
+  `Seams::Admin.config.tenancy_scope` (`:platform` default, `:tenant`
+  alternative) selects the namespace at request time.
+- **`Seams::Admin::Context` Struct.** Wraps the current Identity +
+  Membership as the value `pundit_user` returns. Exposes nil-safe
+  `staff?`, `role`, and `account_id` convenience methods so policies
+  stay readable without each one fishing values out of the controller.
+- **Audit-log auto-write via `Core::Auditable` integration.**
+  `record_admin_audit` after_action on every successful
+  create/update/destroy emits a `Core::AuditLog` row keyed on
+  `Auth::Current.identity&.id`. Wrapped in `defined?(Core::AuditLog)`
+  so the engine boots without core. Update payloads carry
+  `record.saved_changes.transform_values(&:last)`; create/destroy
+  payloads carry attributes minus timestamps.
+- **Four configuration knobs** in `Seams::Admin.config`:
+  `authenticator` (callable; default `staff?` on current Identity);
+  `tenancy_scope` (`:platform` | `:tenant`); `theme_css_path`
+  (host-supplied admin restyle path); `before_admin_action` (callable
+  hook for 2FA, IP allow-list, etc.).
+- **Five Wave-10 insertion-point markers** placed in the admin engine:
+  `admin.engine.events`, `admin.routes.before_resources`,
+  `admin.routes.after_resources`, `admin.configuration.attributes`,
+  `admin.configuration.defaults`. Catalogue updated to 38 markers
+  total across seven engines.
+- **Showcase install path on top of `seams-example`.** The admin
+  generator stub-loads `Auth::Current` and `Accounts::Current`
+  CurrentAttributes objects in the dummy app, ships slim
+  `ApplicationRecord` stubs for every dashboard's resource_class, and
+  appends `administrate` + `pundit` to both the engine's standalone
+  Gemfile and the host Gemfile.
+- **Boot-time dependency assertion.** The engine raises a clear
+  `[seams admin] missing required dependency: ...` at boot when
+  `Auth::Identity`, `Administrate`, or `Pundit` is missing — fail
+  loud at boot rather than NameError mid-request.
+- **`bin/seams help` + post-install message** updated to list `admin`
+  alongside the canonical generators (with the explicit "optional —
+  generate after the canonical six" caveat).
+- **AdminUser-on-separate-tables rule reinterpretation** documented
+  inline in the engine README. Wave 9's credential-only
+  `Auth::Identity` already satisfies the rule's intent (no
+  customer-facing concerns on the admin authentication object); a
+  boolean `staff?` flag is the right granularity. Hosts that need
+  hard isolation override the authenticator.
+
 ### Wave 10 — Splicing tooling
 
 Turns seams from a one-shot scaffolder into a long-lived framework.

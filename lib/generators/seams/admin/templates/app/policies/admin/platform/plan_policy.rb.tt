@@ -1,0 +1,11 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Platform-mode policy for Billing::Plan. Plans are global product
+    # rows (not account-scoped), so even tenant mode generally treats
+    # them as read-only globals.
+    class PlanPolicy < ApplicationPolicy
+    end
+  end
+end

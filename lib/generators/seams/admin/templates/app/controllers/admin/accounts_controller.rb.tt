@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Accounts::Account dashboard.
+# Subclasses Seams::Admin::ApplicationController so the gate, the
+# pundit_user hook, and Phase 3's audit-log auto-write apply.
+module Admin
+  class AccountsController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Accounts::Account
+    end
+
+    def dashboard
+      @dashboard ||= AccountDashboard.new
+    end
+  end
+end

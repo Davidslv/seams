@@ -1,0 +1,282 @@
+# frozen_string_literal: true
+
+module Seams
+  module Admin
+    # Base controller for the seams admin engine. Subclasses
+    # Administrate::ApplicationController so dashboards (Phase 2) get
+    # the framework's defaults — index/show/new/create/edit/update/destroy,
+    # search, filtering, pagination — for free.
+    #
+    # ## Three layered responsibilities
+    #
+    # 1. **Authentication gate** — Phase 1's `Seams::Admin::Authenticator`
+    #    concern installs `before_action :authenticate_admin!`. Default
+    #    gate: `current_identity&.staff?`. Configurable via
+    #    `Seams::Admin.config.authenticator`.
+    #
+    # 2. **Resource-level authorisation** — Phase 3 wires Pundit via
+    #    Administrate's canonical `Administrate::Punditize` concern.
+    #    `Punditize` is the integration thoughtbot ships and documents:
+    #    it overrides Administrate's `authorized_action?` and
+    #    `scoped_resource` to delegate to Pundit, so a per-action
+    #    permission check (`policy.update?`) AND the list-view
+    #    `policy_scope` both fire automatically. Without including
+    #    `Punditize`, Administrate's default `authorized_action?`
+    #    returns true for everything — Pundit policies would be loaded
+    #    but never consulted.
+    #
+    #    The platform-vs-tenant split lives in `policy_namespace`:
+    #    Pundit's array-form lookup (`Pundit.policy!(user, [ns, record])`)
+    #    resolves to `Admin::Platform::*Policy` or
+    #    `Admin::Tenant::*Policy` depending on the active mode.
+    #
+    # 3. **Audit-log auto-write** — Phase 3 emits a `Core::AuditLog` row
+    #    for every successful create/update/destroy via the
+    #    `record_admin_audit` after_action. The actor is
+    #    `Auth::Current.identity` (the human driving the request); the
+    #    auditable is Administrate's `requested_resource`.
+    #
+    # The order here is deliberate: gate, then authorise, then act,
+    # then audit. A request that fails the gate never reaches a
+    # policy; a request that fails a policy never reaches the action;
+    # the audit row only writes after a successful action.
+    class ApplicationController < ::Administrate::ApplicationController
+      include ::Seams::Admin::Authenticator
+      # Administrate's canonical Pundit integration. Internally:
+      #   - includes Pundit::Authorization
+      #   - overrides `authorized_action?` to call
+      #     `Pundit.policy!(pundit_user, [*policy_namespace, resource]).public_send("#{action}?")`
+      #   - overrides `scoped_resource` to apply `Pundit.policy_scope!`
+      #     using the same array-form namespace
+      #   - overrides `authorize_resource` to use `authorize` with the
+      #     namespaced array
+      # Defining our own `policy_namespace` is the supported way to
+      # switch between Admin::Platform::* and Admin::Tenant::*.
+      include ::Administrate::Punditize
+
+      # Pundit raises `Pundit::NotAuthorizedError` when a policy denies a
+      # request. Without an explicit rescue the host inherits the
+      # exception and renders a 500. Treat it as a 403 and surface a
+      # clear message; the after_action audit hook also runs (response
+      # is set), so audit_log records the rejected attempt.
+      rescue_from ::Pundit::NotAuthorizedError, with: :respond_with_admin_unauthorised
+
+      # Catch the parallel exception Administrate raises from inside its
+      # own `authorize_resource` when (for whatever reason) Punditize is
+      # bypassed. Same handling — present the operator with a 403.
+      rescue_from ::Administrate::NotAuthorizedError, with: :respond_with_admin_unauthorised
+
+      # Phase 3 audit-log auto-write. Runs after successful create /
+      # update / destroy actions. Wrapped in `if defined?(Core::AuditLog)`
+      # so the engine is usable without the seams core engine —
+      # operators who don't ship core get no audit log, which is the
+      # correct behaviour when the table doesn't exist.
+      after_action :record_admin_audit, only: %i[create update destroy]
+
+      # Pundit ships `verify_authorized` / `verify_policy_scoped`
+      # after_actions that raise if a controller didn't call
+      # `authorize` / `policy_scope`. Administrate's `Punditize`
+      # already calls them on every standard action, so any future
+      # custom action added to a subclass that forgets the call gets
+      # caught loudly in development. `:only` excludes `:index`
+      # (covered by `verify_policy_scoped` instead) and the rescue
+      # responders themselves (which never authorise — they 403).
+      after_action :verify_authorized,    except: %i[index respond_with_admin_unauthorised]
+      after_action :verify_policy_scoped, only:   %i[index]
+
+      # Helper exposed to dashboards so they can read the active
+      # tenancy mode (:platform vs :tenant). Phase 3 reads this in
+      # policy scopes; dashboards may also branch on it for
+      # account_id columns.
+      helper_method :seams_admin_tenancy_scope
+
+      def seams_admin_tenancy_scope
+        ::Seams::Admin.config.tenancy_scope
+      end
+
+      # Pundit hook. Returns a `Seams::Admin::Context` Struct wrapping
+      # the current Identity and the current Accounts::Membership so
+      # tenant policies can read both signals (staff? + role/account_id)
+      # without each policy reaching into the controller. Returning a
+      # raw Identity would lose the membership; returning the
+      # controller would expose too much. The Struct is the smallest
+      # surface that lets every policy stay decoupled from request
+      # state.
+      #
+      # `current_membership` is read defensively: hosts that don't
+      # ship the accounts engine (platform-only deployments) leave it
+      # nil, and the platform policies don't need it.
+      def pundit_user
+        identity   = ::Auth::Current.identity if defined?(::Auth::Current)
+        membership = current_membership_for_admin
+        ::Seams::Admin::Context.new(identity, membership)
+      end
+
+      # The Pundit policy namespace for the active tenancy mode.
+      # `Administrate::Punditize` calls `Pundit.policy!(pundit_user,
+      # [*policy_namespace, resource])` — Pundit's array-form lookup
+      # walks the namespace tree (`Admin::Platform::IdentityPolicy`
+      # for an `Auth::Identity` resource under `[Admin, Platform]`).
+      # Returning an Array of constants (NOT a single Module) is what
+      # Punditize expects.
+      #
+      # The `Admin` segment is the engine's policy module root; the
+      # second segment switches on tenancy mode. Hosts switching modes
+      # at runtime per-request (rare; typically configured once at boot)
+      # override this method on a subclass and consult their own request
+      # state.
+      def policy_namespace
+        case ::Seams::Admin.config.tenancy_scope
+        when :tenant   then [::Admin::Tenant]
+        else                [::Admin::Platform]
+        end
+      end
+
+      private
+
+      # Resolve the current Accounts::Membership for tenant-mode
+      # policy decisions. Delegates to
+      # `Seams::Admin.config.current_membership_resolver` (a callable
+      # taking the controller). The default reads
+      # `Accounts::Current.membership` (Wave 9's CurrentAttributes
+      # object). Hosts using a different membership-resolution shape
+      # set their own resolver in `config/initializers/seams_admin.rb`
+      # rather than ejecting this controller.
+      def current_membership_for_admin
+        resolver = ::Seams::Admin.config.current_membership_resolver
+        return nil unless resolver.respond_to?(:call)
+
+        resolver.call(self)
+      rescue StandardError => e
+        Rails.logger.warn("[seams admin] membership resolver raised: #{e.class}: #{e.message}") if defined?(Rails)
+        nil
+      end
+
+      # Phase 3 audit-log auto-write. Records a `Core::AuditLog` row
+      # for every successful create/update/destroy.
+      #
+      # Three guards keep the row from writing in cases that would
+      # either crash or duplicate:
+      #
+      #   - `defined?(::Core::AuditLog)` — the engine is usable
+      #     without the seams core engine; no constant means no row.
+      #   - `response.successful? || response.redirect?` — only audit
+      #     actions whose response is in the 2xx/3xx range. A failed
+      #     update (4xx) skipped through the after_action shouldn't
+      #     leave a misleading "update happened" row.
+      #   - `record.respond_to?(:audit_logs)` — when the host model
+      #     already includes `Core::Auditable`, that concern's
+      #     `after_commit` hook ALREADY wrote a row. Writing a second
+      #     row from this controller would double-log. We detect the
+      #     `audit_logs` association the concern installs and skip.
+      #
+      # `requested_resource` is Administrate's resolved record. On
+      # `create` it's the just-saved record; on `update` it's the
+      # just-updated record; on `destroy` it's the record that was just
+      # destroyed (frozen but still readable for `id` / `class.name`).
+      def record_admin_audit
+        return unless defined?(::Core::AuditLog)
+        return unless response.successful? || response.redirect?
+
+        record = requested_resource_for_audit
+        return if record.nil?
+        return if auditable_via_concern?(record)
+
+        ::Core::AuditLog.create!(
+          action:         action_name,
+          auditable_type: record.class.name,
+          auditable_id:   record.id,
+          actor_id:       admin_audit_actor_id,
+          payload:        admin_audit_payload(record)
+        )
+      rescue StandardError => e
+        # Audit-log failures must not break the admin response. A
+        # missing column, a transient DB hiccup, or a unique-constraint
+        # violation should be logged and swallowed — the admin action
+        # itself already succeeded by the time after_action runs.
+        # Operators wanting a structured signal can subscribe to
+        # ActiveSupport::Notifications "seams.admin.audit_failed".
+        Rails.logger.warn("[seams admin] audit log write failed: #{e.class}: #{e.message}") if defined?(Rails)
+        if defined?(::ActiveSupport::Notifications)
+          ::ActiveSupport::Notifications.instrument(
+            "seams.admin.audit_failed",
+            error_class: e.class.name, message: e.message,
+            action: action_name, resource_class: record&.class&.name
+          )
+        end
+      end
+
+      # Read `requested_resource` defensively. On a destroy action
+      # Administrate's `requested_resource` is the just-destroyed
+      # (frozen) record; reading `.id` and `.class.name` still works.
+      # On other actions Administrate caches the resource in
+      # `@requested_resource`, so calling the public method is cheap.
+      # Wrap in a rescue: if the action never resolved a resource (a
+      # subclass that overrode `requested_resource` to raise) we don't
+      # want the audit hook to take down the whole response.
+      def requested_resource_for_audit
+        respond_to?(:requested_resource, true) ? requested_resource : nil
+      rescue StandardError
+        nil
+      end
+
+      # `Core::Auditable` adds `has_many :audit_logs` to the host model
+      # AND wires `after_commit` callbacks that write a row directly.
+      # If the model includes the concern, the row was already written
+      # by the model's own callback — writing another from here would
+      # double-log. The `audit_logs` association is the cheapest
+      # detection signal that doesn't require requiring `Core::Auditable`
+      # itself (which lives in the core engine, not loaded by the
+      # admin engine's dummy app).
+      def auditable_via_concern?(record)
+        return false unless record.class.respond_to?(:reflect_on_association)
+
+        reflection = record.class.reflect_on_association(:audit_logs)
+        return false if reflection.nil?
+
+        reflection.options[:as] == :auditable
+      end
+
+      def admin_audit_actor_id
+        return nil unless defined?(::Auth::Current)
+
+        ::Auth::Current.identity&.id
+      end
+
+      def admin_audit_payload(record)
+        case action_name
+        when "update"
+          # `saved_changes` is the canonical Rails surface for "what
+          # this update actually wrote", available on the just-saved
+          # record. Empty for a no-op update.
+          record.respond_to?(:saved_changes) ? record.saved_changes.transform_values(&:last) : {}
+        else
+          # create + destroy snapshot the attributes minus timestamps
+          # so the row is readable without the audit-log consumer
+          # having to filter timestamp noise.
+          record.respond_to?(:attributes) ? record.attributes.except("created_at", "updated_at") : {}
+        end
+      end
+
+      # Pundit / Administrate authorisation failure handler. Renders a
+      # plain 403 — same shape as the authenticator concern's
+      # `respond_with_admin_forbidden` to keep the operator-visible
+      # surface consistent.
+      def respond_with_admin_unauthorised(_exception = nil)
+        message = <<~MSG.strip
+          Access denied. The seams admin engine's Pundit policy denied
+          this request. The active tenancy mode is
+          `Seams::Admin.config.tenancy_scope = #{::Seams::Admin.config.tenancy_scope.inspect}`;
+          if you expected access, check the matching policy under
+          `Admin::#{::Seams::Admin.config.tenancy_scope.to_s.camelize}::*Policy`.
+        MSG
+
+        if respond_to?(:render)
+          render plain: message, status: :forbidden
+        else
+          head :forbidden
+        end
+      end
+    end
+  end
+end

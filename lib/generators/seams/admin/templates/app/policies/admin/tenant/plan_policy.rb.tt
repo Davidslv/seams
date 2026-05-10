@@ -1,0 +1,47 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Billing::Plan.
+    #
+    # Plans are global product rows, not account-scoped — the
+    # `billing_plans` table carries no `account_id` column. Tenant
+    # admins typically need to **see** the catalogue of available plans
+    # (so they can switch their Subscription) but should not create or
+    # edit them. The default here keeps the catalogue readable to any
+    # account-admin and falls back to the staff? gate for writes.
+    #
+    # `Scope#resolve` returns `scope.all` because the catalogue is
+    # global — there is no `account_id` to filter by. Hosts that mark
+    # plans private to specific accounts eject and add the filter.
+    class PlanPolicy < ApplicationPolicy
+      def create?
+        user&.identity&.staff?
+      end
+
+      def update?
+        user&.identity&.staff?
+      end
+
+      def destroy?
+        user&.identity&.staff?
+      end
+
+      class Scope < ApplicationPolicy::Scope
+        # Plans are global; tenant admins see the catalogue.
+        def resolve
+          scope.all
+        end
+      end
+
+      private
+
+      # Plans are global; per-record tenant guard always passes for
+      # the read actions, and the write actions short-circuit on the
+      # staff? predicates above.
+      def record_in_tenant_scope?
+        true
+      end
+    end
+  end
+end

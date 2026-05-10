@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Accounts::Membership dashboard.
+# Routed under `accounts_memberships` (engine-prefixed) to disambiguate
+# from `teams_memberships` — both engines ship a Membership model.
+module Admin
+  class AccountsMembershipsController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Accounts::Membership
+    end
+
+    def dashboard
+      @dashboard ||= AccountsMembershipDashboard.new
+    end
+  end
+end

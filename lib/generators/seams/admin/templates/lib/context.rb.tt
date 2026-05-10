@@ -1,0 +1,44 @@
+# frozen_string_literal: true
+
+module Seams
+  module Admin
+    # The value `Seams::Admin::ApplicationController#pundit_user`
+    # returns. Wraps the current Auth::Identity together with the
+    # current Accounts::Membership so a Pundit policy can read both
+    # signals (staff? on the Identity, role/account_id on the
+    # Membership) without the policy having to know how to fish either
+    # out of the controller.
+    #
+    # Why a Struct, not the raw Identity? In tenant mode the policies
+    # need to filter by `account_id`, which lives on the Membership,
+    # not the Identity. Pundit's `pundit_user` is a single value, so
+    # we wrap. Hosts that don't carry an Accounts::Membership concept
+    # (single-tenant apps, platform-only admins) leave `membership` nil
+    # and the Identity's `staff?` carries the gate alone.
+    #
+    # Both fields are nil-safe in every policy — the platform policies
+    # only read `identity&.staff?`, the tenant policies fall through to
+    # `scope.none` when membership is nil.
+    Context = Struct.new(:identity, :membership) do
+      # Convenience: a policy that wants to call `user.staff?` rather
+      # than `user.identity&.staff?` can. Mirrors the bare-Identity
+      # surface so policies stay readable when only the Identity
+      # matters.
+      def staff?
+        identity&.staff?
+      end
+
+      # Convenience: same idea on the Membership side. A policy that
+      # only cares about the role can call `user.role` instead of
+      # `user.membership&.role`.
+      def role
+        membership&.role
+      end
+
+      # Convenience: same idea on the Membership side for account_id.
+      def account_id
+        membership&.account_id
+      end
+    end
+  end
+end

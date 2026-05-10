@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Teams::Invitation. Filters by `account_id`.
+    #
+    # The canonical seams `team_invitations` table doesn't carry
+    # `account_id` directly (invitations are scoped through their
+    # Team). The default falls back to `scope.none` if the column is
+    # absent — fail-closed. Hosts whose schema differs eject this
+    # policy and replace `resolve` with a join through Teams::Team.
+    class InvitationPolicy < ApplicationPolicy
+      class Scope < ApplicationPolicy::Scope
+        def resolve
+          return scope.all if staff?
+          return scope.none if account_id.nil?
+          return scope.none unless account_id_column_present?
+
+          scope.where(account_id: account_id)
+        end
+      end
+    end
+  end
+end

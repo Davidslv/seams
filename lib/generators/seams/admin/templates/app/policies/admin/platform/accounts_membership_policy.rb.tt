@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+module Admin
+  module Platform
+    # Platform-mode policy for Accounts::Membership. All Memberships
+    # across every Account are visible.
+    class AccountsMembershipPolicy < ApplicationPolicy
+    end
+  end
+end

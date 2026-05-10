@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Billing::Plan dashboard.
+module Admin
+  class PlansController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Billing::Plan
+    end
+
+    def dashboard
+      @dashboard ||= PlanDashboard.new
+    end
+  end
+end

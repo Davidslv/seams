@@ -1,0 +1,23 @@
+# frozen_string_literal: true
+
+module Admin
+  module Tenant
+    # Tenant-mode policy for Notifications::NotificationPreference.
+    # Filters by `account_id`. NotificationPreference rows are tied to
+    # an Identity, but Identities can span Accounts. Hosts that carry
+    # `account_id` directly on the preference row pick up this policy
+    # as-is; hosts whose schema lacks the column fall through to
+    # `scope.none` (fail-closed) and are expected to eject + rewrite.
+    class NotificationPreferencePolicy < ApplicationPolicy
+      class Scope < ApplicationPolicy::Scope
+        def resolve
+          return scope.all if staff?
+          return scope.none if account_id.nil?
+          return scope.none unless account_id_column_present?
+
+          scope.where(account_id: account_id)
+        end
+      end
+    end
+  end
+end

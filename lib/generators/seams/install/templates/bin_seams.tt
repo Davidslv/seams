@@ -5,7 +5,7 @@
 #
 #   bin/seams install                     # bin/rails generate seams:install
 #   bin/seams engine billing              # bin/rails generate seams:engine billing
-#   bin/seams core | auth | accounts | notifications | billing | teams
+#   bin/seams core | auth | accounts | notifications | billing | teams | admin
 #   bin/seams remove billing              # bin/rails generate seams:remove billing
 #   bin/seams list                        # bin/rails seams:list
 #   bin/seams test billing                # bin/rails seams:test[billing]
@@ -16,7 +16,7 @@
 
 require "shellwords"
 
-CANONICAL = %w[install core auth accounts notifications billing teams].freeze
+CANONICAL = %w[install core auth accounts notifications billing teams admin].freeze
 GENERIC   = %w[engine remove].freeze
 TASKS     = %w[list].freeze
 ENGINE_TASKS = %w[test quality].freeze
@@ -69,7 +69,7 @@ when nil, "help", "-h", "--help"
     Canonical generators:
       install                       Install the framework
       engine <name>                 Generate a generic engine
-      core | auth | accounts | notifications | billing | teams
+      core | auth | accounts | notifications | billing | teams | admin
                                     Generate a canonical engine
       remove <name>                 Remove an engine
 

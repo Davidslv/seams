@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+# Administrate controller for the Teams::Invitation dashboard.
+module Admin
+  class InvitationsController < ::Seams::Admin::ApplicationController
+    def resource_class
+      ::Teams::Invitation
+    end
+
+    def dashboard
+      @dashboard ||= InvitationDashboard.new
+    end
+  end
+end

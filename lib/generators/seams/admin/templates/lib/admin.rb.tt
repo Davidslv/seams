@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+require "admin/configuration"
+require "admin/context"
+require "admin/engine"
+require "admin/concerns/authenticator"
+
+# Engine root for the seams admin engine. Namespaces under
+# `Seams::Admin` (rather than top-level `Admin`) so the host's own
+# `app/admin/...` code does not collide with the engine's controllers,
+# dashboards, or policies. The path layout under engines/admin/lib/
+# uses the short `admin/...` form for grep-friendliness; constants
+# live under `Seams::Admin::*`.
+module Seams
+  module Admin
+    class Error < StandardError; end
+
+    class << self
+      def configuration
+        @configuration ||= Configuration.new
+      end
+
+      def configure
+        yield configuration
+      end
+
+      # Convenience alias matching how the host reads it in
+      # initializers and controller before-actions:
+      #
+      #   Seams::Admin.config.authenticator.call(self)
+      def config
+        configuration
+      end
+    end
+  end
+end
