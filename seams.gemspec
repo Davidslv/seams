@@ -13,11 +13,14 @@ Gem::Specification.new do |spec|
                      "modular monolith. It generates isolated Rails engines with " \
                      "proper namespace isolation, contract tests, dummy apps, and " \
                      "boundary enforcement — without the operational cost of microservices."
-  spec.homepage    = "https://github.com/Davidslv/seams"
+  spec.homepage    = "https://davidslv.uk/modular-rails/"
   spec.license     = "MIT"
 
   spec.required_ruby_version = ">= 4.0.0"
 
+  # homepage_uri (the book's canonical "what is this" page) and
+  # source_code_uri (this repo) deliberately differ so the
+  # rubygems.org page shows two distinct destinations.
   spec.metadata["homepage_uri"]    = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/Davidslv/seams"
   spec.metadata["changelog_uri"]   = "https://github.com/Davidslv/seams/blob/main/CHANGELOG.md"

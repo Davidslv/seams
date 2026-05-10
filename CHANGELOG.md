@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-05-10
+
+First public release on rubygems.org. The cumulative changelog from
+Wave 1 through Wave 11A follows. Subsequent releases will track
+per-version changes only.
+
 ### Wave 11A — Admin engine (Administrate-backed)
 
 Ships `bin/rails generate seams:admin` as an opt-in canonical engine.
