@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/eject_aware"
 require "seams/generators/dummy_app_writer"
 
 module Seams
@@ -19,6 +20,7 @@ module Seams
     # rubocop:disable Metrics/ClassLength
     class BillingGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
+      include Seams::Generators::EjectAware
 
       source_root File.expand_path("templates", __dir__)
 
@@ -34,63 +36,66 @@ module Seams
       end
 
       def overwrite_engine_entry_point
-        template "lib/engine.rb.tt",         engine_path("lib/billing/engine.rb"),        force: true
-        template "lib/billing.rb.tt",        engine_path("lib/billing.rb"),               force: true
-        template "lib/configuration.rb.tt",  engine_path("lib/billing/configuration.rb")
-        template "lib/tasks/billing_check.rake.tt", engine_path("lib/tasks/billing_check.rake")
+        # engine.rb / lib/billing.rb stay framework-managed.
+        template "lib/engine.rb.tt",                 engine_path("lib/billing/engine.rb"),        force: true
+        template "lib/billing.rb.tt",                engine_path("lib/billing.rb"),               force: true
+        template_unless_ejected "lib/configuration.rb.tt",
+                                engine_path("lib/billing/configuration.rb")
+        template_unless_ejected "lib/tasks/billing_check.rake.tt",
+                                engine_path("lib/tasks/billing_check.rake")
       end
 
       def overwrite_routes
-        template "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
+        template_unless_ejected "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
       end
 
       def create_models
-        template "app/models/application_record.rb.tt",
-                 engine_path("app/models/billing/application_record.rb")
-        template "app/models/subscription.rb.tt",
-                 engine_path("app/models/billing/subscription.rb")
-        template "app/models/invoice.rb.tt",
-                 engine_path("app/models/billing/invoice.rb")
-        template "app/models/webhook_event.rb.tt",
-                 engine_path("app/models/billing/webhook_event.rb")
-        template "app/models/plan.rb.tt",
-                 engine_path("app/models/billing/plan.rb")
-        template "app/models/lifetime_pass.rb.tt",
-                 engine_path("app/models/billing/lifetime_pass.rb")
+        template_unless_ejected "app/models/application_record.rb.tt",
+                                engine_path("app/models/billing/application_record.rb")
+        template_unless_ejected "app/models/subscription.rb.tt",
+                                engine_path("app/models/billing/subscription.rb")
+        template_unless_ejected "app/models/invoice.rb.tt",
+                                engine_path("app/models/billing/invoice.rb")
+        template_unless_ejected "app/models/webhook_event.rb.tt",
+                                engine_path("app/models/billing/webhook_event.rb")
+        template_unless_ejected "app/models/plan.rb.tt",
+                                engine_path("app/models/billing/plan.rb")
+        template_unless_ejected "app/models/lifetime_pass.rb.tt",
+                                engine_path("app/models/billing/lifetime_pass.rb")
       end
 
       def create_gateways
-        template "lib/gateways/abstract.rb.tt",
-                 engine_path("lib/billing/gateways/abstract.rb")
+        template_unless_ejected "lib/gateways/abstract.rb.tt",
+                                engine_path("lib/billing/gateways/abstract.rb")
 
         # Stripe ships unconditionally (it's the default + reference
         # implementation that sibling specs reference). Paddle / Adyen
         # are stubs — copied only when --gateway=paddle/adyen.
-        template "lib/gateways/stripe.rb.tt",
-                 engine_path("lib/billing/gateways/stripe.rb")
-        template "lib/stripe/client.rb.tt",
-                 engine_path("lib/billing/stripe/client.rb")
-        template "lib/stripe/webhook_signature.rb.tt",
-                 engine_path("lib/billing/stripe/webhook_signature.rb")
+        template_unless_ejected "lib/gateways/stripe.rb.tt",
+                                engine_path("lib/billing/gateways/stripe.rb")
+        template_unless_ejected "lib/stripe/client.rb.tt",
+                                engine_path("lib/billing/stripe/client.rb")
+        template_unless_ejected "lib/stripe/webhook_signature.rb.tt",
+                                engine_path("lib/billing/stripe/webhook_signature.rb")
 
         return if gateway == "stripe"
 
-        template "lib/gateways/#{gateway}.rb.tt",
-                 engine_path("lib/billing/gateways/#{gateway}.rb")
+        template_unless_ejected "lib/gateways/#{gateway}.rb.tt",
+                                engine_path("lib/billing/gateways/#{gateway}.rb")
       end
 
       def create_concern
-        template "lib/concerns/billable.rb.tt",
-                 engine_path("lib/billing/concerns/billable.rb")
+        template_unless_ejected "lib/concerns/billable.rb.tt",
+                                engine_path("lib/billing/concerns/billable.rb")
       end
 
       def create_jobs
-        template "app/jobs/application_job.rb.tt",
-                 engine_path("app/jobs/billing/application_job.rb")
-        template "app/jobs/start_subscription_job.rb.tt",
-                 engine_path("app/jobs/billing/start_subscription_job.rb")
-        template "app/jobs/cancel_subscription_job.rb.tt",
-                 engine_path("app/jobs/billing/cancel_subscription_job.rb")
+        template_unless_ejected "app/jobs/application_job.rb.tt",
+                                engine_path("app/jobs/billing/application_job.rb")
+        template_unless_ejected "app/jobs/start_subscription_job.rb.tt",
+                                engine_path("app/jobs/billing/start_subscription_job.rb")
+        template_unless_ejected "app/jobs/cancel_subscription_job.rb.tt",
+                                engine_path("app/jobs/billing/cancel_subscription_job.rb")
       end
 
       def create_services
@@ -101,17 +106,17 @@ module Seams
 
       def create_service_foundation
         # Phase 3 (1/4) — uniform service object foundation.
-        template "app/services/service_result.rb.tt",
-                 engine_path("app/services/billing/service_result.rb")
-        template "app/services/stripe_service.rb.tt",
-                 engine_path("app/services/billing/stripe_service.rb")
+        template_unless_ejected "app/services/service_result.rb.tt",
+                                engine_path("app/services/billing/service_result.rb")
+        template_unless_ejected "app/services/stripe_service.rb.tt",
+                                engine_path("app/services/billing/stripe_service.rb")
       end
 
       def create_session_services
-        template "app/services/checkout_session_service.rb.tt",
-                 engine_path("app/services/billing/checkout/create_session_service.rb")
-        template "app/services/portal_session_service.rb.tt",
-                 engine_path("app/services/billing/portal/create_session_service.rb")
+        template_unless_ejected "app/services/checkout_session_service.rb.tt",
+                                engine_path("app/services/billing/checkout/create_session_service.rb")
+        template_unless_ejected "app/services/portal_session_service.rb.tt",
+                                engine_path("app/services/billing/portal/create_session_service.rb")
       end
 
       def create_domain_services
@@ -121,90 +126,90 @@ module Seams
 
       def create_customer_and_subscription_services
         # Phase 3 (2/4) — Customers + Subscriptions service objects.
-        template "app/services/customers/find_or_create_service.rb.tt",
-                 engine_path("app/services/billing/customers/find_or_create_service.rb")
-        template "app/services/subscriptions/cancel_service.rb.tt",
-                 engine_path("app/services/billing/subscriptions/cancel_service.rb")
-        template "app/services/subscriptions/change_plan_service.rb.tt",
-                 engine_path("app/services/billing/subscriptions/change_plan_service.rb")
-        template "app/services/subscriptions/reactivate_service.rb.tt",
-                 engine_path("app/services/billing/subscriptions/reactivate_service.rb")
+        template_unless_ejected "app/services/customers/find_or_create_service.rb.tt",
+                                engine_path("app/services/billing/customers/find_or_create_service.rb")
+        template_unless_ejected "app/services/subscriptions/cancel_service.rb.tt",
+                                engine_path("app/services/billing/subscriptions/cancel_service.rb")
+        template_unless_ejected "app/services/subscriptions/change_plan_service.rb.tt",
+                                engine_path("app/services/billing/subscriptions/change_plan_service.rb")
+        template_unless_ejected "app/services/subscriptions/reactivate_service.rb.tt",
+                                engine_path("app/services/billing/subscriptions/reactivate_service.rb")
       end
 
       def create_invoice_and_lifetime_services
-        template "app/services/invoices/sync_service.rb.tt",
-                 engine_path("app/services/billing/invoices/sync_service.rb")
+        template_unless_ejected "app/services/invoices/sync_service.rb.tt",
+                                engine_path("app/services/billing/invoices/sync_service.rb")
         # Lifetime Deal services — see issue #2 section 3A.LTD.
-        template "app/services/lifetime/grant_pass_service.rb.tt",
-                 engine_path("app/services/billing/lifetime/grant_pass_service.rb")
-        template "app/services/lifetime/revoke_pass_service.rb.tt",
-                 engine_path("app/services/billing/lifetime/revoke_pass_service.rb")
-        template "app/services/lifetime/create_pass_from_checkout_service.rb.tt",
-                 engine_path("app/services/billing/lifetime/create_pass_from_checkout_service.rb")
-        template "app/services/lifetime/create_lifetime_session_service.rb.tt",
-                 engine_path("app/services/billing/lifetime/create_lifetime_session_service.rb")
+        template_unless_ejected "app/services/lifetime/grant_pass_service.rb.tt",
+                                engine_path("app/services/billing/lifetime/grant_pass_service.rb")
+        template_unless_ejected "app/services/lifetime/revoke_pass_service.rb.tt",
+                                engine_path("app/services/billing/lifetime/revoke_pass_service.rb")
+        template_unless_ejected "app/services/lifetime/create_pass_from_checkout_service.rb.tt",
+                                engine_path("app/services/billing/lifetime/create_pass_from_checkout_service.rb")
+        template_unless_ejected "app/services/lifetime/create_lifetime_session_service.rb.tt",
+                                engine_path("app/services/billing/lifetime/create_lifetime_session_service.rb")
       end
 
       # Phase 3 (3/4) — webhook router + 13 handler classes.
       def create_webhook_router_and_handlers
-        template "app/services/webhooks/handler.rb.tt",
-                 engine_path("app/services/billing/webhooks/handler.rb")
-        template "app/services/webhooks/event_router.rb.tt",
-                 engine_path("app/services/billing/webhooks/event_router.rb")
+        template_unless_ejected "app/services/webhooks/handler.rb.tt",
+                                engine_path("app/services/billing/webhooks/handler.rb")
+        template_unless_ejected "app/services/webhooks/event_router.rb.tt",
+                                engine_path("app/services/billing/webhooks/event_router.rb")
 
         webhook_handler_templates.each do |basename|
-          template "app/services/webhooks/handlers/#{basename}.rb.tt",
-                   engine_path("app/services/billing/webhooks/handlers/#{basename}.rb")
+          template_unless_ejected "app/services/webhooks/handlers/#{basename}.rb.tt",
+                                  engine_path("app/services/billing/webhooks/handlers/#{basename}.rb")
         end
       end
 
       def create_webhook_process_event_job
-        template "app/jobs/webhooks/process_event_job.rb.tt",
-                 engine_path("app/jobs/billing/webhooks/process_event_job.rb")
+        template_unless_ejected "app/jobs/webhooks/process_event_job.rb.tt",
+                                engine_path("app/jobs/billing/webhooks/process_event_job.rb")
       end
 
       def create_controllers_and_views
-        template "app/controllers/webhooks_controller.rb.tt",
-                 engine_path("app/controllers/billing/webhooks_controller.rb")
-        template "app/controllers/checkout_controller.rb.tt",
-                 engine_path("app/controllers/billing/checkout_controller.rb")
-        template "app/controllers/portal_controller.rb.tt",
-                 engine_path("app/controllers/billing/portal_controller.rb")
-        template "app/controllers/plans_controller.rb.tt",
-                 engine_path("app/controllers/billing/plans_controller.rb")
-        template "app/views/checkout/success.html.erb.tt",
-                 engine_path("app/views/billing/checkout/success.html.erb")
-        template "app/views/plans/index.html.erb.tt",
-                 engine_path("app/views/billing/plans/index.html.erb")
+        template_unless_ejected "app/controllers/webhooks_controller.rb.tt",
+                                engine_path("app/controllers/billing/webhooks_controller.rb")
+        template_unless_ejected "app/controllers/checkout_controller.rb.tt",
+                                engine_path("app/controllers/billing/checkout_controller.rb")
+        template_unless_ejected "app/controllers/portal_controller.rb.tt",
+                                engine_path("app/controllers/billing/portal_controller.rb")
+        template_unless_ejected "app/controllers/plans_controller.rb.tt",
+                                engine_path("app/controllers/billing/plans_controller.rb")
+        template_unless_ejected "app/views/checkout/success.html.erb.tt",
+                                engine_path("app/views/billing/checkout/success.html.erb")
+        template_unless_ejected "app/views/plans/index.html.erb.tt",
+                                engine_path("app/views/billing/plans/index.html.erb")
       end
 
       # Phase 3 (4/4) — self-service subscription management +
       # read-only billing history. Routes live in config/routes.rb.tt.
       def create_subscriptions_and_invoices_ui
-        template "app/controllers/subscriptions_controller.rb.tt",
-                 engine_path("app/controllers/billing/subscriptions_controller.rb")
-        template "app/controllers/invoices_controller.rb.tt",
-                 engine_path("app/controllers/billing/invoices_controller.rb")
-        template "app/views/subscriptions/index.html.erb.tt",
-                 engine_path("app/views/billing/subscriptions/index.html.erb")
-        template "app/views/subscriptions/show.html.erb.tt",
-                 engine_path("app/views/billing/subscriptions/show.html.erb")
-        template "app/views/invoices/index.html.erb.tt",
-                 engine_path("app/views/billing/invoices/index.html.erb")
-        template "app/views/invoices/show.html.erb.tt",
-                 engine_path("app/views/billing/invoices/show.html.erb")
+        template_unless_ejected "app/controllers/subscriptions_controller.rb.tt",
+                                engine_path("app/controllers/billing/subscriptions_controller.rb")
+        template_unless_ejected "app/controllers/invoices_controller.rb.tt",
+                                engine_path("app/controllers/billing/invoices_controller.rb")
+        template_unless_ejected "app/views/subscriptions/index.html.erb.tt",
+                                engine_path("app/views/billing/subscriptions/index.html.erb")
+        template_unless_ejected "app/views/subscriptions/show.html.erb.tt",
+                                engine_path("app/views/billing/subscriptions/show.html.erb")
+        template_unless_ejected "app/views/invoices/index.html.erb.tt",
+                                engine_path("app/views/billing/invoices/index.html.erb")
+        template_unless_ejected "app/views/invoices/show.html.erb.tt",
+                                engine_path("app/views/billing/invoices/show.html.erb")
       end
 
       # LTD admin controller + views (issue #2 section 3A.LTD). Kept
       # in its own generator method so create_controllers_and_views
       # stays under the AbcSize lint threshold.
       def create_lifetime_admin_controller_and_views
-        template "app/controllers/admin/lifetime_passes_controller.rb.tt",
-                 engine_path("app/controllers/billing/admin/lifetime_passes_controller.rb")
-        template "app/views/admin/lifetime_passes/index.html.erb.tt",
-                 engine_path("app/views/billing/admin/lifetime_passes/index.html.erb")
-        template "app/views/admin/lifetime_passes/new.html.erb.tt",
-                 engine_path("app/views/billing/admin/lifetime_passes/new.html.erb")
+        template_unless_ejected "app/controllers/admin/lifetime_passes_controller.rb.tt",
+                                engine_path("app/controllers/billing/admin/lifetime_passes_controller.rb")
+        template_unless_ejected "app/views/admin/lifetime_passes/index.html.erb.tt",
+                                engine_path("app/views/billing/admin/lifetime_passes/index.html.erb")
+        template_unless_ejected "app/views/admin/lifetime_passes/new.html.erb.tt",
+                                engine_path("app/views/billing/admin/lifetime_passes/new.html.erb")
       end
 
       def create_migrations
@@ -221,22 +226,22 @@ module Seams
       end
 
       def create_specs
-        template "spec/models/subscription_spec.rb.tt",
-                 engine_path("spec/models/billing/subscription_spec.rb")
-        template "spec/models/plan_spec.rb.tt",
-                 engine_path("spec/models/billing/plan_spec.rb")
-        template "spec/gateways/stripe_spec.rb.tt",
-                 engine_path("spec/gateways/billing/stripe_spec.rb")
+        template_unless_ejected "spec/models/subscription_spec.rb.tt",
+                                engine_path("spec/models/billing/subscription_spec.rb")
+        template_unless_ejected "spec/models/plan_spec.rb.tt",
+                                engine_path("spec/models/billing/plan_spec.rb")
+        template_unless_ejected "spec/gateways/stripe_spec.rb.tt",
+                                engine_path("spec/gateways/billing/stripe_spec.rb")
         # Phase 3 (1/4) — factories + Stripe webmock helpers + event fixtures.
-        template "spec/factories/billing.rb.tt",
-                 engine_path("spec/factories/billing.rb")
-        template "spec/support/stripe_helpers.rb.tt",
-                 engine_path("spec/support/stripe_helpers.rb")
+        template_unless_ejected "spec/factories/billing.rb.tt",
+                                engine_path("spec/factories/billing.rb")
+        template_unless_ejected "spec/support/stripe_helpers.rb.tt",
+                                engine_path("spec/support/stripe_helpers.rb")
         # Phase 3 (4/4) — gateway contract shared_examples.
-        template "spec/support/shared_examples/a_billing_gateway.rb.tt",
-                 engine_path("spec/support/shared_examples/a_billing_gateway.rb")
-        template "spec/gateways/contract_spec.rb.tt",
-                 engine_path("spec/gateways/billing/contract_spec.rb")
+        template_unless_ejected "spec/support/shared_examples/a_billing_gateway.rb.tt",
+                                engine_path("spec/support/shared_examples/a_billing_gateway.rb")
+        template_unless_ejected "spec/gateways/contract_spec.rb.tt",
+                                engine_path("spec/gateways/billing/contract_spec.rb")
         create_stripe_event_fixtures
       end
 
@@ -256,16 +261,16 @@ module Seams
           charge_refunded
           checkout_session_completed
         ].each do |name|
-          template "spec/fixtures/stripe/#{name}.json.tt",
-                   engine_path("spec/fixtures/stripe/#{name}.json")
+          template_unless_ejected "spec/fixtures/stripe/#{name}.json.tt",
+                                  engine_path("spec/fixtures/stripe/#{name}.json")
         end
       end
 
       def create_helpers
         # Phase 3 (1/4) — currency formatter for the pricing page +
         # invoice views.
-        template "app/helpers/currency_helper.rb.tt",
-                 engine_path("app/helpers/billing/currency_helper.rb")
+        template_unless_ejected "app/helpers/currency_helper.rb.tt",
+                                engine_path("app/helpers/billing/currency_helper.rb")
       end
 
       def overwrite_readme

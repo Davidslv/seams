@@ -327,4 +327,24 @@ RSpec.describe Seams::Generators::AccountsGenerator do
       expect(content).not_to match(/^\s*host_inject_include_in_user\(/)
     end
   end
+
+  # Wave 10 Phase 2A: every catalogued insertion-point marker the
+  # accounts engine ships must appear in its target file. These
+  # assertions gate against accidental marker removal in future
+  # template edits. See doc/INSERTION_POINTS_CATALOGUE.md for the
+  # canonical list.
+  describe "insertion-point markers (Wave 10)" do
+    {
+      "accounts.engine.events" => "engines/accounts/lib/accounts/engine.rb",
+      "accounts.engine.initializers" => "engines/accounts/lib/accounts/engine.rb",
+      "accounts.configuration.attributes" => "engines/accounts/lib/accounts/configuration.rb",
+      "accounts.configuration.defaults" => "engines/accounts/lib/accounts/configuration.rb"
+    }.each do |marker, path|
+      it "ships #{marker} in #{path}" do
+        assert_file path do |content|
+          expect(content).to include("# seams:insertion-point #{marker}")
+        end
+      end
+    end
+  end
 end

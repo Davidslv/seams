@@ -610,4 +610,26 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
   end
+
+  # Wave 10 Phase 2A: every catalogued insertion-point marker the auth
+  # engine ships must appear in its target file. These assertions gate
+  # against accidental marker removal in future template edits.
+  # See doc/INSERTION_POINTS_CATALOGUE.md for the canonical list.
+  describe "insertion-point markers (Wave 10)" do
+    {
+      "auth.engine.events" => "engines/auth/lib/auth/engine.rb",
+      "auth.engine.initializers" => "engines/auth/lib/auth/engine.rb",
+      "auth.routes.before_session" => "engines/auth/config/routes.rb",
+      "auth.routes.after_oauth" => "engines/auth/config/routes.rb",
+      "auth.configuration.attributes" => "engines/auth/lib/auth/configuration.rb",
+      "auth.configuration.defaults" => "engines/auth/lib/auth/configuration.rb",
+      "auth.configuration.oauth_providers" => "engines/auth/lib/auth/configuration.rb"
+    }.each do |marker, path|
+      it "ships #{marker} in #{path}" do
+        assert_file path do |content|
+          expect(content).to include("# seams:insertion-point #{marker}")
+        end
+      end
+    end
+  end
 end

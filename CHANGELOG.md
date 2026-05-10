@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Wave 10 — Splicing tooling
+
+Turns seams from a one-shot scaffolder into a long-lived framework.
+Generated engines now expose stable, named extension points;
+follow-up generators target those points to add features without
+re-templating the whole engine; and `bin/seams resolve --eject`
+marks any single host file as host-owned so subsequent
+`bin/seams <engine>` runs leave it alone. See
+[`doc/ARCHITECTURE_WAVE_10.md`](doc/ARCHITECTURE_WAVE_10.md) for the
+addendum and [`doc/WRITING_FOLLOW_UP_GENERATORS.md`](doc/WRITING_FOLLOW_UP_GENERATORS.md)
+for the author's guide.
+
+#### Added
+
+- **Insertion-point machinery.** `Seams::Generators::Splicer`
+  (idempotent splice primitives — looks up markers by name, never by
+  line number; auto-detects indentation off the marker line; fifty-line
+  idempotency window) and `Seams::Generators::FollowUpGenerator`
+  (Rails generator base class supplying `engine_path`, `splice`,
+  `assert_marker_exists!`, and a `report_summary` template-method
+  hook). Pure file I/O — no Rails dep on the Splicer itself, so
+  `bin/seams resolve` can reuse it without booting Rails.
+- **Insertion-point catalogue.** 33 markers placed across the six
+  canonical engines (32 active + 1 deferred to Wave 12 pending the
+  core Configuration class). Marker shape:
+  `# seams:insertion-point <engine>.<area>.<scope>` — ASCII only,
+  greppable, parses through every Ruby linter. Format spec in
+  [`doc/INSERTION_POINTS.md`](doc/INSERTION_POINTS.md); canonical list
+  in [`doc/INSERTION_POINTS_CATALOGUE.md`](doc/INSERTION_POINTS_CATALOGUE.md).
+- **`bin/seams resolve` CLI.** Three modes:
+  - `--eject <engine>/<file>` — prepends a
+    `# seams:ejected from <engine>.<path>` header to the host file;
+    refuses to eject framework-managed files (migrations, engine.rb,
+    version.rb, Gemfile, .gemspec).
+  - `--list-markers <engine>` — lists every insertion-point marker
+    the engine ships, with file:line and the catalogue's "purpose"
+    one-liner where present. Falls back to a "this engine may not
+    have been retrofitted" hint when the engine has zero markers.
+  - `--list-ejected` — surveys `engines/` for files carrying the
+    eject header, prints them with their source marker.
+- **`Seams::Generators::EjectAware` mixin** — wired into all six
+  canonical engine generators (auth, accounts, billing, core,
+  notifications, teams). Every `template` call now goes through
+  `template_unless_ejected`, which detects the eject header in the
+  destination's first 200 bytes and short-circuits with a yellow
+  `skip` log line.
+- **First showcase follow-up generator.**
+  `bin/rails generate seams:auth:add_oauth_provider <name>` (e.g.
+  `linkedin`, `apple`, `microsoft`) creates an
+  `Auth::OAuth::<Provider>` adapter under
+  `engines/auth/lib/auth/oauth/<name>.rb`, splices a configuration
+  entry into `engines/auth/lib/auth/configuration.rb` at the
+  `auth.configuration.oauth_providers` marker, and writes a matching
+  spec. Idempotent on rerun.
+- **Documentation.**
+  [`doc/INSERTION_POINTS.md`](doc/INSERTION_POINTS.md) (format spec),
+  [`doc/INSERTION_POINTS_CATALOGUE.md`](doc/INSERTION_POINTS_CATALOGUE.md)
+  (canonical 33-marker list),
+  [`doc/WRITING_FOLLOW_UP_GENERATORS.md`](doc/WRITING_FOLLOW_UP_GENERATORS.md)
+  (author's guide), and
+  [`doc/ARCHITECTURE_WAVE_10.md`](doc/ARCHITECTURE_WAVE_10.md)
+  (architecture addendum with splice + eject sequence diagrams).
+- **Host-facing surfaces updated.**
+  `bin/seams help` and `bin/seams resolve --help` document the new
+  resolve modes; the install generator's post-install message lists
+  the resolve sub-commands and points at the showcase follow-up
+  generator.
+
 ### Wave 9 — Identity / Account / Team rework (BREAKING)
 
 Replaces the conflated `Auth::User` (which owned credentials AND

@@ -1,0 +1,58 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+require "auth/oauth/<%= snake_name %>"
+
+RSpec.describe Auth::OAuth::<%= camel_name %> do
+  let(:client_id)     { "test-client-id" }
+  let(:client_secret) { "test-client-secret" }
+
+  subject(:adapter) do
+    described_class.new(
+      client_id:     client_id,
+      client_secret: client_secret
+    )
+  end
+
+  describe "the abstract contract" do
+    it "is a subclass of Auth::OAuth::Abstract" do
+      expect(described_class.ancestors).to include(Auth::OAuth::Abstract)
+    end
+
+    it "exposes default scopes appropriate for the provider" do
+      expect(described_class::DEFAULT_SCOPES).to be_a(Array)
+      expect(described_class::DEFAULT_SCOPES).not_to be_empty
+    end
+  end
+
+  describe "#authorize_url" do
+    # Until the TODOs in lib/auth/oauth/<%= snake_name %>.rb are filled in,
+    # the URL still points at the example.com placeholder. This test
+    # documents that — and fails the moment a host overrides the
+    # AUTHORIZE_URL with a real endpoint, which is when this spec
+    # should be replaced with provider-specific assertions.
+    it "builds an authorize URL containing the state and redirect_uri" do
+      url = adapter.authorize_url(state: "csrf-token", redirect_uri: "https://host.example/callback")
+
+      expect(url).to include("state=csrf-token")
+      expect(url).to include("redirect_uri=")
+      expect(url).to include("client_id=#{client_id}")
+    end
+  end
+
+  describe "#exchange_code" do
+    # TODO(<%= snake_name %>): replace this with a Faraday stub once the
+    # provider's token endpoint is wired up.
+    it "is implemented (raises only if the abstract methods are kept)" do
+      expect(adapter.method(:exchange_code).owner).to eq(described_class)
+    end
+  end
+
+  describe "#fetch_user_info" do
+    # TODO(<%= snake_name %>): replace this with a Faraday stub once the
+    # provider's userinfo endpoint is wired up.
+    it "is implemented (raises only if the abstract methods are kept)" do
+      expect(adapter.method(:fetch_user_info).owner).to eq(described_class)
+    end
+  end
+end

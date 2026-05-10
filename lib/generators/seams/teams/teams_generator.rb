@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/eject_aware"
 require "seams/generators/dummy_app_writer"
 
 module Seams
@@ -21,6 +22,7 @@ module Seams
     # Run with: bin/rails generate seams:teams
     class TeamsGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
+      include Seams::Generators::EjectAware
 
       source_root File.expand_path("templates", __dir__)
 
@@ -35,39 +37,41 @@ module Seams
       end
 
       def overwrite_engine_entry_point
-        template "lib/engine.rb.tt",         engine_path("lib/teams/engine.rb"),        force: true
-        template "lib/teams.rb.tt",          engine_path("lib/teams.rb"),               force: true
-        template "lib/configuration.rb.tt",  engine_path("lib/teams/configuration.rb")
+        # engine.rb / lib/teams.rb stay framework-managed.
+        template "lib/engine.rb.tt",                 engine_path("lib/teams/engine.rb"),        force: true
+        template "lib/teams.rb.tt",                  engine_path("lib/teams.rb"),               force: true
+        template_unless_ejected "lib/configuration.rb.tt",
+                                engine_path("lib/teams/configuration.rb")
       end
 
       def overwrite_routes
-        template "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
+        template_unless_ejected "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
       end
 
       def create_models
-        template "app/models/application_record.rb.tt",
-                 engine_path("app/models/teams/application_record.rb")
-        template "app/models/team.rb.tt",
-                 engine_path("app/models/teams/team.rb")
-        template "app/models/membership.rb.tt",
-                 engine_path("app/models/teams/membership.rb")
-        template "app/models/current.rb.tt",
-                 engine_path("app/models/teams/current.rb")
+        template_unless_ejected "app/models/application_record.rb.tt",
+                                engine_path("app/models/teams/application_record.rb")
+        template_unless_ejected "app/models/team.rb.tt",
+                                engine_path("app/models/teams/team.rb")
+        template_unless_ejected "app/models/membership.rb.tt",
+                                engine_path("app/models/teams/membership.rb")
+        template_unless_ejected "app/models/current.rb.tt",
+                                engine_path("app/models/teams/current.rb")
         return unless features.include?("invitations")
 
-        template "app/models/invitation.rb.tt",
-                 engine_path("app/models/teams/invitation.rb")
+        template_unless_ejected "app/models/invitation.rb.tt",
+                                engine_path("app/models/teams/invitation.rb")
       end
 
       def create_controllers
-        template "app/controllers/teams_controller.rb.tt",
-                 engine_path("app/controllers/teams/teams_controller.rb")
-        template "app/controllers/memberships_controller.rb.tt",
-                 engine_path("app/controllers/teams/memberships_controller.rb")
+        template_unless_ejected "app/controllers/teams_controller.rb.tt",
+                                engine_path("app/controllers/teams/teams_controller.rb")
+        template_unless_ejected "app/controllers/memberships_controller.rb.tt",
+                                engine_path("app/controllers/teams/memberships_controller.rb")
         return unless features.include?("invitations")
 
-        template "app/controllers/invitations_controller.rb.tt",
-                 engine_path("app/controllers/teams/invitations_controller.rb")
+        template_unless_ejected "app/controllers/invitations_controller.rb.tt",
+                                engine_path("app/controllers/teams/invitations_controller.rb")
       end
 
       # Phase 4A (2/2) — bare-bones views so the engine renders out
@@ -75,43 +79,43 @@ module Seams
       # app/views/teams/teams/* in their own tree.
       def create_views
         %w[index show new edit].each do |action|
-          template "app/views/teams/#{action}.html.erb.tt",
-                   engine_path("app/views/teams/teams/#{action}.html.erb")
+          template_unless_ejected "app/views/teams/#{action}.html.erb.tt",
+                                  engine_path("app/views/teams/teams/#{action}.html.erb")
         end
-        template "app/views/memberships/index.html.erb.tt",
-                 engine_path("app/views/teams/memberships/index.html.erb")
+        template_unless_ejected "app/views/memberships/index.html.erb.tt",
+                                engine_path("app/views/teams/memberships/index.html.erb")
         return unless features.include?("invitations")
 
-        template "app/views/invitations/index.html.erb.tt",
-                 engine_path("app/views/teams/invitations/index.html.erb")
+        template_unless_ejected "app/views/invitations/index.html.erb.tt",
+                                engine_path("app/views/teams/invitations/index.html.erb")
       end
 
       def create_concerns
         # Phase 4A — account scoping helper that pairs with Core's
         # TenantScoped. Mix into models that belong to a single team.
-        template "lib/concerns/account_scoped.rb.tt",
-                 engine_path("lib/teams/concerns/account_scoped.rb")
+        template_unless_ejected "lib/concerns/account_scoped.rb.tt",
+                                engine_path("lib/teams/concerns/account_scoped.rb")
         # `--with=roles` ships role-based controller filters.
         return unless features.include?("roles")
 
-        template "lib/concerns/authorization.rb.tt",
-                 engine_path("lib/teams/concerns/authorization.rb")
+        template_unless_ejected "lib/concerns/authorization.rb.tt",
+                                engine_path("lib/teams/concerns/authorization.rb")
       end
 
       def create_jobs
-        template "app/jobs/application_job.rb.tt",
-                 engine_path("app/jobs/teams/application_job.rb")
+        template_unless_ejected "app/jobs/application_job.rb.tt",
+                                engine_path("app/jobs/teams/application_job.rb")
       end
 
       def create_mailer_and_subscriber
         return unless features.include?("invitations")
 
-        template "app/mailers/invitation_mailer.rb.tt",
-                 engine_path("app/mailers/teams/invitation_mailer.rb")
-        template "app/views/invitation_mailer/invite.text.erb.tt",
-                 engine_path("app/views/teams/invitation_mailer/invite.text.erb")
-        template "app/subscribers/invitation_subscriber.rb.tt",
-                 engine_path("app/subscribers/teams/invitation_subscriber.rb")
+        template_unless_ejected "app/mailers/invitation_mailer.rb.tt",
+                                engine_path("app/mailers/teams/invitation_mailer.rb")
+        template_unless_ejected "app/views/invitation_mailer/invite.text.erb.tt",
+                                engine_path("app/views/teams/invitation_mailer/invite.text.erb")
+        template_unless_ejected "app/subscribers/invitation_subscriber.rb.tt",
+                                engine_path("app/subscribers/teams/invitation_subscriber.rb")
       end
 
       def create_migrations
@@ -126,18 +130,18 @@ module Seams
       end
 
       def create_specs
-        template "spec/models/team_spec.rb.tt",
-                 engine_path("spec/models/teams/team_spec.rb")
-        template "spec/models/membership_spec.rb.tt",
-                 engine_path("spec/models/teams/membership_spec.rb")
+        template_unless_ejected "spec/models/team_spec.rb.tt",
+                                engine_path("spec/models/teams/team_spec.rb")
+        template_unless_ejected "spec/models/membership_spec.rb.tt",
+                                engine_path("spec/models/teams/membership_spec.rb")
         # Phase 4A — factories live alongside the model specs so any
         # spec can `create(:team)` without rolling its own fixture.
-        template "spec/factories/teams.rb.tt",
-                 engine_path("spec/factories/teams.rb")
+        template_unless_ejected "spec/factories/teams.rb.tt",
+                                engine_path("spec/factories/teams.rb")
         return unless features.include?("invitations")
 
-        template "spec/models/invitation_spec.rb.tt",
-                 engine_path("spec/models/teams/invitation_spec.rb")
+        template_unless_ejected "spec/models/invitation_spec.rb.tt",
+                                engine_path("spec/models/teams/invitation_spec.rb")
       end
 
       def overwrite_readme

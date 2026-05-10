@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/eject_aware"
 require "seams/generators/dummy_app_writer"
 
 module Seams
@@ -27,6 +28,7 @@ module Seams
     # rubocop:disable Metrics/ClassLength
     class AuthGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
+      include Seams::Generators::EjectAware
 
       source_root File.expand_path("templates", __dir__)
 
@@ -37,113 +39,118 @@ module Seams
       end
 
       def overwrite_engine_entry_point
-        template "lib/engine.rb.tt",         engine_path("lib/auth/engine.rb"),        force: true
-        template "lib/auth.rb.tt",           engine_path("lib/auth.rb"),               force: true
-        template "lib/configuration.rb.tt",  engine_path("lib/auth/configuration.rb")
+        # engine.rb / lib/auth.rb stay framework-managed (NOT
+        # eject-eligible — see Seams::Generators::EjectAware).
+        # configuration.rb is eject-eligible so a host that has
+        # ejected it keeps its overrides on regenerate.
+        template "lib/engine.rb.tt",                 engine_path("lib/auth/engine.rb"),        force: true
+        template "lib/auth.rb.tt",                   engine_path("lib/auth.rb"),               force: true
+        template_unless_ejected "lib/configuration.rb.tt",
+                                engine_path("lib/auth/configuration.rb")
       end
 
       def overwrite_routes
-        template "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
+        template_unless_ejected "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
       end
 
       def create_models
-        template "app/models/application_record.rb.tt",
-                 engine_path("app/models/auth/application_record.rb")
-        template "app/models/identity.rb.tt",
-                 engine_path("app/models/auth/identity.rb")
-        template "app/models/session.rb.tt",
-                 engine_path("app/models/auth/session.rb")
-        template "app/models/current.rb.tt",
-                 engine_path("app/models/auth/current.rb")
+        template_unless_ejected "app/models/application_record.rb.tt",
+                                engine_path("app/models/auth/application_record.rb")
+        template_unless_ejected "app/models/identity.rb.tt",
+                                engine_path("app/models/auth/identity.rb")
+        template_unless_ejected "app/models/session.rb.tt",
+                                engine_path("app/models/auth/session.rb")
+        template_unless_ejected "app/models/current.rb.tt",
+                                engine_path("app/models/auth/current.rb")
         # OAuth identity link table — issue #2 section 2A. Lives under
         # the Auth::OAuth namespace alongside the lib/ adapter classes
         # (Abstract, Google, Github) so the Zeitwerk inflector only
         # needs the single "oauth" => "OAuth" mapping at engine boot.
-        template "app/models/oauth/provider.rb.tt",
-                 engine_path("app/models/auth/oauth/provider.rb")
+        template_unless_ejected "app/models/oauth/provider.rb.tt",
+                                engine_path("app/models/auth/oauth/provider.rb")
         # Bearer-token API access — issue #2 section 2A.
-        template "app/models/api_token.rb.tt",
-                 engine_path("app/models/auth/api_token.rb")
+        template_unless_ejected "app/models/api_token.rb.tt",
+                                engine_path("app/models/auth/api_token.rb")
       end
 
       def create_controllers
-        template "app/controllers/sessions_controller.rb.tt",
-                 engine_path("app/controllers/auth/sessions_controller.rb")
-        template "app/controllers/registrations_controller.rb.tt",
-                 engine_path("app/controllers/auth/registrations_controller.rb")
-        template "app/controllers/password_resets_controller.rb.tt",
-                 engine_path("app/controllers/auth/password_resets_controller.rb")
-        template "app/controllers/oauth/callbacks_controller.rb.tt",
-                 engine_path("app/controllers/auth/oauth/callbacks_controller.rb")
+        template_unless_ejected "app/controllers/sessions_controller.rb.tt",
+                                engine_path("app/controllers/auth/sessions_controller.rb")
+        template_unless_ejected "app/controllers/registrations_controller.rb.tt",
+                                engine_path("app/controllers/auth/registrations_controller.rb")
+        template_unless_ejected "app/controllers/password_resets_controller.rb.tt",
+                                engine_path("app/controllers/auth/password_resets_controller.rb")
+        template_unless_ejected "app/controllers/oauth/callbacks_controller.rb.tt",
+                                engine_path("app/controllers/auth/oauth/callbacks_controller.rb")
       end
 
       def create_services
-        template "app/services/register_identity.rb.tt",
-                 engine_path("app/services/auth/register_identity.rb")
-        template "app/services/authenticate_identity.rb.tt",
-                 engine_path("app/services/auth/authenticate_identity.rb")
-        template "app/services/reset_password.rb.tt",
-                 engine_path("app/services/auth/reset_password.rb")
-        template "app/services/oauth/authenticator.rb.tt",
-                 engine_path("app/services/auth/oauth/authenticator.rb")
-        template "app/services/generate_api_token.rb.tt",
-                 engine_path("app/services/auth/generate_api_token.rb")
+        template_unless_ejected "app/services/register_identity.rb.tt",
+                                engine_path("app/services/auth/register_identity.rb")
+        template_unless_ejected "app/services/authenticate_identity.rb.tt",
+                                engine_path("app/services/auth/authenticate_identity.rb")
+        template_unless_ejected "app/services/reset_password.rb.tt",
+                                engine_path("app/services/auth/reset_password.rb")
+        template_unless_ejected "app/services/oauth/authenticator.rb.tt",
+                                engine_path("app/services/auth/oauth/authenticator.rb")
+        template_unless_ejected "app/services/generate_api_token.rb.tt",
+                                engine_path("app/services/auth/generate_api_token.rb")
         # Phase Wave 5 (review fix): the revoke path was documented in
         # the README + registered in engine.rb but had no implementer.
-        template "app/services/revoke_api_token.rb.tt",
-                 engine_path("app/services/auth/revoke_api_token.rb")
+        template_unless_ejected "app/services/revoke_api_token.rb.tt",
+                                engine_path("app/services/auth/revoke_api_token.rb")
       end
 
       def create_jobs
-        template "app/jobs/application_job.rb.tt",
-                 engine_path("app/jobs/auth/application_job.rb")
-        template "app/jobs/cleanup_expired_sessions_job.rb.tt",
-                 engine_path("app/jobs/auth/cleanup_expired_sessions_job.rb")
+        template_unless_ejected "app/jobs/application_job.rb.tt",
+                                engine_path("app/jobs/auth/application_job.rb")
+        template_unless_ejected "app/jobs/cleanup_expired_sessions_job.rb.tt",
+                                engine_path("app/jobs/auth/cleanup_expired_sessions_job.rb")
       end
 
       def create_rake_tasks
         # Wave 11: PII rotation task for hosts upgrading from Wave ≤10.
-        template "lib/tasks/auth_pii.rake.tt",
-                 engine_path("lib/tasks/auth_pii.rake")
+        template_unless_ejected "lib/tasks/auth_pii.rake.tt",
+                                engine_path("lib/tasks/auth_pii.rake")
       end
 
       def create_oauth_adapters
-        template "lib/oauth/abstract.rb.tt",
-                 engine_path("lib/auth/oauth/abstract.rb")
-        template "lib/oauth/google.rb.tt",
-                 engine_path("lib/auth/oauth/google.rb")
-        template "lib/oauth/github.rb.tt",
-                 engine_path("lib/auth/oauth/github.rb")
+        template_unless_ejected "lib/oauth/abstract.rb.tt",
+                                engine_path("lib/auth/oauth/abstract.rb")
+        template_unless_ejected "lib/oauth/google.rb.tt",
+                                engine_path("lib/auth/oauth/google.rb")
+        template_unless_ejected "lib/oauth/github.rb.tt",
+                                engine_path("lib/auth/oauth/github.rb")
       end
 
       def create_mailer
-        template "app/mailers/passwords_mailer.rb.tt",
-                 engine_path("app/mailers/auth/passwords_mailer.rb")
-        template "app/views/passwords_mailer/reset_email.html.erb.tt",
-                 engine_path("app/views/auth/passwords_mailer/reset_email.html.erb")
+        template_unless_ejected "app/mailers/passwords_mailer.rb.tt",
+                                engine_path("app/mailers/auth/passwords_mailer.rb")
+        template_unless_ejected "app/views/passwords_mailer/reset_email.html.erb.tt",
+                                engine_path("app/views/auth/passwords_mailer/reset_email.html.erb")
       end
 
       def create_views
-        template "app/views/sessions/new.html.erb.tt",
-                 engine_path("app/views/auth/sessions/new.html.erb")
-        template "app/views/sessions/_oauth_buttons.html.erb.tt",
-                 engine_path("app/views/auth/sessions/_oauth_buttons.html.erb")
-        template "app/views/registrations/new.html.erb.tt",
-                 engine_path("app/views/auth/registrations/new.html.erb")
-        template "app/views/password_resets/new.html.erb.tt",
-                 engine_path("app/views/auth/password_resets/new.html.erb")
-        template "app/views/password_resets/edit.html.erb.tt",
-                 engine_path("app/views/auth/password_resets/edit.html.erb")
+        template_unless_ejected "app/views/sessions/new.html.erb.tt",
+                                engine_path("app/views/auth/sessions/new.html.erb")
+        template_unless_ejected "app/views/sessions/_oauth_buttons.html.erb.tt",
+                                engine_path("app/views/auth/sessions/_oauth_buttons.html.erb")
+        template_unless_ejected "app/views/registrations/new.html.erb.tt",
+                                engine_path("app/views/auth/registrations/new.html.erb")
+        template_unless_ejected "app/views/password_resets/new.html.erb.tt",
+                                engine_path("app/views/auth/password_resets/new.html.erb")
+        template_unless_ejected "app/views/password_resets/edit.html.erb.tt",
+                                engine_path("app/views/auth/password_resets/edit.html.erb")
       end
 
       def create_concerns
-        template "lib/concerns/authenticatable.rb.tt",
-                 engine_path("lib/auth/concerns/authenticatable.rb")
-        template "lib/concerns/authentication.rb.tt",
-                 engine_path("lib/auth/concerns/authentication.rb")
+        template_unless_ejected "lib/concerns/authenticatable.rb.tt",
+                                engine_path("lib/auth/concerns/authenticatable.rb")
+        template_unless_ejected "lib/concerns/authentication.rb.tt",
+                                engine_path("lib/auth/concerns/authentication.rb")
         # Bearer-token controller auth for API endpoints.
-        template "lib/concerns/api_authenticatable.rb.tt",
-                 engine_path("lib/auth/concerns/api_authenticatable.rb")
+        template_unless_ejected "lib/concerns/api_authenticatable.rb.tt",
+                                engine_path("lib/auth/concerns/api_authenticatable.rb")
       end
 
       def create_migrations
@@ -158,19 +165,19 @@ module Seams
       end
 
       def create_specs
-        template "spec/models/identity_spec.rb.tt",
-                 engine_path("spec/models/auth/identity_spec.rb")
-        template "spec/models/session_spec.rb.tt",
-                 engine_path("spec/models/auth/session_spec.rb")
+        template_unless_ejected "spec/models/identity_spec.rb.tt",
+                                engine_path("spec/models/auth/identity_spec.rb")
+        template_unless_ejected "spec/models/session_spec.rb.tt",
+                                engine_path("spec/models/auth/session_spec.rb")
         # Phase 2A finish — coverage for the new Wave-9/10 models.
-        template "spec/models/api_token_spec.rb.tt",
-                 engine_path("spec/models/auth/api_token_spec.rb")
-        template "spec/models/oauth/provider_spec.rb.tt",
-                 engine_path("spec/models/auth/oauth/provider_spec.rb")
-        template "spec/mailers/passwords_mailer_spec.rb.tt",
-                 engine_path("spec/mailers/auth/passwords_mailer_spec.rb")
-        template "spec/factories/auth.rb.tt",
-                 engine_path("spec/factories/auth.rb")
+        template_unless_ejected "spec/models/api_token_spec.rb.tt",
+                                engine_path("spec/models/auth/api_token_spec.rb")
+        template_unless_ejected "spec/models/oauth/provider_spec.rb.tt",
+                                engine_path("spec/models/auth/oauth/provider_spec.rb")
+        template_unless_ejected "spec/mailers/passwords_mailer_spec.rb.tt",
+                                engine_path("spec/mailers/auth/passwords_mailer_spec.rb")
+        template_unless_ejected "spec/factories/auth.rb.tt",
+                                engine_path("spec/factories/auth.rb")
       end
 
       def overwrite_readme

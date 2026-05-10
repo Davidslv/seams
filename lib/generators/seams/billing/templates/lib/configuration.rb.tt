@@ -20,6 +20,8 @@ module Billing
   class Configuration
     attr_accessor :gateway, :api_key, :webhook_secret, :default_currency,
                   :process_webhooks_async, :billable_class
+    # Follow-up generators that add knobs (proration mode, dunning retries, tax adapters) declare their attr_accessor here.
+    # seams:insertion-point billing.configuration.attributes
 
     def initialize
       @gateway                = "<%= gateway_class_name %>"
@@ -32,6 +34,8 @@ module Billing
       @process_webhooks_async = false
       # The Account-as-billable contract — see class comment.
       @billable_class         = "Accounts::Account"
+      # Follow-up generators that add defaults for new attributes (matching billing.configuration.attributes) splice them here.
+      # seams:insertion-point billing.configuration.defaults
     end
 
     # Short identifier used as the `gateway:` field in canonical event

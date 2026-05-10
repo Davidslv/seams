@@ -736,4 +736,27 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
   end
+
+  # Wave 10 Phase 2A: every catalogued insertion-point marker the
+  # notifications engine ships must appear in its target file. These
+  # assertions gate against accidental marker removal in future
+  # template edits. See doc/INSERTION_POINTS_CATALOGUE.md for the
+  # canonical list.
+  describe "insertion-point markers (Wave 10)" do
+    {
+      "notifications.engine.events" => "engines/notifications/lib/notifications/engine.rb",
+      "notifications.engine.subscribers" => "engines/notifications/lib/notifications/engine.rb",
+      "notifications.configuration.attributes" => "engines/notifications/lib/notifications/configuration.rb",
+      "notifications.configuration.defaults" => "engines/notifications/lib/notifications/configuration.rb",
+      "notifications.notifiable.strategies" => "engines/notifications/lib/notifications/concerns/notifiable.rb",
+      "notifications.type_registry.defaults" => "engines/notifications/lib/notifications.rb",
+      "notifications.routes.after_preferences" => "engines/notifications/config/routes.rb"
+    }.each do |marker, path|
+      it "ships #{marker} in #{path}" do
+        assert_file path do |content|
+          expect(content).to include("# seams:insertion-point #{marker}")
+        end
+      end
+    end
+  end
 end

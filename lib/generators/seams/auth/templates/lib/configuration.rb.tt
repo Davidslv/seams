@@ -12,6 +12,8 @@ module Auth
   class Configuration
     attr_accessor :session_ttl, :cookie_name, :after_sign_in_url, :after_sign_out_url,
                   :password_min_length, :oauth_providers
+    # Follow-up generators that add new top-level configuration knobs (passkey_rp_id, magic_link_ttl) declare their attr_accessor here.
+    # seams:insertion-point auth.configuration.attributes
 
     def initialize
       @session_ttl         = 30 * 24 * 60 * 60   # 30 days, in seconds
@@ -32,7 +34,12 @@ module Auth
       #                 client_secret: ENV.fetch("GITHUB_OAUTH_CLIENT_SECRET") }
       #     }
       #   end
-      @oauth_providers     = {}
+      @oauth_providers     = {
+        # Follow-up generators that ship pre-wired OAuth providers splice a `linkedin: { adapter: "Auth::OAuth::LinkedIn", ... }` entry here.
+        # seams:insertion-point auth.configuration.oauth_providers
+      }
+      # Follow-up generators that add defaults for new attributes (matching auth.configuration.attributes) splice them here.
+      # seams:insertion-point auth.configuration.defaults
     end
   end
 end

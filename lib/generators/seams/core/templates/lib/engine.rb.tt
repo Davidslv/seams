@@ -10,6 +10,8 @@ module Core
 
     initializer "core.register_events" do
       Seams::EventRegistry.register("record.audited.core", emitted_by: "Core")
+      # Follow-up generators that emit new core events (e.g. record.soft_deleted.core) register them here.
+      # seams:insertion-point core.engine.events
     end
 
     initializer "core.append_migrations" do |app|
@@ -19,5 +21,8 @@ module Core
         end
       end
     end
+
+    # Follow-up generators that need their own initializer block (audit subscribers, validators) declare them here.
+    # seams:insertion-point core.engine.initializers
   end
 end

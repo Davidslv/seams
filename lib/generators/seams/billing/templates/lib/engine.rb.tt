@@ -29,6 +29,8 @@ module Billing
       Seams::EventRegistry.register("lifetime.granted.billing",             emitted_by: "Billing")
       Seams::EventRegistry.register("lifetime.purchased.billing",           emitted_by: "Billing")
       Seams::EventRegistry.register("lifetime.revoked.billing",             emitted_by: "Billing")
+      # Follow-up generators that ship new billing events (subscription.discount_applied.billing, dispute.created.billing) register them here.
+      # seams:insertion-point billing.engine.events
     end
 
     initializer "billing.append_migrations" do |app|
@@ -38,6 +40,9 @@ module Billing
         end
       end
     end
+
+    # Follow-up generators that need their own initializer block (custom Billable include, gateway feature-flag wiring) declare it here.
+    # seams:insertion-point billing.engine.initializers
 
     # Auto-include Billing::Billable into the configured tenant class
     # (default: Accounts::Account). Wired via a to_prepare hook so the

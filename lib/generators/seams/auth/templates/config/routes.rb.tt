@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 Auth::Engine.routes.draw do
+  # Follow-up generators that ship sign-in alternatives (passkeys, magic links, SSO) splice their routes here, ahead of the password session resource so they take precedence.
+  # seams:insertion-point auth.routes.before_session
   resource :session,        only: %i[new create destroy], controller: :sessions
   resource :registration,   only: %i[new create],         controller: :registrations
   resource :password_reset, only: %i[new create edit update]
@@ -13,4 +15,7 @@ Auth::Engine.routes.draw do
     get "start",    to: "oauth/callbacks#start",    as: :oauth_start
     get "callback", to: "oauth/callbacks#callback", as: :oauth_callback
   end
+
+  # Follow-up generators that add NEW route surfaces (API token UI, social-link admin) splice their resources here.
+  # seams:insertion-point auth.routes.after_oauth
 end

@@ -460,4 +460,24 @@ RSpec.describe Seams::Generators::TeamsGenerator do
                                    "engines/teams/app/views/teams/teams/index.html.erb"))).to be(true)
     end
   end
+
+  # Wave 10 Phase 2A: every catalogued insertion-point marker the teams
+  # engine ships must appear in its target file. These assertions gate
+  # against accidental marker removal in future template edits.
+  # See doc/INSERTION_POINTS_CATALOGUE.md for the canonical list.
+  describe "insertion-point markers (Wave 10)" do
+    {
+      "teams.engine.events" => "engines/teams/lib/teams/engine.rb",
+      "teams.engine.subscribers" => "engines/teams/lib/teams/engine.rb",
+      "teams.routes.before_teams" => "engines/teams/config/routes.rb",
+      "teams.routes.after_invitations" => "engines/teams/config/routes.rb",
+      "teams.configuration.attributes" => "engines/teams/lib/teams/configuration.rb"
+    }.each do |marker, path|
+      it "ships #{marker} in #{path}" do
+        assert_file path do |content|
+          expect(content).to include("# seams:insertion-point #{marker}")
+        end
+      end
+    end
+  end
 end

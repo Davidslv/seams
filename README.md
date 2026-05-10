@@ -42,15 +42,22 @@ hidden behind the gem.
 - `bin/seams teams`          — canonical Teams engine (Team, Membership, Invitation, AccountScoped, --with flag)
 - `bin/seams remove <name>`  — clean removal + sibling cleanup + drop-table migration
 - `bin/seams list`           — engines, the events they emit, and what they subscribe to
+- `bin/seams resolve`        — eject host files / list insertion-point markers / list ejected files
+- `bin/rails generate seams:auth:add_oauth_provider <name>` — first follow-up generator (adds an OAuth provider adapter to an installed Auth engine)
 - Four custom RuboCop cops that enforce cross-engine boundaries
 - A GitHub Actions CI workflow that runs every engine's specs in parallel
 
 ## Documentation
 
 - [doc/GETTING_STARTED.md](doc/GETTING_STARTED.md)
-- [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)
+- [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md) — short overview
+- [doc/ARCHITECTURE_WAVE_9.md](doc/ARCHITECTURE_WAVE_9.md) — full system walk-through (post-Wave-9)
+- [doc/ARCHITECTURE_WAVE_10.md](doc/ARCHITECTURE_WAVE_10.md) — Wave 10 addendum: insertion points, follow-up generators, eject CLI
 - [doc/ENGINE_CATALOGUE.md](doc/ENGINE_CATALOGUE.md)
 - [doc/CURRENT_ATTRIBUTES.md](doc/CURRENT_ATTRIBUTES.md) — per-request namespaces (Auth::Current, Accounts::Current, Teams::Current, Core::Current)
+- [doc/INSERTION_POINTS.md](doc/INSERTION_POINTS.md) — marker format spec
+- [doc/INSERTION_POINTS_CATALOGUE.md](doc/INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers
+- [doc/WRITING_FOLLOW_UP_GENERATORS.md](doc/WRITING_FOLLOW_UP_GENERATORS.md) — write your own follow-up generator
 - [doc/ADDING_AN_ENGINE.md](doc/ADDING_AN_ENGINE.md)
 - [doc/REMOVING_AN_ENGINE.md](doc/REMOVING_AN_ENGINE.md)
 - [doc/WRITING_AN_ADAPTER.md](doc/WRITING_AN_ADAPTER.md)

@@ -12,6 +12,8 @@ module Notifications
       Seams::EventRegistry.register("notification.queued.notifications",     emitted_by: "Notifications")
       Seams::EventRegistry.register("notification.delivered.notifications",  emitted_by: "Notifications")
       Seams::EventRegistry.register("notification.failed.notifications",     emitted_by: "Notifications")
+      # Follow-up generators that ship new delivery semantics (notification.bounced.notifications, etc.) register them here.
+      # seams:insertion-point notifications.engine.events
     end
 
     initializer "notifications.append_migrations" do |app|
@@ -25,6 +27,8 @@ module Notifications
     config.after_initialize do
       require "notifications/concerns/notifiable"
       Notifications::AuthSubscriber.attach!
+      # Follow-up generators that ship subscribers for new cross-engine events (Notifications::TeamsSubscriber, etc.) splice their attach! calls here.
+      # seams:insertion-point notifications.engine.subscribers
       Notifications::BillingSubscriber.attach! if defined?(Billing::Engine)
     end
   end

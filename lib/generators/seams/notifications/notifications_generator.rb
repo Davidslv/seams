@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/eject_aware"
 require "seams/generators/dummy_app_writer"
 
 module Seams
@@ -23,6 +24,7 @@ module Seams
     # rubocop:disable Metrics/ClassLength
     class NotificationsGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
+      include Seams::Generators::EjectAware
 
       source_root File.expand_path("templates", __dir__)
 
@@ -46,38 +48,55 @@ module Seams
       end
 
       def overwrite_engine_entry_point
+        # engine.rb stays framework-managed.
         template "lib/engine.rb.tt", engine_path("lib/notifications/engine.rb"), force: true
       end
 
+      def overwrite_routes
+        # Routes ship with an explicit Engine.routes.draw block — the
+        # generic engine scaffold leaves it empty, but notifications
+        # needs the canonical /notifications + /preferences surface +
+        # the Wave 10 `notifications.routes.after_preferences`
+        # insertion-point marker so follow-up generators can splice
+        # admin-side digest / opt-out routes.
+        template_unless_ejected "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
+      end
+
       def create_configuration
-        template "lib/configuration.rb.tt",  engine_path("lib/notifications/configuration.rb")
-        template "lib/type_registry.rb.tt",  engine_path("lib/notifications/type_registry.rb")
-        template "lib/notifications.rb.tt",  engine_path("lib/notifications.rb"), force: true
+        template_unless_ejected "lib/configuration.rb.tt",
+                                engine_path("lib/notifications/configuration.rb")
+        template_unless_ejected "lib/type_registry.rb.tt",
+                                engine_path("lib/notifications/type_registry.rb")
+        # lib/notifications.rb stays framework-managed (root require file).
+        template "lib/notifications.rb.tt", engine_path("lib/notifications.rb"), force: true
       end
 
       def create_adapters
-        template "lib/adapters/abstract.rb.tt",      engine_path("lib/notifications/adapters/abstract.rb")
-        template "lib/adapters/action_mailer.rb.tt", engine_path("lib/notifications/adapters/action_mailer.rb")
+        template_unless_ejected "lib/adapters/abstract.rb.tt",
+                                engine_path("lib/notifications/adapters/abstract.rb")
+        template_unless_ejected "lib/adapters/action_mailer.rb.tt",
+                                engine_path("lib/notifications/adapters/action_mailer.rb")
         # SMS adapter only ships when the sms channel is enabled.
         return unless channels.include?("sms")
 
-        template "lib/adapters/null_sms.rb.tt", engine_path("lib/notifications/adapters/null_sms.rb")
+        template_unless_ejected "lib/adapters/null_sms.rb.tt",
+                                engine_path("lib/notifications/adapters/null_sms.rb")
       end
 
       def create_concern
-        template "lib/concerns/notifiable.rb.tt",
-                 engine_path("lib/notifications/concerns/notifiable.rb")
+        template_unless_ejected "lib/concerns/notifiable.rb.tt",
+                                engine_path("lib/notifications/concerns/notifiable.rb")
       end
 
       def create_models
-        template "app/models/application_record.rb.tt",
-                 engine_path("app/models/notifications/application_record.rb")
-        template "app/models/notification.rb.tt",
-                 engine_path("app/models/notifications/notification.rb")
-        template "app/models/notification_preference.rb.tt",
-                 engine_path("app/models/notifications/notification_preference.rb")
-        template "app/models/delivery.rb.tt",
-                 engine_path("app/models/notifications/delivery.rb")
+        template_unless_ejected "app/models/application_record.rb.tt",
+                                engine_path("app/models/notifications/application_record.rb")
+        template_unless_ejected "app/models/notification.rb.tt",
+                                engine_path("app/models/notifications/notification.rb")
+        template_unless_ejected "app/models/notification_preference.rb.tt",
+                                engine_path("app/models/notifications/notification_preference.rb")
+        template_unless_ejected "app/models/delivery.rb.tt",
+                                engine_path("app/models/notifications/delivery.rb")
         create_strategy_models
       end
 
@@ -86,55 +105,55 @@ module Seams
         # STRATEGY_CLASSES in the Notifiable concern is conditionally
         # rendered (in_app/email/sms) to match.
         channels.each do |channel|
-          template "app/models/strategies/#{channel}.rb.tt",
-                   engine_path("app/models/notifications/strategies/#{channel}.rb")
+          template_unless_ejected "app/models/strategies/#{channel}.rb.tt",
+                                  engine_path("app/models/notifications/strategies/#{channel}.rb")
         end
       end
 
       def create_jobs
-        template "app/jobs/application_job.rb.tt",
-                 engine_path("app/jobs/notifications/application_job.rb")
-        template "app/jobs/send_due_notifications_job.rb.tt",
-                 engine_path("app/jobs/notifications/send_due_notifications_job.rb")
-        template "app/jobs/send_notification_job.rb.tt",
-                 engine_path("app/jobs/notifications/send_notification_job.rb")
-        template "app/jobs/create_notification_job.rb.tt",
-                 engine_path("app/jobs/notifications/create_notification_job.rb")
+        template_unless_ejected "app/jobs/application_job.rb.tt",
+                                engine_path("app/jobs/notifications/application_job.rb")
+        template_unless_ejected "app/jobs/send_due_notifications_job.rb.tt",
+                                engine_path("app/jobs/notifications/send_due_notifications_job.rb")
+        template_unless_ejected "app/jobs/send_notification_job.rb.tt",
+                                engine_path("app/jobs/notifications/send_notification_job.rb")
+        template_unless_ejected "app/jobs/create_notification_job.rb.tt",
+                                engine_path("app/jobs/notifications/create_notification_job.rb")
       end
 
       def create_subscriber
-        template "app/subscribers/auth_subscriber.rb.tt",
-                 engine_path("app/subscribers/notifications/auth_subscriber.rb")
-        template "app/subscribers/billing_subscriber.rb.tt",
-                 engine_path("app/subscribers/notifications/billing_subscriber.rb")
+        template_unless_ejected "app/subscribers/auth_subscriber.rb.tt",
+                                engine_path("app/subscribers/notifications/auth_subscriber.rb")
+        template_unless_ejected "app/subscribers/billing_subscriber.rb.tt",
+                                engine_path("app/subscribers/notifications/billing_subscriber.rb")
       end
 
       def create_controllers
-        template "app/controllers/notifications_controller.rb.tt",
-                 engine_path("app/controllers/notifications/notifications_controller.rb")
-        template "app/controllers/preferences_controller.rb.tt",
-                 engine_path("app/controllers/notifications/preferences_controller.rb")
+        template_unless_ejected "app/controllers/notifications_controller.rb.tt",
+                                engine_path("app/controllers/notifications/notifications_controller.rb")
+        template_unless_ejected "app/controllers/preferences_controller.rb.tt",
+                                engine_path("app/controllers/notifications/preferences_controller.rb")
       end
 
       def create_views
-        template "app/views/notifications/_bell.html.erb.tt",
-                 engine_path("app/views/notifications/notifications/_bell.html.erb")
-        template "app/views/notifications/index.html.erb.tt",
-                 engine_path("app/views/notifications/notifications/index.html.erb")
+        template_unless_ejected "app/views/notifications/_bell.html.erb.tt",
+                                engine_path("app/views/notifications/notifications/_bell.html.erb")
+        template_unless_ejected "app/views/notifications/index.html.erb.tt",
+                                engine_path("app/views/notifications/notifications/index.html.erb")
       end
 
       def create_channel_and_stimulus
-        template "app/channels/notification_channel.rb.tt",
-                 engine_path("app/channels/notifications/notification_channel.rb")
-        template "app/javascript/controllers/notification_bell_controller.js.tt",
-                 engine_path("app/javascript/notifications/controllers/notification_bell_controller.js")
+        template_unless_ejected "app/channels/notification_channel.rb.tt",
+                                engine_path("app/channels/notifications/notification_channel.rb")
+        template_unless_ejected "app/javascript/controllers/notification_bell_controller.js.tt",
+                                engine_path("app/javascript/notifications/controllers/notification_bell_controller.js")
       end
 
       def create_mailer
-        template "app/mailers/application_mailer.rb.tt",
-                 engine_path("app/mailers/notifications/application_mailer.rb")
-        template "app/mailers/notification_mailer.rb.tt",
-                 engine_path("app/mailers/notifications/notification_mailer.rb")
+        template_unless_ejected "app/mailers/application_mailer.rb.tt",
+                                engine_path("app/mailers/notifications/application_mailer.rb")
+        template_unless_ejected "app/mailers/notification_mailer.rb.tt",
+                                engine_path("app/mailers/notifications/notification_mailer.rb")
       end
 
       def create_default_templates
@@ -143,22 +162,22 @@ module Seams
         # in-app rendering. Hosts override either or both by dropping
         # files at app/views/notifications/templates/<name>.<format>.erb.
         %i[text html].each do |format|
-          template "app/views/templates/default.#{format}.erb.tt",
-                   engine_path("app/views/notifications/templates/default.#{format}.erb")
-          template "app/views/templates/welcome.#{format}.erb.tt",
-                   engine_path("app/views/notifications/templates/welcome.#{format}.erb")
+          template_unless_ejected "app/views/templates/default.#{format}.erb.tt",
+                                  engine_path("app/views/notifications/templates/default.#{format}.erb")
+          template_unless_ejected "app/views/templates/welcome.#{format}.erb.tt",
+                                  engine_path("app/views/notifications/templates/welcome.#{format}.erb")
           BILLING_TEMPLATES.each do |name|
-            template "app/views/templates/billing/#{name}.#{format}.erb.tt",
-                     engine_path("app/views/notifications/templates/billing/#{name}.#{format}.erb")
+            template_unless_ejected "app/views/templates/billing/#{name}.#{format}.erb.tt",
+                                    engine_path("app/views/notifications/templates/billing/#{name}.#{format}.erb")
           end
         end
 
         # Mailer layout — wraps every notification email so hosts get
         # consistent header/footer chrome without per-template repetition.
-        template "app/views/layouts/notifications/mailer.html.erb.tt",
-                 engine_path("app/views/layouts/notifications/mailer.html.erb")
-        template "app/views/layouts/notifications/mailer.text.erb.tt",
-                 engine_path("app/views/layouts/notifications/mailer.text.erb")
+        template_unless_ejected "app/views/layouts/notifications/mailer.html.erb.tt",
+                                engine_path("app/views/layouts/notifications/mailer.html.erb")
+        template_unless_ejected "app/views/layouts/notifications/mailer.text.erb.tt",
+                                engine_path("app/views/layouts/notifications/mailer.text.erb")
       end
 
       def create_migrations
@@ -172,14 +191,14 @@ module Seams
 
       def create_specs
         # Phase 2B finish — coverage for the engine's three core models.
-        template "spec/factories/notifications.rb.tt",
-                 engine_path("spec/factories/notifications.rb")
-        template "spec/models/notification_spec.rb.tt",
-                 engine_path("spec/models/notifications/notification_spec.rb")
-        template "spec/models/delivery_spec.rb.tt",
-                 engine_path("spec/models/notifications/delivery_spec.rb")
-        template "spec/models/notification_preference_spec.rb.tt",
-                 engine_path("spec/models/notifications/notification_preference_spec.rb")
+        template_unless_ejected "spec/factories/notifications.rb.tt",
+                                engine_path("spec/factories/notifications.rb")
+        template_unless_ejected "spec/models/notification_spec.rb.tt",
+                                engine_path("spec/models/notifications/notification_spec.rb")
+        template_unless_ejected "spec/models/delivery_spec.rb.tt",
+                                engine_path("spec/models/notifications/delivery_spec.rb")
+        template_unless_ejected "spec/models/notification_preference_spec.rb.tt",
+                                engine_path("spec/models/notifications/notification_preference_spec.rb")
       end
 
       def create_dummy_app

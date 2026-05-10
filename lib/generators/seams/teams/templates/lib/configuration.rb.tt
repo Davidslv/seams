@@ -6,6 +6,8 @@ module Teams
   class Configuration
     attr_accessor :invitation_ttl, :max_members_per_team
     attr_writer   :host_url, :invitation_mailer_from
+    # Follow-up generators that add knobs (slug_generator, archive_grace_period) declare their attr_accessor here.
+    # seams:insertion-point teams.configuration.attributes
 
     def initialize
       @invitation_ttl         = 7 * 24 * 60 * 60  # 7 days, in seconds

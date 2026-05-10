@@ -11,12 +11,16 @@ module Accounts
   class Configuration
     attr_accessor :incineration_grace_period,
                   :after_account_create_url
+    # Follow-up generators that add knobs (account_owner_role, default_account_locale) declare their attr_accessor here.
+    # seams:insertion-point accounts.configuration.attributes
 
     def initialize
       # How long a cancelled account lingers before incineration (hard
       # delete). Hosts use this to power dunning + grace-period UX.
       @incineration_grace_period = 30 * 24 * 60 * 60   # 30 days
       @after_account_create_url  = "/"
+      # Follow-up generators that add defaults for new attributes (matching accounts.configuration.attributes) splice them here.
+      # seams:insertion-point accounts.configuration.defaults
     end
   end
 end

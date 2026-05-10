@@ -14,6 +14,8 @@ module Teams
       Seams::EventRegistry.register("team.member_left.teams",      emitted_by: "Teams")
       Seams::EventRegistry.register("invitation.sent.teams",       emitted_by: "Teams")
       Seams::EventRegistry.register("invitation.accepted.teams",   emitted_by: "Teams")
+      # Follow-up generators that emit new teams events (team.archived.teams, invitation.revoked.teams) register them here.
+      # seams:insertion-point teams.engine.events
     end
 
     initializer "teams.append_migrations" do |app|
@@ -42,6 +44,8 @@ module Teams
       end
 
       Teams::InvitationSubscriber.attach!
+      # Follow-up generators that ship subscribers (Teams::AccountSubscriber.attach!, etc.) splice their attach! calls here.
+      # seams:insertion-point teams.engine.subscribers
     end
   end
 end

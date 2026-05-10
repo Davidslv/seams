@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/eject_aware"
 require "seams/generators/dummy_app_writer"
 
 module Seams
@@ -36,6 +37,7 @@ module Seams
     # Run with: bin/rails generate seams:accounts
     class AccountsGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
+      include Seams::Generators::EjectAware
 
       source_root File.expand_path("templates", __dir__)
 
@@ -46,31 +48,33 @@ module Seams
       end
 
       def overwrite_engine_entry_point
-        template "lib/engine.rb.tt",         engine_path("lib/accounts/engine.rb"),        force: true
-        template "lib/accounts.rb.tt",       engine_path("lib/accounts.rb"),               force: true
-        template "lib/configuration.rb.tt",  engine_path("lib/accounts/configuration.rb")
+        # engine.rb / lib/accounts.rb stay framework-managed.
+        template "lib/engine.rb.tt",                 engine_path("lib/accounts/engine.rb"),        force: true
+        template "lib/accounts.rb.tt",               engine_path("lib/accounts.rb"),               force: true
+        template_unless_ejected "lib/configuration.rb.tt",
+                                engine_path("lib/accounts/configuration.rb")
       end
 
       def overwrite_routes
-        template "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
+        template_unless_ejected "config/routes.rb.tt", engine_path("config/routes.rb"), force: true
       end
 
       def create_models
-        template "app/models/application_record.rb.tt",
-                 engine_path("app/models/accounts/application_record.rb")
-        template "app/models/account.rb.tt",
-                 engine_path("app/models/accounts/account.rb")
-        template "app/models/membership.rb.tt",
-                 engine_path("app/models/accounts/membership.rb")
-        template "app/models/current.rb.tt",
-                 engine_path("app/models/accounts/current.rb")
+        template_unless_ejected "app/models/application_record.rb.tt",
+                                engine_path("app/models/accounts/application_record.rb")
+        template_unless_ejected "app/models/account.rb.tt",
+                                engine_path("app/models/accounts/account.rb")
+        template_unless_ejected "app/models/membership.rb.tt",
+                                engine_path("app/models/accounts/membership.rb")
+        template_unless_ejected "app/models/current.rb.tt",
+                                engine_path("app/models/accounts/current.rb")
       end
 
       def create_concerns
-        template "lib/concerns/account_scoped.rb.tt",
-                 engine_path("lib/accounts/concerns/account_scoped.rb")
-        template "lib/concerns/authorization.rb.tt",
-                 engine_path("lib/accounts/concerns/authorization.rb")
+        template_unless_ejected "lib/concerns/account_scoped.rb.tt",
+                                engine_path("lib/accounts/concerns/account_scoped.rb")
+        template_unless_ejected "lib/concerns/authorization.rb.tt",
+                                engine_path("lib/accounts/concerns/authorization.rb")
       end
 
       def create_migrations
@@ -81,15 +85,15 @@ module Seams
       end
 
       def create_factories
-        template "spec/factories/accounts.rb.tt",
-                 engine_path("spec/factories/accounts.rb")
+        template_unless_ejected "spec/factories/accounts.rb.tt",
+                                engine_path("spec/factories/accounts.rb")
       end
 
       def create_unit_specs
-        template "spec/models/accounts/account_spec.rb.tt",
-                 engine_path("spec/models/accounts/account_spec.rb")
-        template "spec/models/accounts/membership_spec.rb.tt",
-                 engine_path("spec/models/accounts/membership_spec.rb")
+        template_unless_ejected "spec/models/accounts/account_spec.rb.tt",
+                                engine_path("spec/models/accounts/account_spec.rb")
+        template_unless_ejected "spec/models/accounts/membership_spec.rb.tt",
+                                engine_path("spec/models/accounts/membership_spec.rb")
       end
 
       def overwrite_readme

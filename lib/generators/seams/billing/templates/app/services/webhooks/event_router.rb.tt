@@ -28,7 +28,9 @@ module Billing
         "payment_intent.payment_failed"          => "Billing::Webhooks::Handlers::PaymentFailedHandler",
         "charge.refunded"                        => "Billing::Webhooks::Handlers::ChargeRefundedHandler",
         "checkout.session.completed"             => "Billing::Webhooks::Handlers::CheckoutSessionCompletedHandler",
-        "checkout.session.async_payment_succeeded" => "Billing::Webhooks::Handlers::CheckoutSessionCompletedHandler"
+        "checkout.session.async_payment_succeeded" => "Billing::Webhooks::Handlers::CheckoutSessionCompletedHandler",
+        # Follow-up generators that ship handlers for additional Stripe events (customer.tax_id.created, payment_method.attached) splice their `"event.type" => "Billing::Webhooks::Handlers::ClassName",` entry here. Trailing commas on every entry keep the hash valid both before and after a splice.
+        # seams:insertion-point billing.event_router.handlers
       }
 
       module_function

@@ -52,6 +52,8 @@ module Notifications
                             template: "billing/lifetime_purchased",
                             channels: %i[in_app email],
                             display:  "Lifetime access purchased")
+      # Follow-up generators that ship new cross-engine notification types (teams.invitation_received, auth.password_reset) splice their TypeRegistry.register(...) call here.
+      # seams:insertion-point notifications.type_registry.defaults
     end
 
     def email_adapter

@@ -186,4 +186,23 @@ RSpec.describe Seams::Generators::CoreGenerator do
       end
     end
   end
+
+  # Wave 10 Phase 2A: every catalogued insertion-point marker the core
+  # engine ships must appear in its target file. These assertions gate
+  # against accidental marker removal in future template edits.
+  # See doc/INSERTION_POINTS_CATALOGUE.md for the canonical list.
+  # `core.configuration.attributes` is deferred to Wave 12 and is
+  # intentionally omitted here.
+  describe "insertion-point markers (Wave 10)" do
+    {
+      "core.engine.events" => "engines/core/lib/core/engine.rb",
+      "core.engine.initializers" => "engines/core/lib/core/engine.rb"
+    }.each do |marker, path|
+      it "ships #{marker} in #{path}" do
+        assert_file path do |content|
+          expect(content).to include("# seams:insertion-point #{marker}")
+        end
+      end
+    end
+  end
 end

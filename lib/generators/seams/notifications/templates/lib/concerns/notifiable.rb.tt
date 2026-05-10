@@ -51,8 +51,10 @@ module Notifications
       sms:    "Notifications::Strategies::Sms",
 <%- end -%>
 <%- if channels.include?("in_app") -%>
-      in_app: "Notifications::Strategies::InApp"
+      in_app: "Notifications::Strategies::InApp",
 <%- end -%>
+      # Follow-up generators that ship new delivery strategies (push, webhook, slack) splice their `key: "Notifications::Strategies::ClassName",` entry here. Trailing commas on every entry keep the hash valid both before and after a splice.
+      # seams:insertion-point notifications.notifiable.strategies
     }.freeze
 
     included do

@@ -6,6 +6,8 @@ require "billing/engine"
 require "billing/concerns/billable"
 require "billing/gateways/abstract"
 require "billing/gateways/stripe"
+# Follow-up generators that ship pre-wired gateway adapters (seams:billing:add_gateway paddle) splice their `require "billing/gateways/paddle"` line here.
+# seams:insertion-point billing.gateways.adapters
 
 module Billing
   class Error           < StandardError; end

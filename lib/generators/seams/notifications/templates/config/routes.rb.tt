@@ -11,4 +11,7 @@ Notifications::Engine.routes.draw do
   end
 
   resource :preferences, only: %i[show update]
+
+  # Follow-up generators that add admin-side notification routes (digest scheduling, channel-specific opt-outs) splice their resources here.
+  # seams:insertion-point notifications.routes.after_preferences
 end

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 Teams::Engine.routes.draw do
+  # Follow-up generators that add admin-only or token-only routes splice them here, ahead of the canonical teams resource.
+  # seams:insertion-point teams.routes.before_teams
   resources :teams, only: %i[index show new create edit update destroy] do
     resources :memberships, only: %i[index create destroy]
     resources :invitations, only: %i[index create destroy]
@@ -11,4 +13,7 @@ Teams::Engine.routes.draw do
   # level so the URL is short and shareable.
   get  "/invitations/accept/:token", to: "invitations#accept_form", as: :accept_invitation
   post "/invitations/accept/:token", to: "invitations#accept",      as: :confirm_invitation
+
+  # Follow-up generators that add new top-level team routes (transfer, archive) splice them here.
+  # seams:insertion-point teams.routes.after_invitations
 end

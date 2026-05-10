@@ -1080,11 +1080,13 @@ Wave 9 was foundational. With the Identity / Account / Team shape
 locked in, the next wave can stop regenerating engines and start
 extending them. From the [roadmap](ROADMAP_2026_05.md):
 
-- **Wave 10** — splicing tooling: annotated insertion-point
-  markers, follow-up generators (`bin/rails generate seams:auth:add_passkeys`),
-  and `bin/seams resolve --eject <engine_or_concern>` to copy
-  templated code into the host as host-owned with subsequent
-  regenerations skipping it.
+- **Wave 10** (now shipped — see
+  [`ARCHITECTURE_WAVE_10.md`](ARCHITECTURE_WAVE_10.md) for the
+  addendum) — splicing tooling: annotated insertion-point markers
+  (33 across the six canonical engines), follow-up generators
+  (`bin/rails generate seams:auth:add_oauth_provider linkedin` is
+  the first showcase), and `bin/seams resolve` for ejection /
+  marker listing / ejected-file survey.
 - **Wave 11** — permissions DSL + outgoing webhooks: both ride on
   Wave 9's Account / Identity model and Wave 10's splicing tooling.
 - **Wave 12** — small-wins polish across every engine
@@ -1119,15 +1121,18 @@ Where to find each piece of Wave 9 functionality, by claim:
 1. [`README.md`](../README.md) — the one-paragraph pitch + the Quick Start.
 2. **This document** — ARCHITECTURE_WAVE_9.md, the full system
    walk-through.
-3. [`ENGINE_CATALOGUE.md`](ENGINE_CATALOGUE.md) — per-engine
+3. [`ARCHITECTURE_WAVE_10.md`](ARCHITECTURE_WAVE_10.md) — the
+   Wave 10 addendum: insertion points, follow-up generators, and
+   the `bin/seams resolve` escape hatch.
+4. [`ENGINE_CATALOGUE.md`](ENGINE_CATALOGUE.md) — per-engine
    surface area as a reference.
-4. [`CURRENT_ATTRIBUTES.md`](CURRENT_ATTRIBUTES.md) — the
+5. [`CURRENT_ATTRIBUTES.md`](CURRENT_ATTRIBUTES.md) — the
    per-request cascade, in detail.
-5. [`UPGRADING_FROM_WAVE_8.md`](UPGRADING_FROM_WAVE_8.md) — only
+6. [`UPGRADING_FROM_WAVE_8.md`](UPGRADING_FROM_WAVE_8.md) — only
    if you're maintaining a host that adopted seams pre-Wave-9.
-6. [`/Users/davidslv/projects/seams-example/README.md`](../../seams-example/README.md) —
+7. [`/Users/davidslv/projects/seams-example/README.md`](../../seams-example/README.md) —
    the canonical demo's overview.
-7. [`/Users/davidslv/projects/seams-example/db/seeds.rb`](../../seams-example/db/seeds.rb) —
+8. [`/Users/davidslv/projects/seams-example/db/seeds.rb`](../../seams-example/db/seeds.rb) —
    the shortest end-to-end flow through every engine.
 
 After that, drill into the engine you care about: each canonical

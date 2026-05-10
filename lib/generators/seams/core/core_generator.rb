@@ -5,6 +5,7 @@ require "rails/generators"
 require "seams"
 require "generators/seams/engine/engine_generator"
 require "seams/generators/host_injector"
+require "seams/generators/eject_aware"
 require "seams/generators/dummy_app_writer"
 
 module Seams
@@ -24,6 +25,7 @@ module Seams
     # Run with: bin/rails generate seams:core
     class CoreGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
+      include Seams::Generators::EjectAware
 
       source_root File.expand_path("templates", __dir__)
 
@@ -34,40 +36,41 @@ module Seams
       end
 
       def overwrite_engine_entry_point
+        # engine.rb / lib/core.rb stay framework-managed.
         template "lib/engine.rb.tt", engine_path("lib/core/engine.rb"), force: true
         template "lib/core.rb.tt",   engine_path("lib/core.rb"),        force: true
       end
 
       def create_models
-        template "app/models/application_record.rb.tt",
-                 engine_path("app/models/core/application_record.rb")
-        template "app/models/audit_log.rb.tt",
-                 engine_path("app/models/core/audit_log.rb")
+        template_unless_ejected "app/models/application_record.rb.tt",
+                                engine_path("app/models/core/application_record.rb")
+        template_unless_ejected "app/models/audit_log.rb.tt",
+                                engine_path("app/models/core/audit_log.rb")
       end
 
       def create_concerns
-        template "app/models/concerns/auditable.rb.tt",
-                 engine_path("app/models/concerns/core/auditable.rb")
-        template "app/models/concerns/soft_deletable.rb.tt",
-                 engine_path("app/models/concerns/core/soft_deletable.rb")
-        template "app/models/concerns/sluggable.rb.tt",
-                 engine_path("app/models/concerns/core/sluggable.rb")
-        template "app/models/concerns/tenant_scoped.rb.tt",
-                 engine_path("app/models/concerns/core/tenant_scoped.rb")
-        template "app/controllers/concerns/has_current_attributes.rb.tt",
-                 engine_path("app/controllers/concerns/core/has_current_attributes.rb")
+        template_unless_ejected "app/models/concerns/auditable.rb.tt",
+                                engine_path("app/models/concerns/core/auditable.rb")
+        template_unless_ejected "app/models/concerns/soft_deletable.rb.tt",
+                                engine_path("app/models/concerns/core/soft_deletable.rb")
+        template_unless_ejected "app/models/concerns/sluggable.rb.tt",
+                                engine_path("app/models/concerns/core/sluggable.rb")
+        template_unless_ejected "app/models/concerns/tenant_scoped.rb.tt",
+                                engine_path("app/models/concerns/core/tenant_scoped.rb")
+        template_unless_ejected "app/controllers/concerns/has_current_attributes.rb.tt",
+                                engine_path("app/controllers/concerns/core/has_current_attributes.rb")
       end
 
       def create_services_and_validators
-        template "app/services/event_publisher.rb.tt",
-                 engine_path("app/services/core/event_publisher.rb")
-        template "app/validators/email_format_validator.rb.tt",
-                 engine_path("app/validators/core/email_format_validator.rb")
+        template_unless_ejected "app/services/event_publisher.rb.tt",
+                                engine_path("app/services/core/event_publisher.rb")
+        template_unless_ejected "app/validators/email_format_validator.rb.tt",
+                                engine_path("app/validators/core/email_format_validator.rb")
       end
 
       def create_current
-        template "app/models/current.rb.tt",
-                 engine_path("app/models/core/current.rb")
+        template_unless_ejected "app/models/current.rb.tt",
+                                engine_path("app/models/core/current.rb")
       end
 
       def create_migration
@@ -76,14 +79,14 @@ module Seams
       end
 
       def create_specs
-        template "spec/models/audit_log_spec.rb.tt",
-                 engine_path("spec/models/core/audit_log_spec.rb")
-        template "spec/concerns/auditable_spec.rb.tt",
-                 engine_path("spec/concerns/core/auditable_spec.rb")
-        template "spec/concerns/sluggable_spec.rb.tt",
-                 engine_path("spec/concerns/core/sluggable_spec.rb")
-        template "spec/validators/email_format_validator_spec.rb.tt",
-                 engine_path("spec/validators/core/email_format_validator_spec.rb")
+        template_unless_ejected "spec/models/audit_log_spec.rb.tt",
+                                engine_path("spec/models/core/audit_log_spec.rb")
+        template_unless_ejected "spec/concerns/auditable_spec.rb.tt",
+                                engine_path("spec/concerns/core/auditable_spec.rb")
+        template_unless_ejected "spec/concerns/sluggable_spec.rb.tt",
+                                engine_path("spec/concerns/core/sluggable_spec.rb")
+        template_unless_ejected "spec/validators/email_format_validator_spec.rb.tt",
+                                engine_path("spec/validators/core/email_format_validator_spec.rb")
       end
 
       def overwrite_readme

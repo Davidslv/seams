@@ -1109,4 +1109,27 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
   end
+
+  # Wave 10 Phase 2A: every catalogued insertion-point marker the
+  # billing engine ships must appear in its target file. These
+  # assertions gate against accidental marker removal in future
+  # template edits. See doc/INSERTION_POINTS_CATALOGUE.md for the
+  # canonical list.
+  describe "insertion-point markers (Wave 10)" do
+    {
+      "billing.engine.events" => "engines/billing/lib/billing/engine.rb",
+      "billing.engine.initializers" => "engines/billing/lib/billing/engine.rb",
+      "billing.routes.before_webhook" => "engines/billing/config/routes.rb",
+      "billing.configuration.attributes" => "engines/billing/lib/billing/configuration.rb",
+      "billing.configuration.defaults" => "engines/billing/lib/billing/configuration.rb",
+      "billing.event_router.handlers" => "engines/billing/app/services/billing/webhooks/event_router.rb",
+      "billing.gateways.adapters" => "engines/billing/lib/billing.rb"
+    }.each do |marker, path|
+      it "ships #{marker} in #{path}" do
+        assert_file path do |content|
+          expect(content).to include("# seams:insertion-point #{marker}")
+        end
+      end
+    end
+  end
 end

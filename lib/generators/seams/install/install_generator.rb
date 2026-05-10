@@ -166,24 +166,40 @@ module Seams
 
       public
 
+      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       def post_install_message
         say ""
         say "  Seams is installed. Generate your first engine with:", :green
         say "    bin/seams core          (or bin/rails generate seams:core)"
         say ""
+        say "  Canonical generators (run in this order):", :yellow
+        say "    bin/seams core          - Core engine (concerns, audit log)"
+        say "    bin/seams auth          - Auth engine (Identity, sessions, OAuth)"
+        say "    bin/seams accounts      - Accounts engine (tenant + Membership + system actor)"
+        say "    bin/seams notifications - Notifications engine"
+        say "    bin/seams billing       - Billing engine"
+        say "    bin/seams teams         - Teams engine"
+        say ""
+        say "  Follow-up generators (extend an already-installed engine):", :yellow
+        say "    bin/rails generate seams:auth:add_oauth_provider <name>"
+        say "                            - add a new OAuth provider adapter"
+        say "                              (e.g. linkedin, apple, microsoft)"
+        say ""
         say "  Other useful commands:", :yellow
-        say "    bin/seams list          - list engines + their events"
-        say "    bin/seams core          - generate the canonical Core engine (concerns, audit log)"
-        say "    bin/seams auth          - generate the canonical Auth engine (Identity, sessions, OAuth)"
-        say "    bin/seams accounts      - generate the canonical Accounts engine (tenant + Membership + system actor)"
-        say "    bin/seams notifications - generate the canonical Notifications engine"
-        say "    bin/seams billing       - generate the canonical Billing engine"
-        say "    bin/seams teams         - generate the canonical Teams engine"
+        say "    bin/seams list                          - list engines + their events"
+        say "    bin/seams resolve --eject <engine>/<file>"
+        say "                                            - mark a host file as host-owned"
+        say "                                              (skipped on regenerate)"
+        say "    bin/seams resolve --list-markers <engine>"
+        say "                                            - list insertion-point markers"
+        say "    bin/seams resolve --list-ejected        - list every ejected file under engines/"
         say ""
         say "  Recommended order: core -> auth -> accounts -> notifications -> billing -> teams.", :yellow
         say "  See doc/CURRENT_ATTRIBUTES.md (after install) for the per-request namespace cascade.", :yellow
+        say "  See doc/WRITING_FOLLOW_UP_GENERATORS.md to write your own follow-up generator.", :yellow
         say ""
       end
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
     end
   end
 end

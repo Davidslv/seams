@@ -4,6 +4,7 @@ require "seams"
 require "seams/cli/list"
 require "seams/cli/test_changed"
 require "seams/cli/quality"
+require "seams/cli/resolve"
 
 module Seams
   # Top-level CLI aggregator. Each public method delegates to a
@@ -14,6 +15,7 @@ module Seams
   #   Seams::CLI.list                            # bin/rails seams:list
   #   Seams::CLI.test_changed(base: "main")      # seams:test:changed
   #   Seams::CLI.quality                         # seams:quality:all
+  #   Seams::CLI.resolve(mode: :eject, ...)      # bin/seams resolve --eject ...
   module CLI
     module_function
 
@@ -31,6 +33,16 @@ module Seams
 
     def quality(engines_root: "engines", output: $stdout)
       Seams::CLI::Quality.new(engines_root: engines_root, output: output).call
+    end
+
+    def resolve(mode:, argument: nil, engines_root: "engines", output: $stdout, error: $stderr)
+      Seams::CLI::Resolve.new(
+        mode: mode,
+        argument: argument,
+        engines_root: engines_root,
+        output: output,
+        error: error
+      ).call
     end
   end
 end

@@ -28,6 +28,8 @@ module Auth
       # API token lifecycle (issue #2 section 2A)
       Seams::EventRegistry.register("api_token.issued.auth",     emitted_by: "Auth")
       Seams::EventRegistry.register("api_token.revoked.auth",    emitted_by: "Auth")
+      # Follow-up generators that emit new auth events (e.g. identity.passkey_added.auth) register them here.
+      # seams:insertion-point auth.engine.events
     end
 
     initializer "auth.append_migrations" do |app|
@@ -37,5 +39,8 @@ module Auth
         end
       end
     end
+
+    # Follow-up generators that need their own initializer block (e.g. attaching a subscriber on an auth event) declare it here.
+    # seams:insertion-point auth.engine.initializers
   end
 end

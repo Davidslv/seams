@@ -14,6 +14,8 @@ module Accounts
       Seams::EventRegistry.register("membership.created.accounts",         emitted_by: "Accounts")
       Seams::EventRegistry.register("membership.role_changed.accounts",    emitted_by: "Accounts")
       Seams::EventRegistry.register("membership.removed.accounts",         emitted_by: "Accounts")
+      # Follow-up generators that emit new accounts events (account.upgraded.accounts, etc.) register them here.
+      # seams:insertion-point accounts.engine.events
     end
 
     initializer "accounts.append_migrations" do |app|
@@ -23,6 +25,9 @@ module Accounts
         end
       end
     end
+
+    # Follow-up generators that need their own initializer block declare it here, ahead of the cross-engine dependency check.
+    # seams:insertion-point accounts.engine.initializers
 
     # Boot-time dependency assertion. Accounts requires Auth: an
     # Accounts::Membership with an `identity_id` is meaningless

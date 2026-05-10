@@ -10,6 +10,9 @@
 #   bin/seams list                        # bin/rails seams:list
 #   bin/seams test billing                # bin/rails seams:test[billing]
 #   bin/seams quality billing             # bin/rails seams:quality[billing]
+#   bin/seams resolve --eject <engine>/<file>
+#   bin/seams resolve --list-markers <engine>
+#   bin/seams resolve --list-ejected
 
 require "shellwords"
 
@@ -18,21 +21,78 @@ GENERIC   = %w[engine remove].freeze
 TASKS     = %w[list].freeze
 ENGINE_TASKS = %w[test quality].freeze
 
+# `resolve` runs in-process — it doesn't need bin/rails because it
+# doesn't need the Rails environment. We require seams from the host
+# bundle and dispatch directly. This keeps `bin/seams resolve` fast
+# (~50ms) compared to ~3s for any bin/rails invocation.
+def run_resolve(rest)
+  if rest.empty? || %w[--help -h help].include?(rest.first)
+    puts <<~HELP
+      Usage:
+        bin/seams resolve --eject <engine>/<file_relative>
+            Mark a single host file as host-owned (skipped on regenerate).
+            Example: bin/seams resolve --eject auth/app/mailers/auth/passwords_mailer.rb
+
+        bin/seams resolve --list-markers <engine>
+            List every insertion-point marker the engine ships.
+
+        bin/seams resolve --list-ejected
+            List every ejected file under engines/.
+    HELP
+    exit 0
+  end
+
+  flag = rest.shift
+  argument = rest.shift
+
+  mode =
+    case flag
+    when "--eject"        then :eject
+    when "--list-markers" then :list_markers
+    when "--list-ejected" then :list_ejected
+    else
+      abort "Unknown resolve flag: #{flag.inspect}. Run `bin/seams resolve --help` for usage."
+    end
+
+  require "bundler/setup"
+  require "seams/cli"
+  ok = Seams::CLI.resolve(mode: mode, argument: argument)
+  exit(ok ? 0 : 1)
+end
+
 cmd, *rest = ARGV
 case cmd
 when nil, "help", "-h", "--help"
   puts <<~HELP
     Usage: bin/seams <command> [args]
+
+    Canonical generators:
       install                       Install the framework
       engine <name>                 Generate a generic engine
       core | auth | accounts | notifications | billing | teams
                                     Generate a canonical engine
       remove <name>                 Remove an engine
+
+    Follow-up generators (extend an already-installed engine):
+      bin/rails generate seams:auth:add_oauth_provider <name>
+                                    Add a new OAuth provider adapter
+                                    (e.g. linkedin, apple, microsoft)
+      See doc/WRITING_FOLLOW_UP_GENERATORS.md for how to write your own.
+
+    Diagnostics + escape hatch:
       list                          List engines + their events
       test <engine>                 Run an engine's specs
       quality <engine>              Run rubocop on an engine
+      resolve --eject <engine>/<file>
+                                    Mark a host file as host-owned (skipped on regenerate)
+      resolve --list-markers <engine>
+                                    List insertion-point markers in the engine
+      resolve --list-ejected        List every ejected file under engines/
+      resolve --help                Detail on each resolve mode
   HELP
   exit 0
+when "resolve"
+  run_resolve(rest)
 when *CANONICAL
   exec "bin/rails", "generate", "seams:#{cmd}", *rest
 when *GENERIC

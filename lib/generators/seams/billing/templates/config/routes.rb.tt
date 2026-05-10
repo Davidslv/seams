@@ -33,5 +33,7 @@ Billing::Engine.routes.draw do
     resources :lifetime_passes, only: %i[index new create destroy]
   end
 
+  # Follow-up generators that add new gateway-flow routes (Adyen webhook, Paddle webhook, alternative checkout) splice their routes here, ahead of the existing Stripe webhook.
+  # seams:insertion-point billing.routes.before_webhook
   post "/webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
 end

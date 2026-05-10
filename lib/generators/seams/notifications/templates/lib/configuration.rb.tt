@@ -10,11 +10,15 @@ module Notifications
   #   end
   class Configuration
     attr_accessor :email_adapter, :sms_adapter, :default_from
+    # Follow-up generators that add knobs (push adapter, webhook adapter, in-app retention) declare their attr_accessor here.
+    # seams:insertion-point notifications.configuration.attributes
 
     def initialize
       @email_adapter = "Notifications::Adapters::ActionMailer"
       @sms_adapter   = "Notifications::Adapters::NullSms"
       @default_from  = "no-reply@example.com"
+      # Follow-up generators that add defaults for new attributes (matching notifications.configuration.attributes) splice them here.
+      # seams:insertion-point notifications.configuration.defaults
     end
   end
 end
