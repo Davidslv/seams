@@ -42,7 +42,7 @@ jobs:
       name: rubygems
       url: https://rubygems.org/gems/seams
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ruby/setup-ruby@v1
         with:
