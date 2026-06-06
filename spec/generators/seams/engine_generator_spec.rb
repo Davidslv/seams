@@ -60,8 +60,15 @@ RSpec.describe Seams::Generators::EngineGenerator do
       assert_file "engines/billing/app/controllers/billing/application_controller.rb" do |content|
         expect(content).to include("module Billing")
         expect(content).to include("class ApplicationController < ::ApplicationController")
-        expect(content).to include("before_action :authenticate_identity!")
-        expect(content).to include("skip_before_action :authenticate_identity!")
+        # Active code line (no leading "#"). Without ^…/m the previous
+        # assertion also matched the same string inside the doc comment,
+        # silently passing if the actual call was deleted.
+        expect(content).to match(/^\s*before_action :authenticate_identity!/m)
+        # Documentation block must include the opt-out pattern so engines
+        # serving public flows know how to lift the default. This match
+        # requires the leading "#", so it cannot be confused with the
+        # active call above.
+        expect(content).to match(/#\s*skip_before_action :authenticate_identity!/)
       end
     end
 
