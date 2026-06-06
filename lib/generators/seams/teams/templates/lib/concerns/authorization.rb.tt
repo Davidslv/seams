@@ -18,13 +18,11 @@ module Teams
     private
 
     def require_team_member!
-      head :forbidden and return false unless team_member?
-      true
+      redirect_to teams_path, alert: "Not a member of that team." unless team_member?
     end
 
     def require_team_admin!
-      head :forbidden and return false unless team_admin?
-      true
+      redirect_to teams_path, alert: "Admin access required." unless team_admin?
     end
 
     def team_member?

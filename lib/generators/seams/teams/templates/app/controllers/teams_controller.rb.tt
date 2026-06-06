@@ -2,7 +2,11 @@
 
 module Teams
   class TeamsController < ApplicationController
-    before_action :set_team, only: %i[show edit update destroy]
+    include Teams::Authorization
+
+    before_action :set_team,              only: %i[show edit update destroy]
+    before_action :require_team_member!,  only: %i[show]
+    before_action :require_team_admin!,   only: %i[edit update destroy]
 
     def index
       @teams = Teams::Team.joins(:memberships).where(memberships: { identity_id: current_identity_id })
@@ -51,18 +55,6 @@ module Teams
 
     def team_params
       params.require(:team).permit(:name, :slug)
-    end
-
-    # Resolves the signed-in human's id from `Auth::Current.identity`
-    # (the Auth engine's per-request namespace). Gated on
-    # `defined?(Auth::Current)` so it's safe in hosts that don't ship
-    # auth. Override in your host if you wire auth differently.
-    def current_identity_id
-      if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
-        return Auth::Current.identity.id
-      end
-
-      nil
     end
   end
 end
