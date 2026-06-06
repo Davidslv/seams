@@ -3,6 +3,7 @@
 require "notifications/version"
 require "notifications/configuration"
 require "notifications/type_registry"
+require "notifications/preferences"
 require "notifications/engine"
 require "notifications/concerns/notifiable"
 require "notifications/adapters/abstract"

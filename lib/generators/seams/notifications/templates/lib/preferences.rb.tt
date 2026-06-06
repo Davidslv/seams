@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+module Notifications
+  # Channel/type key registry for the preferences surface.
+  #
+  # The preferences form posts flat keys of the form
+  # +<channel>:<type>+ (e.g. +in_app:billing.invoice_paid+) or
+  # +<channel>:any+ for the channel-wide catch-all row. This module
+  # derives the closed set of acceptable keys from:
+  #
+  # * +NotificationPreference::CHANNELS+ — the canonical delivery
+  #   channels compiled into the engine.
+  # * +Notifications::TypeRegistry.names+ — the notification types the
+  #   host has registered (seeded by +Notifications.seed_default_types!+
+  #   and extended via the initializer).
+  #
+  # PreferencesController passes the result to +params.permit(...)+ so
+  # Rails rejects unknown keys without relying on +permit!+.
+  module Preferences
+    module_function
+
+    # Returns every key the preferences form is allowed to post.
+    # Format: +["in_app:any", "in_app:welcome", "email:any", ...]+
+    def allowed_keys
+      channels = Notifications::NotificationPreference::CHANNELS
+      types    = Notifications::TypeRegistry.names
+
+      channels.flat_map do |channel|
+        [
+          "#{channel}:any",
+          *types.map { |type| "#{channel}:#{type}" }
+        ]
+      end
+    end
+  end
+end

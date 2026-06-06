@@ -349,6 +349,34 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
         expect(content).not_to include("def current_user_id")
       end
     end
+
+    # Security: the generated controller must be brakeman-clean out of
+    # the box. permit! is a mass-assignment risk (OWASP A03); the
+    # registry-driven explicit permit list replaces it.
+    it "PreferencesController uses the registry-driven explicit permit list instead of permit!" do
+      assert_file "engines/notifications/app/controllers/notifications/preferences_controller.rb" do |content|
+        expect(content).to include("Notifications::Preferences.allowed_keys")
+        expect(content).to include("params.require(:preferences).permit(*Notifications::Preferences.allowed_keys)")
+        expect(content).not_to include("permit!")
+      end
+    end
+  end
+
+  describe "Preferences key registry" do
+    it "ships lib/notifications/preferences.rb with Notifications::Preferences.allowed_keys" do
+      assert_file "engines/notifications/lib/notifications/preferences.rb" do |content|
+        expect(content).to include("module Preferences")
+        expect(content).to include("def allowed_keys")
+        expect(content).to include("Notifications::NotificationPreference::CHANNELS")
+        expect(content).to include("Notifications::TypeRegistry.names")
+      end
+    end
+
+    it "lib/notifications.rb requires notifications/preferences" do
+      assert_file "engines/notifications/lib/notifications.rb" do |content|
+        expect(content).to include('require "notifications/preferences"')
+      end
+    end
   end
 
   describe "views + ActionCable + Stimulus" do
