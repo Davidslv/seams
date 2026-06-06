@@ -110,16 +110,9 @@ module Teams
       Teams::Membership::ROLES.include?(candidate) ? candidate : "member"
     end
 
-    # Resolves the signed-in human's id from `Auth::Current.identity`
-    # (the Auth engine's per-request namespace). Gated on
-    # `defined?(Auth::Current)` so it's safe in hosts that don't ship
-    # auth. Override in your host if you wire auth differently.
-    def current_identity_id
-      if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
-        return Auth::Current.identity.id
-      end
-
-      nil
-    end
+    # current_identity_id is provided by Teams::Authorization (included
+    # at the top of the class). Do not redefine here — keep the concern
+    # as the single source of truth so a future change to identity
+    # resolution lands in one place.
   end
 end

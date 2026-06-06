@@ -27,9 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Teams generator: `InvitationsController#accept` now redirects unauthenticated requests to the sign-in path (stashing the token in the session under `pending_invitation_token`) instead of raising `ActiveRecord::RecordInvalid`. The host's sign-in flow is responsible for reading `return_to` and redirecting back after authentication.
 - Teams generator: `InvitationsController#accept` now verifies that the signed-in identity's email matches the invitation email (case-insensitively) before creating the membership. Previously any authenticated identity holding a valid token could accept the invitation under a different account.
-
-### Fixed
-
 - Billing generator: `scoped_invoices` / `scoped_subscriptions` now return
   `.none` when the current customer ref is nil. The previous behaviour was
   an **information disclosure**: Rails translates
