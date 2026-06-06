@@ -40,6 +40,7 @@ RSpec.describe Seams::Generators::DummyAppWriter do
         spec/dummy/db/schema.rb
         spec/dummy/app/models/application_record.rb
         spec/dummy/app/models/user.rb
+        spec/dummy/app/controllers/application_controller.rb
         spec/dummy/log/.keep
         spec/dummy/tmp/.keep
         spec/spec_helper.rb
@@ -75,6 +76,18 @@ RSpec.describe Seams::Generators::DummyAppWriter do
     it "writes the supplied host User body" do
       content = File.read(File.join(engine_path, "spec/dummy/app/models/user.rb"))
       expect(content).to include("class User < ApplicationRecord")
+    end
+
+    it "writes a dummy ApplicationController that stubs authenticate_identity! as a no-op" do
+      # Engine ApplicationControllers ship with `before_action
+      # :authenticate_identity!` by default. Engine request specs run
+      # against the dummy app's ApplicationController, which here must
+      # expose the method so the before_action chain resolves rather
+      # than raising NoMethodError. Specs that want to exercise the
+      # unauthenticated path stub or override this method.
+      content = File.read(File.join(engine_path, "spec/dummy/app/controllers/application_controller.rb"))
+      expect(content).to include("class ApplicationController < ActionController::Base")
+      expect(content).to match(/def authenticate_identity!/)
     end
 
     it "rails_helper.rb loads the dummy environment + schema" do
