@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Engine generator: ApplicationController now requires authentication by default. Opt out via `skip_before_action :authenticate_identity!` in controllers serving public flows. [BREAKING for hosts that explicitly relied on engines being unauthenticated by default.]
+- Notifications generator: preferences controller now uses explicit permit list from the channel/type registry rather than permit!. Eliminates the brakeman mass-assignment warning shipped with downstream engines.
 
 ## [0.1.0] — 2026-05-10
 

@@ -7,15 +7,8 @@ module Notifications
     end
 
     def update
-      # Whitelist the keys we accept. The form posts
-      # `preferences[<channel>:<type>] = "1" | "0"`. Allowed channels
-      # are the canonical CHANNELS list; type is either "any" (→ nil)
-      # or a NotificationPreference::TYPE-style identifier ([a-z0-9_]).
       preference_params.each do |key, enabled|
         channel, type = key.split(":", 2)
-        next unless Notifications::NotificationPreference::CHANNELS.include?(channel)
-        next unless type.nil? || type == "any" || type.match?(/\A[a-z0-9_]+\z/)
-
         type = nil if type == "any"
         pref = Notifications::NotificationPreference.find_or_initialize_by(
           identity_id:       current_identity_id,
@@ -29,13 +22,12 @@ module Notifications
 
     private
 
-    # `params[:preferences].to_h` raises ActionController::UnfilteredParameters
-    # in Rails default config. Use permit! after filtering to the
-    # `:preferences` key — the per-key channel/type validation above
-    # is the real safety net.
+    # Permit only the keys the channel/type registry allows. The closed
+    # list is derived at request time from NotificationPreference::CHANNELS
+    # and Notifications::TypeRegistry, so brakeman sees no mass-assignment
+    # risk and unknown keys are rejected by Rails rather than silently dropped.
     def preference_params
-      raw = params.require(:preferences)
-      raw.respond_to?(:permit!) ? raw.permit!.to_h : raw.to_h
+      params.require(:preferences).permit(*Notifications::Preferences.allowed_keys)
     end
 
     # Resolves the signed-in identity's id from `Auth::Current.identity`

@@ -67,6 +67,8 @@ module Seams
                                 engine_path("lib/notifications/configuration.rb")
         template_unless_ejected "lib/type_registry.rb.tt",
                                 engine_path("lib/notifications/type_registry.rb")
+        template_unless_ejected "lib/preferences.rb.tt",
+                                engine_path("lib/notifications/preferences.rb")
         # lib/notifications.rb stays framework-managed (root require file).
         template "lib/notifications.rb.tt", engine_path("lib/notifications.rb"), force: true
       end
