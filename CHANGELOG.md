@@ -13,7 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Billing generator: `scoped_invoices` / `scoped_subscriptions` now return `.none` when the current customer ref is nil. Previously they produced an `IS NULL` query that matched all unlinked rows.
+- Billing generator: `scoped_invoices` / `scoped_subscriptions` now return
+  `.none` when the current customer ref is nil. The previous behaviour was
+  an **information disclosure**: Rails translates
+  `.where(customer_ref: nil)` to `WHERE customer_ref IS NULL`, which
+  matches every invoice and subscription row whose `customer_ref` has not
+  yet been linked to a Stripe customer — typically including manual,
+  draft, or test records seeded by other staff. The fix returns an empty
+  relation when there is no customer to scope by.
+
+  Hosts that have already ejected
+  `app/controllers/billing/invoices_controller.rb` or
+  `subscriptions_controller.rb` will not re-generate them (per the
+  `template_unless_ejected` contract). To pick up the fix, prepend each
+  scope helper with:
+
+      return Billing::Invoice.none if current_billing_customer_ref.nil?
+
+  (likewise `Billing::Subscription.none` in the subscriptions helper)
+  before the existing `.where(customer_ref: …)` line.
 
 ## [0.1.0] — 2026-05-10
 
