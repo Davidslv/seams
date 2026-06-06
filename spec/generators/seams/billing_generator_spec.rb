@@ -1018,6 +1018,18 @@ RSpec.describe Seams::Generators::BillingGenerator do
       end
     end
 
+    it "scoped_invoices returns .none when current_billing_customer_ref is nil" do
+      assert_file "engines/billing/app/controllers/billing/invoices_controller.rb" do |content|
+        expect(content).to include("return Billing::Invoice.none if current_billing_customer_ref.nil?")
+      end
+    end
+
+    it "scoped_subscriptions returns .none when current_billing_customer_ref is nil" do
+      assert_file "engines/billing/app/controllers/billing/subscriptions_controller.rb" do |content|
+        expect(content).to include("return Billing::Subscription.none if current_billing_customer_ref.nil?")
+      end
+    end
+
     it "ships index + show views for both controllers" do
       %w[
         engines/billing/app/views/billing/subscriptions/index.html.erb

@@ -77,6 +77,8 @@ module Billing
     # — the Stripe `cus_*` id resolved from the current Account — which
     # is correct whenever the controller has an Account in scope.
     def scoped_subscriptions
+      return Billing::Subscription.none if current_billing_customer_ref.nil?
+
       Billing::Subscription.where(customer_ref: current_billing_customer_ref)
     end
 

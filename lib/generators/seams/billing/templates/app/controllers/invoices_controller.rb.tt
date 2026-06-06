@@ -32,6 +32,8 @@ module Billing
     private
 
     def scoped_invoices
+      return Billing::Invoice.none if current_billing_customer_ref.nil?
+
       Billing::Invoice.where(customer_ref: current_billing_customer_ref)
     end
 

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Engine generator: ApplicationController now requires authentication by default. Opt out via `skip_before_action :authenticate_identity!` in controllers serving public flows. [BREAKING for hosts that explicitly relied on engines being unauthenticated by default.]
 
+### Fixed
+
+- Billing generator: `scoped_invoices` / `scoped_subscriptions` now return `.none` when the current customer ref is nil. Previously they produced an `IS NULL` query that matched all unlinked rows.
+
 ## [0.1.0] — 2026-05-10
 
 First public release on rubygems.org. The cumulative changelog from
