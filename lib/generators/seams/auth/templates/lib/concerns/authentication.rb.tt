@@ -9,8 +9,19 @@ module Auth
   #
   #   class ApplicationController < ActionController::Base
   #     include Auth::Authentication
-  #     before_action :authenticate_identity!
   #   end
+  #
+  # Including this concern is what makes `authenticate_identity!` available
+  # to every engine controller that inherits from the host's
+  # `::ApplicationController`. Engine generators produced by `seams:engine`
+  # enforce authentication on every action by default via:
+  #
+  #   before_action :authenticate_identity!
+  #
+  # Controllers serving public flows (e.g. password reset, invitation
+  # accept-via-token) must opt out explicitly:
+  #
+  #   skip_before_action :authenticate_identity!, only: %i[accept_form accept]
   #
   # Side-effect: when a sign-in is resolved, `Current.identity` is set
   # so models / services downstream can access the signed-in identity

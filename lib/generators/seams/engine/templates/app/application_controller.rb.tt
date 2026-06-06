@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
 module <%= module_name %>
+  # Enforces authentication on every action by default. Mount points
+  # that should be reachable while signed out (e.g. password reset,
+  # invitation accept-via-token) must opt out explicitly:
+  #
+  #   skip_before_action :authenticate_identity!, only: %i[accept_form accept]
   class ApplicationController < ::ApplicationController
+    before_action :authenticate_identity!
   end
 end

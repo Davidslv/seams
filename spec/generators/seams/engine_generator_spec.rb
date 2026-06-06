@@ -56,10 +56,12 @@ RSpec.describe Seams::Generators::EngineGenerator do
       end
     end
 
-    it "creates the namespaced ApplicationController" do
+    it "creates the namespaced ApplicationController with authentication enforced by default" do
       assert_file "engines/billing/app/controllers/billing/application_controller.rb" do |content|
         expect(content).to include("module Billing")
         expect(content).to include("class ApplicationController < ::ApplicationController")
+        expect(content).to include("before_action :authenticate_identity!")
+        expect(content).to include("skip_before_action :authenticate_identity!")
       end
     end
 

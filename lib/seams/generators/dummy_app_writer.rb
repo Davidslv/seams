@@ -251,10 +251,20 @@ module Seams
         # inherit from ::ApplicationController (the seams:engine generator
         # default) can boot inside a request spec. Real hosts will have
         # their own; this is dummy-only.
+        #
+        # `authenticate_identity!` is stubbed as a no-op so engine request
+        # specs pass by default (simulating an authenticated session).
+        # Specs that need to verify the authentication gate should stub or
+        # override this method, or use the `sign_in_as` helper when present.
         <<~RB
           # frozen_string_literal: true
 
           class ApplicationController < ActionController::Base
+            def authenticate_identity!
+              # Stub: always passes in the dummy app. Engine specs that want to
+              # exercise the unauthenticated path should stub this method or
+              # call `sign_in_as` from the authentication test helper.
+            end
           end
         RB
       end
