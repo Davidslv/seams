@@ -41,7 +41,18 @@ module Teams
     # Wraps the lookup in a row lock and short-circuits if the
     # invitation has already been accepted, so a double-click on the
     # email link returns a friendly redirect instead of a 500.
+    #
+    # Unauthenticated requests stash the token in the session and
+    # redirect to the sign-in path with a `return_to` parameter equal
+    # to the current request URL. The host's sign-in flow is responsible
+    # for reading `return_to` and redirecting the user back after
+    # authentication.
     def accept
+      unless current_identity_id
+        session[:pending_invitation_token] = params[:token]
+        return redirect_to(main_app.new_session_path(return_to: request.url))
+      end
+
       Teams::Invitation.transaction do
         @invitation = Teams::Invitation.lock.find_by!(token: params[:token])
 
@@ -51,6 +62,18 @@ module Teams
 
         if @invitation.expired?
           return redirect_to root_path, alert: "Invitation expired"
+        end
+
+        # Prevent a holder of a stolen token from accepting the
+        # invitation under a different identity. Compare
+        # case-insensitively to guard against trivial casing bypasses.
+        current_email = if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
+                          Auth::Current.identity.email.to_s.downcase
+                        else
+                          ""
+                        end
+        unless current_email == @invitation.email.to_s.downcase
+          return redirect_to teams_path, alert: "This invitation was sent to a different email address."
         end
 
         @invitation.team.memberships.create!(identity_id: current_identity_id, role: @invitation.role)
@@ -87,16 +110,9 @@ module Teams
       Teams::Membership::ROLES.include?(candidate) ? candidate : "member"
     end
 
-    # Resolves the signed-in human's id from `Auth::Current.identity`
-    # (the Auth engine's per-request namespace). Gated on
-    # `defined?(Auth::Current)` so it's safe in hosts that don't ship
-    # auth. Override in your host if you wire auth differently.
-    def current_identity_id
-      if defined?(Auth::Current) && Auth::Current.respond_to?(:identity) && Auth::Current.identity
-        return Auth::Current.identity.id
-      end
-
-      nil
-    end
+    # current_identity_id is provided by Teams::Authorization (included
+    # at the top of the class). Do not redefine here — keep the concern
+    # as the single source of truth so a future change to identity
+    # resolution lands in one place.
   end
 end

@@ -180,8 +180,16 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       end
     end
 
-    it "TeamsController#current_identity_id reads Auth::Current.identity (not bare Current)" do
+    # TeamsController delegates current_identity_id to Teams::Authorization,
+    # which is the canonical source of Auth::Current resolution. The
+    # controller itself no longer duplicates the resolver.
+    it "TeamsController delegates current_identity_id to Teams::Authorization (no inline resolver)" do
       assert_file "engines/teams/app/controllers/teams/teams_controller.rb" do |content|
+        expect(content).to include("include Teams::Authorization")
+        expect(content).not_to include("def current_identity_id")
+      end
+
+      assert_file "engines/teams/lib/teams/concerns/authorization.rb" do |content|
         expect(content).to include("Auth::Current")
         expect(content).not_to match(/(?<!Auth::)Current\.respond_to\?\(:identity\)/)
       end
@@ -204,6 +212,28 @@ RSpec.describe Seams::Generators::TeamsGenerator do
       assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
         expect(content).to include("include Teams::Authorization")
         expect(content).to include("require_team_admin!")
+      end
+    end
+
+    it "TeamsController includes Authorization and applies member/admin before_actions" do
+      assert_file "engines/teams/app/controllers/teams/teams_controller.rb" do |content|
+        expect(content).to include("include Teams::Authorization")
+        expect(content).to include("before_action :require_team_member!,  only: %i[show]")
+        expect(content).to include("before_action :require_team_admin!,   only: %i[edit update destroy]")
+      end
+    end
+
+    it "InvitationsController#accept redirects unauthenticated requests to sign-in" do
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
+        expect(content).to include("session[:pending_invitation_token] = params[:token]")
+        expect(content).to include("main_app.new_session_path(return_to: request.url)")
+      end
+    end
+
+    it "InvitationsController#accept verifies the accepting identity's email matches the invitation" do
+      assert_file "engines/teams/app/controllers/teams/invitations_controller.rb" do |content|
+        expect(content).to include("current_email == @invitation.email.to_s.downcase")
+        expect(content).to include("This invitation was sent to a different email address.")
       end
     end
   end
