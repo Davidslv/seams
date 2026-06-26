@@ -1,8 +1,14 @@
 # frozen_string_literal: true
 
-# Intentionally empty. The Accounts engine ships no controllers in
-# Wave 9 — hosts wire their own account-creation flows; the engine
-# provides models + concerns. Future waves may add a thin controller
-# surface.
+# Wave 11 (Phase 4): the accounts engine ships a single tenant-facing
+# surface — the memberships role picker (index + update), scoped to
+# Accounts::Current.account and guarded by membership.manage.accounts.
+# Account-creation flows still live in the host.
 Accounts::Engine.routes.draw do
+  # Follow-up generators that add admin-only or token-only routes splice them here, ahead of the canonical memberships resource.
+  # seams:insertion-point accounts.routes.before_memberships
+  resources :memberships, only: %i[index update]
+
+  # Follow-up generators that add new top-level accounts routes splice them here.
+  # seams:insertion-point accounts.routes.after_memberships
 end

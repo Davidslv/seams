@@ -1,0 +1,100 @@
+# frozen_string_literal: true
+
+module Accounts
+  # Tenant-facing screen where an account admin changes a member's
+  # role. Both actions are scoped to `Accounts::Current.account` and
+  # guarded by the `membership.manage.accounts` ability — the
+  # Authorization concern resolves that against the current
+  # membership's role and applies the platform-staff bypass.
+  #
+  # `#update` enforces three hard safeguards against privilege
+  # escalation (see the guard chain). Each one redirects back with an
+  # alert rather than silently no-opping, so an admin who hits a wall
+  # is told why.
+  class MembershipsController < ApplicationController
+    include Accounts::Authorization
+
+    # owner > admin > member. The screen never assigns `owner` (it is
+    # protected — see safeguard 1) nor `system` (an internal,
+    # human-less actor), so the only roles a picker may offer are
+    # `admin` and `member`.
+    ROLE_RANK        = { "member" => 1, "admin" => 2, "owner" => 3 }.freeze
+    ASSIGNABLE_ROLES = %w[admin member].freeze
+
+    before_action -> { authorize_permission!("membership.manage.accounts") }
+    before_action :set_membership, only: %i[update]
+
+    helper_method :own_membership?, :assignable_roles
+
+    def index
+      @memberships = Accounts::Current.account.memberships.active.order(:created_at)
+    end
+
+    def update
+      violation = escalation_violation
+      return deny(violation) if violation
+
+      @membership.update!(role: requested_role)
+      redirect_to memberships_path, notice: "Role updated."
+    end
+
+    private
+
+    # The safeguard message that blocks this role change, or nil when
+    # the change is allowed. Ordered so each safeguard has a single,
+    # independently testable trigger:
+    #
+    #   2. a user cannot change their own role;
+    #   1a. an owner's role cannot be changed (no demotion);
+    #   --. `system` / unknown roles are never assignable;
+    #   3. a user cannot assign a role senior to their own (owner >
+    #      admin > member) — this is what stops an admin minting an
+    #      owner;
+    #   1b. `owner` is never assignable, even for an acting owner who
+    #      would otherwise clear the senior check.
+    def escalation_violation
+      return "You cannot change your own role." if own_membership?(@membership)
+      return "The owner's role cannot be changed through this screen." if @membership.owner?
+      return "That role cannot be assigned." unless ROLE_RANK.key?(requested_role)
+      return "You cannot assign a role senior to your own." unless actor_can_assign?(requested_role)
+      return "The owner role cannot be assigned here." unless ASSIGNABLE_ROLES.include?(requested_role)
+
+      nil
+    end
+
+    # Always scoped to the current account so an admin can never reach
+    # a membership in another tenant by guessing an id.
+    def set_membership
+      @membership = Accounts::Current.account.memberships.find(params[:id])
+    end
+
+    # Role extracted on its own (never via permit) so the params shape
+    # reads as "we coerce the role ourselves", the same Brakeman-safe
+    # convention the teams engine uses.
+    def requested_role
+      params.dig(:membership, :role).to_s
+    end
+
+    def own_membership?(membership)
+      actor = Accounts::Current.membership
+      actor.present? && actor.id == membership.id
+    end
+
+    # The acting role may assign a target role only when the target is
+    # not senior to the actor's own (owner > admin > member). An actor
+    # with no resolved membership (rank 0) can assign nothing.
+    def actor_can_assign?(role)
+      actor_rank  = ROLE_RANK[current_permission_role].to_i
+      target_rank = ROLE_RANK[role].to_i
+      target_rank.positive? && target_rank <= actor_rank
+    end
+
+    def assignable_roles
+      ASSIGNABLE_ROLES
+    end
+
+    def deny(message)
+      redirect_to memberships_path, alert: message
+    end
+  end
+end

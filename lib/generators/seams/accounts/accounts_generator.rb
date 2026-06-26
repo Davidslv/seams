@@ -77,6 +77,24 @@ module Seams
                                 engine_path("lib/accounts/concerns/authorization.rb")
       end
 
+      # Phase 4 — the one tenant-facing controller the engine ships:
+      # the memberships role picker. Scoped to Accounts::Current.account
+      # and guarded by membership.manage.accounts (see the controller).
+      def create_controllers
+        template_unless_ejected "app/controllers/memberships_controller.rb.tt",
+                                engine_path("app/controllers/accounts/memberships_controller.rb")
+      end
+
+      # Phase 4 — bare-bones view so the role picker renders out of the
+      # box. Plain semantic ERB: NO design-engine (ui_*) helpers, so the
+      # screen works whether or not the opt-in design engine is
+      # installed. Hosts override by dropping a file at
+      # app/views/accounts/memberships/index.html.erb in their own tree.
+      def create_views
+        template_unless_ejected "app/views/memberships/index.html.erb.tt",
+                                engine_path("app/views/accounts/memberships/index.html.erb")
+      end
+
       def create_migrations
         template "db/migrate/create_accounts.rb.tt",
                  engine_path("db/migrate/#{timestamp(0)}_create_accounts.rb")
@@ -154,9 +172,13 @@ module Seams
       end
 
       def create_runtime_specs
-        # Currently a single runtime boot spec covers events, schema,
-        # create_with_owner, and Accounts::Current. Split into multiple
-        # files in a later phase if the file grows past ~120 lines.
+        # The boot spec (written in create_dummy_app) covers events,
+        # schema, create_with_owner, and Accounts::Current. Phase 4 adds
+        # a request-style behavioural spec for the memberships role
+        # picker: the happy path plus each of the three escalation
+        # safeguards.
+        template "spec/runtime/memberships_flow_spec.rb.tt",
+                 engine_path("spec/runtime/accounts_memberships_flow_spec.rb")
       end
 
       def wire_into_host

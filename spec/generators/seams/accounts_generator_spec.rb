@@ -236,13 +236,48 @@ RSpec.describe Seams::Generators::AccountsGenerator do
   end
 
   describe "routes" do
-    it "ships an empty engine routes file (no controllers in Wave 9)" do
+    it "mounts the memberships role-picker resource (index + update)" do
       assert_file "engines/accounts/config/routes.rb" do |content|
         expect(content).to include("Accounts::Engine.routes.draw do")
-        # The block has no controller routes — the engine ships
-        # models + concerns only.
-        expect(content).not_to include("resources :")
-        expect(content).not_to include("resource :")
+        expect(content).to include("resources :memberships, only: %i[index update]")
+      end
+    end
+
+    it "ships the routes insertion-point markers around the resource" do
+      assert_file "engines/accounts/config/routes.rb" do |content|
+        expect(content).to include("# seams:insertion-point accounts.routes.before_memberships")
+        expect(content).to include("# seams:insertion-point accounts.routes.after_memberships")
+      end
+    end
+  end
+
+  describe "controllers + views (Phase 4)" do
+    it "ships the tenant-facing memberships controller guarded by the ability" do
+      assert_file "engines/accounts/app/controllers/accounts/memberships_controller.rb" do |content|
+        [
+          "class MembershipsController < ApplicationController",
+          "include Accounts::Authorization",
+          'authorize_permission!("membership.manage.accounts")',
+          "def index",
+          "def update",
+          # The three escalation safeguards.
+          "if own_membership?(@membership)",
+          "if @membership.owner?",
+          "unless actor_can_assign?(requested_role)",
+          "ASSIGNABLE_ROLES = %w[admin member].freeze"
+        ].each { |needle| expect(content).to include(needle) }
+        # Scoped to the current account, never global.
+        expect(content).to include("Accounts::Current.account.memberships")
+      end
+    end
+
+    it "ships a design-independent index view (plain ERB, no ui_* helpers)" do
+      assert_file "engines/accounts/app/views/accounts/memberships/index.html.erb" do |content|
+        expect(content).to include('name="membership[role]"')
+        expect(content).to include("assignable_roles.each")
+        expect(content).to include("button")
+        # MUST NOT hard-depend on the opt-in design engine.
+        expect(content).not_to match(/\bui_[a-z_]+/)
       end
     end
   end
@@ -284,6 +319,19 @@ RSpec.describe Seams::Generators::AccountsGenerator do
           "Seams::EventRegistry.registered?",
           "account.created.accounts",
           "Accounts::Current"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
+
+    it "ships the memberships behavioural spec covering the happy path + three safeguards" do
+      assert_file "engines/accounts/spec/runtime/accounts_memberships_flow_spec.rb" do |content|
+        [
+          "Accounts memberships role picker",
+          "type: :request",
+          "happy path",
+          "safeguard 1: the owner role cannot be changed",
+          "safeguard 2: a user cannot change their own role",
+          "safeguard 3: a user cannot assign a role senior to their own"
         ].each { |needle| expect(content).to include(needle) }
       end
     end

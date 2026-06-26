@@ -1,0 +1,145 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+# Behavioural request specs for the tenant-facing memberships role
+# picker: the happy path plus each of the three privilege-escalation
+# safeguards the controller enforces.
+#
+# The Rack stack resets ActiveSupport::CurrentAttributes around every
+# request, so attribute values set in the spec would be wiped before
+# the controller ran. Instead we stub the per-request Current surface
+# (the account + the acting membership) and the Auth identity the staff
+# bypass reads — method stubs survive the executor reset that clears
+# attribute values.
+RSpec.describe "Accounts memberships role picker", type: :request do
+  def act_as(membership:, staff: false)
+    allow(Accounts::Current).to receive(:account).and_return(account)
+    allow(Accounts::Current).to receive(:membership).and_return(membership)
+    identity = staff ? Struct.new(:staff?).new(true) : nil
+    allow(Auth::Current).to receive(:identity).and_return(identity)
+  end
+
+  let(:owner_identity) do
+    Auth::Identity.create!(email: "owner-#{SecureRandom.hex(4)}@example.com", password: "verysecret")
+  end
+
+  let(:account) do
+    Accounts::Account.create_with_owner(
+      account: { name: "Acme #{SecureRandom.hex(2)}" },
+      owner:   Struct.new(:identity, :name).new(owner_identity, "Olive Owner")
+    )
+  end
+
+  let(:owner_membership)  { account.memberships.find_by(role: "owner") }
+  let(:admin_membership)  { build_membership("admin",  "Adam Admin") }
+  let(:member_membership) { build_membership("member", "Mia Member") }
+
+  def build_membership(role, name)
+    identity = Auth::Identity.create!(
+      email: "#{role}-#{SecureRandom.hex(4)}@example.com", password: "verysecret"
+    )
+    account.memberships.create!(role: role, name: name, identity_id: identity.id, active: true)
+  end
+
+  describe "index" do
+    it "lists the current account's active memberships" do
+      act_as(membership: admin_membership)
+      member_membership
+
+      get "/accounts/memberships"
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Mia Member")
+    end
+  end
+
+  describe "happy path" do
+    it "an admin promotes a member to admin" do
+      act_as(membership: admin_membership)
+      target = member_membership
+
+      patch "/accounts/memberships/#{target.id}", params: { membership: { role: "admin" } }
+
+      expect(response).to have_http_status(:found)
+      expect(flash[:notice]).to be_present
+      expect(target.reload.role).to eq("admin")
+    end
+
+    it "an admin demotes another admin to member" do
+      act_as(membership: admin_membership)
+      target = build_membership("admin", "Other Admin")
+
+      patch "/accounts/memberships/#{target.id}", params: { membership: { role: "member" } }
+
+      expect(response).to have_http_status(:found)
+      expect(target.reload.role).to eq("member")
+    end
+  end
+
+  describe "safeguard 1: the owner role cannot be changed" do
+    it "refuses to demote an owner" do
+      act_as(membership: admin_membership)
+
+      patch "/accounts/memberships/#{owner_membership.id}", params: { membership: { role: "member" } }
+
+      expect(flash[:alert]).to be_present
+      expect(owner_membership.reload.role).to eq("owner")
+    end
+
+    it "refuses to promote anyone to owner, even for an acting owner" do
+      act_as(membership: owner_membership)
+      target = member_membership
+
+      patch "/accounts/memberships/#{target.id}", params: { membership: { role: "owner" } }
+
+      expect(flash[:alert]).to be_present
+      expect(target.reload.role).to eq("member")
+    end
+  end
+
+  describe "safeguard 2: a user cannot change their own role" do
+    it "refuses to change the acting membership" do
+      act_as(membership: admin_membership)
+
+      patch "/accounts/memberships/#{admin_membership.id}", params: { membership: { role: "member" } }
+
+      expect(flash[:alert]).to match(/your own role/i)
+      expect(admin_membership.reload.role).to eq("admin")
+    end
+  end
+
+  describe "safeguard 3: a user cannot assign a role senior to their own" do
+    it "refuses an admin assigning owner (senior to admin)" do
+      act_as(membership: admin_membership)
+      target = member_membership
+
+      patch "/accounts/memberships/#{target.id}", params: { membership: { role: "owner" } }
+
+      expect(flash[:alert]).to match(/senior/i)
+      expect(target.reload.role).to eq("member")
+    end
+
+    it "never assigns the system role through the screen" do
+      act_as(membership: admin_membership)
+      target = member_membership
+
+      patch "/accounts/memberships/#{target.id}", params: { membership: { role: "system" } }
+
+      expect(flash[:alert]).to be_present
+      expect(target.reload.role).to eq("member")
+    end
+  end
+
+  describe "authorization" do
+    it "forbids a plain member from changing roles" do
+      act_as(membership: member_membership)
+      target = build_membership("member", "Another Member")
+
+      patch "/accounts/memberships/#{target.id}", params: { membership: { role: "admin" } }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(target.reload.role).to eq("member")
+    end
+  end
+end

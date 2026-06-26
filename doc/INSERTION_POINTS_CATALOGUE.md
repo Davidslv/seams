@@ -17,7 +17,7 @@ Marker count summary:
 |---|---|---|
 | core | 2 (+1 deferred) | engine.rb (configuration.rb deferred to Wave 12) |
 | auth | 7 | engine.rb, routes.rb, configuration.rb |
-| accounts | 4 | engine.rb, configuration.rb |
+| accounts | 6 | engine.rb, configuration.rb, routes.rb |
 | teams | 5 | engine.rb, routes.rb, configuration.rb |
 | notifications | 7 | engine.rb, configuration.rb, notifiable.rb, type registry |
 | billing | 7 | engine.rb, routes.rb, configuration.rb, webhook router |
@@ -189,6 +189,22 @@ deliberately omitted — the eject CLI handles non-extensible needs.
   `@after_account_create_url` assignment.
 - **Purpose:** matches `accounts.configuration.attributes` — defaults
   for the new attributes go here.
+
+### accounts.routes.before_memberships
+
+- **File:** `engines/accounts/config/routes.rb`
+- **Inside:** the `Accounts::Engine.routes.draw` block, before the
+  canonical `resources :memberships` line.
+- **Purpose:** follow-up generators that add admin-only or token-only
+  routes splice them here, ahead of the role-picker resource.
+
+### accounts.routes.after_memberships
+
+- **File:** `engines/accounts/config/routes.rb`
+- **Inside:** the `Accounts::Engine.routes.draw` block, after the
+  `resources :memberships` line, before the closing `end`.
+- **Purpose:** follow-up generators that add new top-level accounts
+  routes (e.g. account settings, transfer) splice them here.
 
 ---
 
