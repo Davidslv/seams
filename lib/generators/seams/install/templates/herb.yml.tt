@@ -1,0 +1,10 @@
+# Herb config for this Seams host. Herb lints HTML+ERB templates (host views
+# AND generated engine views) for invalid nesting, accessibility, and unsafe
+# raw output. Run with `bundle exec herb lint "**/*.html.erb"`; CI runs it too.
+#
+# Pin the version so a herb upgrade can't enable new rules mid-CI without a
+# deliberate bump. Regenerate the full default with `bundle exec herb-lint --init`.
+#
+# Docs: https://herb-tools.dev/configuration
+
+framework: actionview

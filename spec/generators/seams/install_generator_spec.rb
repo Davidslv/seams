@@ -380,4 +380,73 @@ RSpec.describe Seams::Generators::InstallGenerator do
       expect(dockerfile).to match(/^EXPOSE \d+/)
     end
   end
+
+  describe "quality toolchain — installed by default" do
+    before do
+      File.write(File.join(destination_root, "Gemfile"), "source \"https://rubygems.org\"\n")
+      run_generator
+    end
+
+    it "creates the config files" do
+      assert_file ".herb.yml"
+      assert_file "config/initializers/strong_migrations.rb" do |content|
+        expect(content).to include("StrongMigrations.start_after = 0")
+      end
+      assert_file "lefthook.yml" do |content|
+        expect(content).to include("pre-commit")
+        expect(content).to include("herb lint")
+        expect(content).to include("rspec")
+      end
+    end
+
+    it "injects the gems the CI workflow and hooks shell out to" do
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      %w[rubocop brakeman bundler-audit herb lefthook strong_migrations].each do |g|
+        expect(gemfile).to match(/gem ["']#{g}["']/), "expected gem #{g} in Gemfile"
+      end
+    end
+
+    it "wires herb + strong_migrations into the generated CI" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("herb lint")
+        expect(content).to include("db:create db:migrate")
+      end
+    end
+  end
+
+  describe "quality toolchain — opt out" do
+    before { File.write(File.join(destination_root, "Gemfile"), "source \"https://rubygems.org\"\n") }
+
+    it "--no-herb skips the config, gem, and CI step" do
+      run_generator(["--no-herb"])
+      expect(File.exist?(File.join(destination_root, ".herb.yml"))).to be(false)
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      expect(gemfile).not_to match(/gem ["']herb["']/)
+      ci = File.read(File.join(destination_root, ".github/workflows/ci.yml"))
+      expect(ci).not_to include("herb lint")
+    end
+
+    it "--no-strong-migrations skips the initializer, gem, and CI step" do
+      run_generator(["--no-strong-migrations"])
+      expect(File.exist?(File.join(destination_root, "config/initializers/strong_migrations.rb"))).to be(false)
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      expect(gemfile).not_to match(/gem ["']strong_migrations["']/)
+      ci = File.read(File.join(destination_root, ".github/workflows/ci.yml"))
+      expect(ci).not_to include("db:create db:migrate")
+    end
+
+    it "--no-lefthook skips the config and gem" do
+      run_generator(["--no-lefthook"])
+      expect(File.exist?(File.join(destination_root, "lefthook.yml"))).to be(false)
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      expect(gemfile).not_to match(/gem ["']lefthook["']/)
+    end
+
+    it "still generates valid CI YAML with all quality tools opted out" do
+      run_generator(["--no-herb", "--no-strong-migrations", "--no-lefthook"])
+      expect do
+        YAML.safe_load_file(File.join(destination_root, ".github/workflows/ci.yml"), aliases: true)
+      end.not_to raise_error
+    end
+  end
 end

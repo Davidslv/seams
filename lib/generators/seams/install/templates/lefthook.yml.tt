@@ -1,0 +1,25 @@
+# Git hooks for this Seams host. Install once with:
+#
+#   bundle exec lefthook install
+#
+# These run the same quality gates as CI, but locally — before a push, so
+# issues surface immediately instead of in CI. Bypass with `git ... --no-verify`.
+
+pre-commit:
+  parallel: true
+  commands:
+    rubocop:
+      glob: "*.rb"
+      # --force-exclusion honours the engines/ exclude in .rubocop.yml even
+      # when files are passed explicitly (engines lint themselves).
+      run: bundle exec rubocop --force-exclusion {staged_files}
+<% if options[:herb] -%>
+    herb:
+      glob: "*.html.erb"
+      run: bundle exec herb lint {staged_files}
+<% end -%>
+
+pre-push:
+  commands:
+    specs:
+      run: bundle exec rspec
