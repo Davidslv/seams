@@ -10,7 +10,11 @@
 # Risk: append-mostly. profile_data is a json column for the raw
 #       provider response (sub/login/etc) so we can re-derive things
 #       like display name without re-fetching.
-class CreateAuthOauthProviders < ActiveRecord::Migration[7.1]
+# Class name uses the camel-OA "OAuth" spelling: the auth engine registers
+# `OAuth` as an ActiveSupport inflector acronym, so the migrator camelizes
+# this file's name to CreateAuthOAuthProviders. A single-O class name would
+# raise `uninitialized constant CreateAuthOAuthProviders` at migrate time.
+class CreateAuthOAuthProviders < ActiveRecord::Migration[7.1]
   def change
     create_table :auth_oauth_providers do |t|
       t.references :identity,     null: false, foreign_key: { to_table: :auth_identities }
