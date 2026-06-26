@@ -313,6 +313,100 @@ RSpec.describe Seams::Generators::DesignGenerator do
     end
   end
 
+  # #20 — the design:component generator ships INSIDE the generated engine at
+  # engines/design/lib/generators/design/component/, so a host can run
+  # `rails g design:component <name>` to add a strict-locals partial + its
+  # preview, and the gallery picks it up automatically (the preview is what makes
+  # ui_<name> public). The generator's own .tt templates are double-edged: the
+  # engine ships them verbatim (NOT processed by the meta-generator's ERB), then
+  # `rails g design:component` runs ERB over them. These specs cover both the
+  # shipped files and an end-to-end run of the component generator.
+  describe "design:component generator" do
+    it "ships the generator class under Design::Generators, writing into ui/", :aggregate_failures do
+      assert_file "engines/design/lib/generators/design/component/component_generator.rb" do |content|
+        expect(content).to include("module Design")
+        expect(content).to include("module Generators")
+        expect(content).to include("class ComponentGenerator < Rails::Generators::NamedBase")
+        # writes the partial + the preview into the engine's ui/ tree
+        expect(content).to include("view_path(\"ui/_\#{file_name}.html.erb\")")
+        expect(content).to include("view_path(\"ui/previews/_\#{file_name}.html.erb\")")
+        # resolves the engine root at host runtime (non-isolated engine)
+        expect(content).to include("Design::Engine.root")
+        # the verb the host types + the helper the host gets (literal text in
+        # the generator's say output — Ruby interpolation at run time)
+        expect(content).to include("rails g design:component")
+        expect(content).to include("ui_\#{file_name} is now callable")
+      end
+    end
+
+    it "ships the partial + preview .tt templates VERBATIM (escapes intact)", :aggregate_failures do
+      # The meta-generator copies these (copy_file, not template), so the `<%%`
+      # escapes survive: `rails g design:component` un-escapes them to `<%`. If
+      # the meta-generator had run ERB over them, the escapes would be gone and
+      # the `<%= file_name %>` placeholders would nest inside a real tag.
+      assert_file "engines/design/lib/generators/design/component/templates/component.html.erb.tt" do |content|
+        expect(content).to include("<%%# locals:")
+        expect(content).to include("<%= file_name %>")
+        expect(content).to include("<%%= tag.div")
+        expect(content).to include("class_names")
+      end
+      assert_file "engines/design/lib/generators/design/component/templates/preview.html.erb.tt" do |content|
+        expect(content).to include("<%%= ui_<%= file_name %>")
+        expect(content).to include("file_name.humanize")
+      end
+    end
+
+    describe "running design:component end-to-end" do
+      # Load the shipped generator from the generated engine, stub
+      # Design::Engine.root so it writes into that engine, and run it. Proves the
+      # double-templating contract holds: the produced partial is valid,
+      # single-pass ERB and the preview registers the component for the auto-wire.
+      let(:engine_root) { File.join(destination_root, "engines/design") }
+
+      before do
+        # The shipped generator resolves Design::Engine.root at host runtime;
+        # stub it to the generated engine so it writes back into that tree.
+        root = Pathname.new(engine_root)
+        stub_const("Design::Engine", Module.new)
+        Design::Engine.define_singleton_method(:root) { root }
+
+        generator_file = File.join(engine_root,
+                                   "lib/generators/design/component/component_generator.rb")
+        load generator_file
+        Design::Generators::ComponentGenerator.start(["badge"], destination_root: destination_root)
+      end
+
+      it "writes ui/_badge.html.erb as a single-pass strict-locals partial", :aggregate_failures do
+        assert_file "engines/design/app/views/ui/_badge.html.erb" do |content|
+          # the meta-generator's `<%%` escapes are now un-escaped to real ERB
+          expect(content).to include("<%# locals: (variant: :default, content: nil, **attrs) -%>")
+          # the name is interpolated into the class names
+          expect(content).to include("class_names(\"badge\", \"badge-\#{variant}\"")
+          # no leftover escape markers or un-interpolated placeholders
+          expect(content).not_to include("<%%")
+          expect(content).not_to include("<%= file_name %>")
+        end
+      end
+
+      it "writes ui/previews/_badge.html.erb calling the ui_badge helper", :aggregate_failures do
+        assert_file "engines/design/app/views/ui/previews/_badge.html.erb" do |content|
+          expect(content).to include("<%# locals: () -%>")
+          expect(content).to include('<%= ui_badge { "Badge" } %>')
+          expect(content).not_to include("<%%")
+          expect(content).not_to include("compositor_badge")
+        end
+      end
+
+      it "makes the component public — its preview joins the auto-wire list" do
+        # Design.component_names derives the public list from ui/previews/_*.erb,
+        # so a freshly generated preview means ui_badge exists + lists in /design/guide.
+        previews = Dir[File.join(engine_root, "app/views/ui/previews/_*.html.erb")]
+                   .map { |p| File.basename(p).delete_prefix("_").delete_suffix(".html.erb") }
+        expect(previews).to include("badge")
+      end
+    end
+  end
+
   describe "isolated-engine leftovers removed" do
     it "removes the base Design::ApplicationController" do
       full = File.join(destination_root, "engines/design/app/controllers/design/application_controller.rb")

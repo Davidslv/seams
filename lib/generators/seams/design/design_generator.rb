@@ -34,6 +34,11 @@ module Seams
     # design:component generator), and the Phase 2/3 component + shell units.
     #
     # Run with: bin/seams design   (or bin/rails generate seams:design)
+    #
+    # Like the admin generator, this is a long-but-flat orchestration class: each
+    # public method is one small, single-purpose generate step, so the length is
+    # inherent to the number of files the engine ships, not tangled logic.
+    # rubocop:disable Metrics/ClassLength
     class DesignGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
       include Seams::Generators::EjectAware
@@ -182,6 +187,24 @@ module Seams
                                 engine_path("app/views/layouts/design/guide.html.erb")
         template_unless_ejected "app/views/design/guide/index.html.erb.tt",
                                 engine_path("app/views/design/guide/index.html.erb")
+      end
+
+      # The design:component generator (#20): ships INSIDE the generated engine
+      # at engines/design/lib/generators/design/component/, so a host can run
+      # `rails g design:component <name>` (Rails auto-discovers it on the engine's
+      # lib path; no registration needed). Ported from quire-saas's Compositor.
+      #
+      # copy_file (NOT template): the generator's own .tt templates are ERB run by
+      # `rails g design:component`, so they must reach the engine VERBATIM. The
+      # meta-generator's ERB would un-escape their `<%%` markers and nest the
+      # `<%= file_name %>` placeholders inside a real tag — a parse error.
+      def create_component_generator
+        copy_file "lib/generators/design/component/component_generator.rb.tt",
+                  engine_path("lib/generators/design/component/component_generator.rb")
+        copy_file "lib/generators/design/component/templates/component.html.erb.tt",
+                  engine_path("lib/generators/design/component/templates/component.html.erb.tt")
+        copy_file "lib/generators/design/component/templates/preview.html.erb.tt",
+                  engine_path("lib/generators/design/component/templates/preview.html.erb.tt")
       end
 
       def create_runtime_spec
@@ -393,5 +416,6 @@ module Seams
         TXT
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

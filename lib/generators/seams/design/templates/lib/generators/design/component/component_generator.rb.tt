@@ -1,0 +1,52 @@
+# frozen_string_literal: true
+
+require "rails/generators/named_base"
+
+module Design
+  module Generators
+    # rails g design:component badge
+    #
+    # Scaffolds a component (a strict-locals partial under app/views/ui/) and its
+    # preview (under app/views/ui/previews/). The preview is what makes the
+    # component "public": it gets an auto-wired ui_<name> helper AND a section in
+    # the living gallery, both automatically, with no extra wiring. The generator
+    # gives you the skeleton and the conventions; you fill in the markup with the
+    # design system's Tailwind classes.
+    #
+    # Ported from quire-saas's Compositor (compositor:component), generalised:
+    # compositor/ -> ui/, compositor_<name> -> ui_<name>, Compositor:: -> Design::.
+    class ComponentGenerator < Rails::Generators::NamedBase
+      source_root File.expand_path("templates", __dir__)
+
+      desc "Scaffold a design-system component partial (app/views/ui/) and its preview."
+
+      def create_component_partial
+        template "component.html.erb.tt", view_path("ui/_#{file_name}.html.erb")
+      end
+
+      def create_preview_partial
+        template "preview.html.erb.tt", view_path("ui/previews/_#{file_name}.html.erb")
+      end
+
+      def next_steps
+        say ""
+        say "  design:component #{file_name} scaffolded.", :green
+        say "  1. Build the markup in app/views/ui/_#{file_name}.html.erb"
+        say "     using the design system's classes; bake in accessibility."
+        say "  2. Show its states in app/views/ui/previews/_#{file_name}.html.erb"
+        say "  3. ui_#{file_name} is now callable in every view; see /design/guide."
+        say ""
+      end
+
+      private
+
+      # The design engine is non-isolated, so its partials live in the engine's
+      # own app/views/ui/ tree (which Rails appends to the host's view paths).
+      # Resolve the engine root at runtime so the generator writes into the
+      # engine wherever the host vendored it.
+      def view_path(relative)
+        File.join(Design::Engine.root, "app", "views", relative)
+      end
+    end
+  end
+end

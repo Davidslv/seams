@@ -1,0 +1,3 @@
+<%%# locals: () -%>
+<%%# TODO: show every state of <%= file_name %>. -%>
+<%%= ui_<%= file_name %> { "<%= file_name.humanize %>" } %>
