@@ -6,6 +6,7 @@
 #   bin/seams install                     # bin/rails generate seams:install
 #   bin/seams engine billing              # bin/rails generate seams:engine billing
 #   bin/seams core | auth | accounts | notifications | billing | teams | admin | design
+#   bin/seams permissions                 # bin/rails generate seams:permissions
 #   bin/seams remove billing              # bin/rails generate seams:remove billing
 #   bin/seams list                        # bin/rails seams:list
 #   bin/seams test billing                # bin/rails seams:test[billing]
@@ -16,7 +17,7 @@
 
 require "shellwords"
 
-CANONICAL = %w[install core auth accounts notifications billing teams admin design].freeze
+CANONICAL = %w[install core auth accounts notifications billing teams admin design permissions].freeze
 GENERIC   = %w[engine remove].freeze
 TASKS     = %w[list].freeze
 ENGINE_TASKS = %w[test quality].freeze
@@ -71,6 +72,8 @@ when nil, "help", "-h", "--help"
       engine <name>                 Generate a generic engine
       core | auth | accounts | notifications | billing | teams | admin | design
                                     Generate a canonical engine
+      permissions                   Generate the host-editable role -> ability
+                                    grant map (config/initializers/seams_permissions.rb)
       remove <name>                 Remove an engine
 
     Follow-up generators (extend an already-installed engine):

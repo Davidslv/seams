@@ -1,0 +1,35 @@
+# frozen_string_literal: true
+
+# Seams permissions — the host-editable role -> ability grant map.
+#
+# This is the ONE place you decide who-can-do-what. There is no database
+# table and no DSL: authorisation is a code-defined role hierarchy plus
+# this map. Edit the hash below, restart, done.
+#
+# How it resolves (Seams::Permissions.can?):
+#   - Roles inherit DOWNWARD: owner inherits admin inherits member. So a
+#     code only needs to appear at the LOWEST role that should hold it —
+#     anything granted to "member" is automatically held by admin + owner.
+#   - "system" is a pseudo-role that bypasses every check (background
+#     jobs, trusted internal actors). It needs no entry here.
+#   - Platform staff (Auth::Identity#staff?) are bypassed at the REQUEST
+#     layer by the caller (e.g. authorize_permission!), not here.
+#   - Deny-by-default: a role that is not granted a code does not hold it.
+#
+# The catalog of ability CODES is engine-owned. Each engine registers the
+# `resource.action.engine` codes it understands from its engine.rb
+# (mirroring the event bus). You can only grant codes that some engine has
+# registered — referencing an unregistered code makes `can?` RAISE, not
+# quietly allow. List the live catalog with:
+#
+#   bin/rails runner 'pp Seams::PermissionRegistry.all'
+#
+# The map below is a copy of Seams::Permissions::DEFAULT_GRANTS as shipped
+# by the gem at the time this file was generated. Add, remove, or move
+# codes between roles to fit your product. To add a brand-new code, first
+# register it from the owning engine's engine.rb, then grant it here.
+Seams.configure do |config|
+  config.permission_grants = {
+<%= grant_map_body %>
+  }
+end
