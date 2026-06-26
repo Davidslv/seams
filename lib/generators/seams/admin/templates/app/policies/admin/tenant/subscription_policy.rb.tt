@@ -17,6 +17,12 @@ module Admin
           scope.where(account_id: account_id)
         end
       end
+
+      private
+
+      def permission_ability
+        "subscription.manage.billing"
+      end
     end
   end
 end

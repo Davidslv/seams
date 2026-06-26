@@ -48,6 +48,10 @@ module Admin
 
       private
 
+      def permission_ability
+        "identity.manage.auth"
+      end
+
       # Identity has no `account_id` column. Per-record tenant guard
       # checks instead that the Identity holds a membership in the
       # current Account.

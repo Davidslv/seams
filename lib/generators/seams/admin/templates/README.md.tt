@@ -77,8 +77,10 @@ Seams::Admin.configure { |c| c.tenancy_scope = :platform }
 Seams::Admin.configure { |c| c.tenancy_scope = :tenant }
 ```
 
-- **Gate:** `Accounts::Membership#role == "admin"` (read off
-  `Accounts::Current.membership`).
+- **Gate:** `Seams::Permissions.can?(role:, ability:)` — each tenant
+  policy resolves its resource's ability code against the membership
+  role read off `Accounts::Current.membership` (no `role == "admin"`
+  literal). Platform `staff?` and the `system` role still bypass.
 - **Visibility:** only the current Account's data — every Pundit
   `Scope` filters by `account_id`.
 - **Use case:** a tenant-facing admin surface where each customer's

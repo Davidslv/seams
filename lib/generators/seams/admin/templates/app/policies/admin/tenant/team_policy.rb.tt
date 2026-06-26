@@ -23,6 +23,12 @@ module Admin
           scope.where(account_id: account_id)
         end
       end
+
+      private
+
+      def permission_ability
+        "team.manage.teams"
+      end
     end
   end
 end

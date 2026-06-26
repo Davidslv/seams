@@ -21,6 +21,10 @@ module Admin
 
       private
 
+      def permission_ability
+        "account.manage.accounts"
+      end
+
       def record_in_tenant_scope?
         return true if user&.identity&.staff?
         return true if record.nil? || record.is_a?(Class)
