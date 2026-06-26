@@ -1,0 +1,37 @@
+# frozen_string_literal: true
+
+module Design
+  # The host-wide design-system helper. The only hand-written helper is the one
+  # that isn't a plain "render a component" — currently just ui_icon. Every
+  # public component (one with a preview partial) gets a `ui_<name>` helper
+  # defined automatically (see define_component_helpers!), so adding a component
+  # never means adding a helper.
+  #
+  # Mixed into ActionController::Base by the engine's to_prepare hook, so the
+  # helpers resolve in the host's views AND every other engine's views.
+  module UiHelper
+    # <%%= ui_icon(:close) %> — references the inline sprite by fragment.
+    def ui_icon(name, size: nil)
+      return if name.nil?
+
+      render "ui/icon", name: name, size: size
+    end
+
+    # Define ui_<name>(**locals, &block) for every public component. The block,
+    # if given, is captured and passed as the `content` local — so a component
+    # that takes content declares `content: nil` in its strict locals, and every
+    # other keyword flows straight through (extras land in the partial's trailing
+    # **attrs and are splatted onto its root element).
+    def self.define_component_helpers!
+      Design.component_names.each do |name|
+        method_name = "ui_#{name}"
+        next if instance_methods(false).include?(method_name.to_sym)
+
+        define_method(method_name) do |**locals, &block|
+          locals = locals.merge(content: capture(&block)) if block
+          render "ui/#{name}", **locals
+        end
+      end
+    end
+  end
+end

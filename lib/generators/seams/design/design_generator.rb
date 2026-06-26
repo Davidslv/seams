@@ -1,0 +1,291 @@
+# frozen_string_literal: true
+
+require "fileutils"
+require "rails/generators"
+require "seams"
+require "generators/seams/engine/engine_generator"
+require "seams/generators/host_injector"
+require "seams/generators/eject_aware"
+
+module Seams
+  module Generators
+    # Generates the canonical Design engine on top of the generic engine
+    # scaffold — Phase 1 (this unit): the engine skeleton, the non-isolated
+    # wiring that makes `ui_*` helpers + `ui/` partials visible host-wide, the
+    # Tailwind v4 token injection, the FormBuilder default, and the icon sprite
+    # render.
+    #
+    # The design engine is DELIBERATELY NOT `isolate_namespace`d (D4 in
+    # proposals/design_system_engine.md). The whole value is that a component
+    # renders anywhere in the host and in every other engine's views without
+    # ceremony, which requires the partials and the helper to live in the host's
+    # view paths and `ActionController::Base`. The base EngineGenerator produces
+    # an isolated engine, so this generator overwrites lib/design/engine.rb with
+    # the non-isolated form and removes the single-namespace leftovers the base
+    # scaffold ships.
+    #
+    # Naming (D1): the engine, CLI verb, folder and Ruby namespace are `design`
+    # (`Design::`); the VIEW + HELPER surface is `ui` — partials at
+    # app/views/ui/_<name>.html.erb, previews at app/views/ui/previews/, and
+    # auto-derived helpers named `ui_<name>`.
+    #
+    # Later sub-issues import this skeleton: #17 (tokens/theme), #18 (helpers +
+    # gallery + tests), #19 (FormBuilder + form components), #20 (the
+    # design:component generator), and the Phase 2/3 component + shell units.
+    #
+    # Run with: bin/seams design   (or bin/rails generate seams:design)
+    class DesignGenerator < Rails::Generators::Base
+      include Seams::Generators::HostInjector
+      include Seams::Generators::EjectAware
+
+      source_root File.expand_path("templates", __dir__)
+
+      ENGINE_NAME = "design"
+
+      def create_base_engine
+        # The base EngineGenerator raises if engines/design/ already exists.
+        # Skip it on a re-run so a second `bin/seams design` is a no-op on the
+        # engine and simply re-applies the (idempotent) host wiring below.
+        if File.directory?(engine_path(""))
+          say "  exist   engines/design (kept — re-applying host wiring only)", :blue
+          return
+        end
+
+        EngineGenerator.start([ENGINE_NAME], destination_root: destination_root)
+      end
+
+      # The base EngineGenerator emits an ISOLATED engine. The design engine is
+      # non-isolated by design (D4), so overwrite lib/design/engine.rb with the
+      # non-isolated form that auto-wires the helper into ActionController::Base.
+      # engine.rb stays framework-managed (NOT eject-aware), like every other
+      # canonical generator's engine.rb.
+      def overwrite_engine_entry_point
+        template "lib/engine.rb.tt", engine_path("lib/design/engine.rb"), force: true
+        template "lib/design.rb.tt", engine_path("lib/design.rb"),        force: true
+      end
+
+      # The base scaffold ships an isolated engine's ApplicationController and
+      # ApplicationRecord under app/controllers/design/ and app/models/design/.
+      # A view-layer engine needs neither — it has no controllers and no models
+      # in Phase 1 — so remove them. (#18 adds the dev-only guide controller.)
+      def remove_isolated_leftovers
+        # config/routes.rb is KEPT (an empty `Design::Engine.routes.draw do end`)
+        # so the engine stays mountable in the dummy app + host; the dev-only
+        # guide route (#18) is drawn into it later.
+        %w[
+          app/controllers/design/application_controller.rb
+          app/models/design/application_record.rb
+          spec/design_spec.rb
+        ].each do |relative|
+          full = engine_path(relative)
+          next unless File.exist?(full)
+
+          FileUtils.rm(full)
+          say "  remove  #{relative} (isolated-engine leftover)", :red
+        end
+
+        %w[app/controllers/design app/models/design].each do |relative|
+          full = engine_path(relative)
+          Dir.rmdir(full) if File.directory?(full) && Dir.empty?(full)
+        end
+      end
+
+      # The auto-wire registry: Design.component_names derives the public
+      # component list from the preview partials, and resets on reload so a new
+      # component appears without a server restart. Ported from quire-saas's
+      # lib/compositor.rb (compositor -> design, compositor/previews -> ui/previews).
+      def create_auto_wire
+        template "lib/design/components.rb.tt", engine_path("lib/design/components.rb")
+      end
+
+      # The host-wide helper module. ui_icon is the one hand-written helper;
+      # define_component_helpers! auto-derives ui_<name> for every preview.
+      # Ported from quire-saas's app/helpers/compositor_helper.rb.
+      def create_helper
+        template "app/helpers/design/ui_helper.rb.tt",
+                 engine_path("app/helpers/design/ui_helper.rb")
+      end
+
+      # The default form builder. Subclasses the standard Rails builder and only
+      # ADDS ui_* methods, so it is safe as the app-wide default. Ported from
+      # quire-saas's app/form_builders/compositor/form_builder.rb (compositor_*
+      # -> ui_*, the field partial path compositor/field -> ui/field). #19
+      # fleshes out the textarea/select/submit helpers + the ui/field partial.
+      def create_form_builder
+        template "app/form_builders/design/form_builder.rb.tt",
+                 engine_path("app/form_builders/design/form_builder.rb")
+      end
+
+      # The icon sprite + icon partials — the minimum view surface the skeleton
+      # needs so `render "ui/icon_sprite"` (wired into the host layout below) and
+      # ui_icon resolve. #25 ships the full primitive + icon set; these two are
+      # the load-bearing pair the host layout references on first boot.
+      def create_icon_partials
+        template_unless_ejected "app/views/ui/_icon.html.erb.tt",
+                                engine_path("app/views/ui/_icon.html.erb")
+        template_unless_ejected "app/views/ui/_icon_sprite.html.erb.tt",
+                                engine_path("app/views/ui/_icon_sprite.html.erb")
+      end
+
+      def create_runtime_spec
+        template "spec/runtime/design_boot_spec.rb.tt",
+                 engine_path("spec/runtime/design_boot_spec.rb")
+      end
+
+      def overwrite_readme
+        template "README.md.tt", engine_path("README.md"), force: true
+      end
+
+      # --- Host wiring ----------------------------------------------------------
+
+      def wire_into_host
+        # Tailwind v4 is a hard dependency (D2): the @theme token layer the
+        # engine ships is Tailwind-native. Inject the gem and write the token
+        # block into the host's application.css.
+        host_inject_gem("tailwindcss-rails", "~> 4.0")
+        inject_theme_into_host_css
+        set_host_default_form_builder
+        render_sprite_in_host_layout
+      end
+
+      def report_summary
+        say report_summary_text, :green
+      end
+
+      private
+
+      def engine_path(relative)
+        File.join(destination_root, "engines", ENGINE_NAME, relative)
+      end
+
+      # Write the neutral @theme token block into the host's Tailwind entrypoint.
+      # Phase 1 ships a minimal NEUTRAL default (paper/ink/accent + a system type
+      # stack); #17 owns the full WCAG-AA token layer. If the host has no
+      # application.css yet (no tailwindcss-rails installed at generate time),
+      # create one with the `@import "tailwindcss"` line so the first boot has a
+      # working stylesheet. Idempotent — skips if the token marker is present.
+      def inject_theme_into_host_css
+        css_path = host_path("app/assets/tailwind/application.css")
+
+        unless File.exist?(css_path)
+          FileUtils.mkdir_p(File.dirname(css_path))
+          create_file css_path, %(@import "tailwindcss";\n)
+        end
+
+        return if File.read(css_path).include?(THEME_MARKER)
+
+        say "  inject  app/assets/tailwind/application.css (@theme tokens)", :green
+        append_to_file css_path, "\n#{neutral_theme_block}"
+      end
+
+      THEME_MARKER = "seams:design tokens"
+      private_constant :THEME_MARKER
+
+      # The minimal NEUTRAL default theme. Not quire's garnet/Spectral — a
+      # restrained paper/ink palette, one cool accent, a system type stack.
+      # #17 replaces this with the full, audited token set; the marker comment
+      # keeps that injection idempotent and easy to find.
+      def neutral_theme_block
+        <<~CSS
+          /* ---------------------------------------------------------------------------
+             #{THEME_MARKER} — the neutral default design tokens, owned by Tailwind @theme.
+             Retheme by overriding these values; nothing else changes. (seams design)
+             --------------------------------------------------------------------------- */
+          @theme {
+            --color-paper:#ffffff; --color-paper-raised:#f6f7f9; --color-card:#ffffff;
+            --color-ink:#16181d; --color-ink-2:#3a3f47; --color-muted:#646b76; --color-faint:#8a909a;
+            --color-line:#e6e8ec; --color-line-2:#d4d8df;
+            --color-accent:#2f5bd7; --color-accent-deep:#1f3f9c;
+            --color-ready:#137a4b; --color-ready-bg:#e7f4ed; --color-ready-line:#a8d6bd;
+            --color-progress:#9a5b06; --color-progress-bg:#fbf1e0; --color-progress-line:#eccf97;
+            --color-alert:#c5273a; --color-alert-bg:#fbecee; --color-alert-line:#f1b6bd;
+            --font-display:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+            --font-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+            --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+          }
+        CSS
+      end
+
+      # Make Design::FormBuilder the host's default form builder so every
+      # `form_with` / `form_for` gets the f.ui_* field methods without passing
+      # `builder:`. Injected into config/application.rb inside the Application
+      # class body. Idempotent.
+      def set_host_default_form_builder
+        application_rb = host_path("config/application.rb")
+        unless File.exist?(application_rb)
+          return host_skip("config/application.rb not found — set " \
+                           "config.action_view.default_form_builder = \"Design::FormBuilder\" yourself")
+        end
+
+        contents = File.read(application_rb)
+        return if contents.include?("default_form_builder")
+
+        say "  inject  config/application.rb (default_form_builder = Design::FormBuilder)", :green
+        inject_into_class application_rb, "Application", <<~RUBY
+          # The Design engine's FormBuilder only ADDS ui_* field helpers; the
+          # standard f.text_field / f.select / f.submit are untouched, so it is
+          # safe as the app-wide default. Set as a string so the constant is
+          # resolved lazily, after the engine has loaded.
+          config.action_view.default_form_builder = "Design::FormBuilder"
+        RUBY
+      end
+
+      # Render the icon sprite once near the top of <body> in the host layout so
+      # the ui_* components can reference icons by fragment without an external
+      # request. Injected immediately after the opening <body> tag. Skips if the
+      # host layout is missing or already renders the sprite.
+      def render_sprite_in_host_layout
+        layout = host_path("app/views/layouts/application.html.erb")
+        unless File.exist?(layout)
+          return host_skip("app/views/layouts/application.html.erb not found — " \
+                           'add `<%= render "ui/icon_sprite" %>` near the top of <body> yourself')
+        end
+
+        contents = File.read(layout)
+        return if contents.include?('render "ui/icon_sprite"')
+
+        body_anchor = /<body[^>]*>\n/
+        unless contents.match?(body_anchor)
+          return host_skip("app/views/layouts/application.html.erb has no <body> tag — " \
+                           'add `<%= render "ui/icon_sprite" %>` near the top of <body> yourself')
+        end
+
+        say "  inject  app/views/layouts/application.html.erb (render \"ui/icon_sprite\")", :green
+        inject_into_file layout, after: body_anchor do
+          %(    <%# seams design — icon sprite for ui_* components %>\n) +
+            %(    <%= render "ui/icon_sprite" %>\n)
+        end
+      end
+
+      def report_summary_text
+        <<~TXT
+
+          Design engine generated at engines/design/
+
+          Next steps:
+            1. bundle install
+               (picks up tailwindcss-rails, injected into the host Gemfile)
+
+            2. bin/rails tailwindcss:install   (if Tailwind isn't set up yet)
+               then build it:  bin/rails tailwindcss:build
+
+            3. Use the components anywhere in the host or another engine's views:
+                 <%= ui_button(variant: :primary) { "Save" } %>
+                 <%= form_with model: @record do |f| %>
+                   <%= f.ui_text_field :title, label: "Title" %>
+                 <% end %>
+
+          The engine is non-isolated: ui_* helpers and ui/ partials resolve
+          everywhere, and Design::FormBuilder is the host default form builder.
+
+          Retheme by overriding the @theme tokens in
+          app/assets/tailwind/application.css.
+
+          Run the engine specs:
+            bin/rails seams:test[design]
+
+        TXT
+      end
+    end
+  end
+end

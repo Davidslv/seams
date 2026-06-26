@@ -1,0 +1,90 @@
+# frozen_string_literal: true
+
+module Design
+  # The design-system form builder. Subclasses the standard Rails builder and
+  # only ADDS ui_* methods — f.text_field / f.select / f.submit are untouched —
+  # so it is safe to make the app-wide default (see
+  # config.action_view.default_form_builder), and you never pass `builder:` per
+  # form.
+  #
+  # Each method wires the form object's name, value and validation error into the
+  # ui/field markup, so the accessibility (label association, aria-invalid,
+  # aria-describedby) is baked in and cannot drift. Arbitrary HTML options —
+  # including data-* attributes for Stimulus — pass straight through to the
+  # control, so Hotwire keeps working untouched.
+  #
+  # Phase 1 ships the field helpers + the shared accessible wrapper; #19 ships
+  # the ui/field partial and the rest of the form-component set.
+  class FormBuilder < ActionView::Helpers::FormBuilder
+    # f.ui_text_field :title, label: "Book title", hint: "Shown on the cover"
+    # (+ _email_field / _url_field / _tel_field / _number_field / _password_field)
+    %i[text email url tel number password].each do |kind|
+      define_method(:"ui_#{kind}_field") do |method, label:, hint: nil, **opts|
+        @template.render("ui/field",
+                         label: label,
+                         name:  field_name(method),
+                         id:    field_id(method),
+                         type:  kind.to_s,
+                         value: object_value(method),
+                         hint:  error_for(method) ? nil : hint,
+                         error: error_for(method),
+                         **opts)
+      end
+    end
+
+    # f.ui_text_area :notes, label: "Notes", hint: "Optional"
+    def ui_text_area(method, label:, hint: nil, **opts)
+      ui_control(method, label:, hint:) do |ids|
+        @template.text_area(@object_name, method,
+                            class: "textarea", id: ids[:id],
+                            "aria-invalid": ids[:invalid], "aria-describedby": ids[:described],
+                            **opts)
+      end
+    end
+
+    # f.ui_select :marketplace, %w[UK US], label: "Primary marketplace"
+    def ui_select(method, choices = nil, options = {}, label:, hint: nil, **html)
+      ui_control(method, label:, hint:) do |ids|
+        @template.select(@object_name, method, choices, options,
+                         { class: "select", id: ids[:id],
+                           "aria-invalid": ids[:invalid], "aria-describedby": ids[:described] }.merge(html))
+      end
+    end
+
+    # f.ui_submit "Create" — primary by default; pass variant: for others.
+    def ui_submit(value = nil, variant: :primary, **opts)
+      classes = ["btn", ("btn-#{variant}" unless variant.to_s == "default"), opts.delete(:class)].compact.join(" ")
+      submit(value, class: classes, **opts)
+    end
+
+    private
+
+    # Shared, accessible .field wrapper for controls the field partial doesn't
+    # render itself (textarea, select). Keeps the label/error/aria wiring in one
+    # place.
+    def ui_control(method, label:, hint:)
+      error = error_for(method)
+      input_id = field_id(method)
+      described = error ? "#{input_id}-error" : (hint ? "#{input_id}-hint" : nil)
+      ids = { id: input_id, invalid: (error ? "true" : nil), described: described }
+
+      @template.content_tag(:div, class: ["field", ("field-error" if error)].compact.join(" ")) do
+        parts = [@template.label(@object_name, method, label, class: "label", for: input_id)]
+        parts << yield(ids)
+        parts << @template.content_tag(:p, hint, class: "hint", id: "#{input_id}-hint") if hint && !error
+        parts << @template.content_tag(:p, error, class: "hint", id: "#{input_id}-error") if error
+        @template.safe_join(parts)
+      end
+    end
+
+    def object_value(method)
+      object.respond_to?(method) ? object.public_send(method) : nil
+    end
+
+    def error_for(method)
+      return nil unless object.respond_to?(:errors)
+
+      object.errors[method].first
+    end
+  end
+end

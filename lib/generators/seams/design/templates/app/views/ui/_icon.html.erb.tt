@@ -1,0 +1,2 @@
+<%%# locals: (name:, size: nil) -%>
+<%%= tag.svg class: class_names("ic", "ic-#{size}" => size.present?), "aria-hidden": "true" do %><use href="#ui-icon-<%%= name %>"></use><%% end %>
