@@ -1,0 +1,15 @@
+<%%# locals: (items:, label: "Formatting", **attrs) -%>
+<%%= tag.div class: "toolbar", role: "toolbar", "aria-label": label, **attrs do %>
+  <%% items.each do |item| -%>
+    <%% if item[:sep_before] -%>
+      <%%= tag.span class: "tool-sep", "aria-hidden": "true" %>
+    <%% end -%>
+    <%%= tag.button type: "button", class: "tool", "aria-label": item[:label] do %>
+      <%% if item[:icon] -%>
+        <%%= ui_icon(item[:icon]) %>
+      <%% else -%>
+        <%%= item[:label] %>
+      <%% end -%>
+    <%% end %>
+  <%% end -%>
+<%% end %>

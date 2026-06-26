@@ -1,0 +1,9 @@
+<%%# locals: (items:, **attrs) -%>
+<%%= tag.nav class: "outline", "aria-label": "Outline", **attrs do %>
+  <%% items.each do |item| -%>
+    <%% level = item.fetch(:level, 1) -%>
+    <%%= tag.a item[:label], href: item.fetch(:href, "#"),
+          class: class_names("l#{level}" => level > 1),
+          "aria-current": (item[:current] ? "true" : nil) %>
+  <%% end -%>
+<%% end %>

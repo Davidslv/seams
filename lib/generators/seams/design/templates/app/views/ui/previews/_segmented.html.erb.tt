@@ -1,0 +1,15 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_segmented(
+        name: "view",
+        label: "View",
+        selected: "list",
+        options: [["list", "List"], ["grid", "Grid"], ["board", "Board"]]
+      ) %>
+  <%%= ui_segmented(
+        name: "theme",
+        label: "Theme",
+        selected: "system",
+        options: [["light", "Light"], ["dark", "Dark"], ["system", "System"]]
+      ) %>
+</div>

@@ -1,0 +1,9 @@
+<%%# locals: () -%>
+<%%= ui_menu(
+  label: "Account",
+  items: [
+    { label: "Profile", href: "/account/profile" },
+    { label: "Billing", href: "/account/billing" },
+    { label: "Sign out", danger: true, separator_before: true }
+  ]
+) %>
