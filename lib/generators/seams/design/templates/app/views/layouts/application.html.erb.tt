@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <title><%%= content_for(:title) || "<%= app_name %>" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%%= csrf_meta_tags %>
+    <%%= csp_meta_tag %>
+    <%%= yield :head %>
+    <%%# The host's Tailwind build carries the seams:design @theme tokens + the
+        ui_* component layer the generator injected into application.css. %>
+    <%%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%%= javascript_importmap_tags if respond_to?(:javascript_importmap_tags) %>
+  </head>
+
+  <body style="font-family:var(--sans);color:var(--ink);background:var(--paper);min-height:100vh">
+    <a href="#main" class="skip sr-only">Skip to content</a>
+
+    <%%# seams design — icon sprite for ui_* components %>
+    <%%= render "ui/icon_sprite" %>
+
+    <header class="app-header" role="banner">
+      <nav class="app-nav" aria-label="Primary">
+        <a href="/" class="app-brand">
+          <span class="mark" aria-hidden="true"></span>
+          <%= app_name %>
+        </a>
+        <span class="spacer"></span>
+        <%%# A starter account menu, rendered from the ui_menu component. A host
+            with auth swaps this for its real sign-in / account links. %>
+        <%%= ui_button(variant: :ghost, size: :sm) { "Account" } %>
+      </nav>
+    </header>
+
+    <%%# Flash messages, rendered through the banner component's tone variants. %>
+    <%% if flash[:notice].present? %>
+      <div class="shell" style="margin-top:var(--s-4)">
+        <%%= ui_banner(message: flash[:notice], kind: :info, role: "status") %>
+      </div>
+    <%% end %>
+    <%% if flash[:alert].present? %>
+      <div class="shell" style="margin-top:var(--s-4)">
+        <%%= ui_banner(message: flash[:alert], kind: :alert, role: "alert") %>
+      </div>
+    <%% end %>
+
+    <main id="main" class="shell" style="padding-top:var(--s-7);padding-bottom:var(--s-7)">
+      <%%= yield %>
+    </main>
+
+    <footer class="app-foot" role="contentinfo">
+      <div class="shell row-wrap">
+        <span><%= app_name %></span>
+        <span class="spacer"></span>
+        <span class="small muted">Built with the seams design system</span>
+      </div>
+    </footer>
+  </body>
+</html>

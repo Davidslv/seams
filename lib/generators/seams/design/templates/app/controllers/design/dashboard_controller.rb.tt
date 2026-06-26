@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+# The starter signed-in dashboard shipped by `bin/seams design --shell`.
+#
+# It is intentionally a thin, host-owned starting point: it subclasses the
+# host's ApplicationController (so any auth / account / tenancy filters the host
+# adds later apply automatically), and renders an empty-state built from the
+# ui_* components that lists the canonical seams engines the host could add.
+#
+# Replace this with your real home page; it exists so a freshly generated host
+# boots to a styled, signed-in screen instead of bare markup. The route + root
+# the generator drew into the host point here.
+module Design
+  class DashboardController < ApplicationController
+    def index
+      # The canonical seams engines a host can generate next. Each entry is the
+      # `bin/seams <name>` verb plus a one-line summary, rendered as the
+      # dashboard's empty-state list. Static on purpose — a host replaces this
+      # controller with its real dashboard once it has data to show.
+      @suggested_engines = [
+        ["auth",          "Sign-in, sessions, password reset, OAuth"],
+        ["accounts",      "User accounts + the Current attributes"],
+        ["teams",         "Teams, memberships, invitations"],
+        ["billing",       "Plans, subscriptions, invoices"],
+        ["notifications", "In-app + email notifications"],
+        ["admin",         "A back-office for the above"]
+      ]
+    end
+  end
+end
