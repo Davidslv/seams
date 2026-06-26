@@ -1,0 +1,18 @@
+<%%# locals: (items:, label: nil, **attrs) -%>
+<%%= tag.div class: "menu", role: "menu", **attrs do %>
+  <%% if label.present? -%>
+    <%%= tag.p label, class: "menu-label" %>
+  <%% end -%>
+  <%% items.each do |item| -%>
+    <%% if item[:separator_before] -%>
+      <%%= tag.div "", class: "menu-sep" %>
+    <%% end -%>
+    <%% if item[:href].present? -%>
+      <%%= tag.a item[:label], href: item[:href], role: "menuitem",
+            class: class_names("danger" => item[:danger]) %>
+    <%% else -%>
+      <%%= tag.button item[:label], type: "button", role: "menuitem",
+            class: class_names("danger" => item[:danger]) %>
+    <%% end -%>
+  <%% end -%>
+<%% end %>

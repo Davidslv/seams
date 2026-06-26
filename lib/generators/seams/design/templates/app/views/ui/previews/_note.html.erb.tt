@@ -1,0 +1,2 @@
+<%%# locals: () -%>
+<%%= ui_note do %>Use a note to call out a useful aside or a piece of context that supports the main content without interrupting it.<%% end %>

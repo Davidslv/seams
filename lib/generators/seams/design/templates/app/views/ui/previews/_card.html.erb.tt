@@ -1,0 +1,12 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_card do %>
+    <h3 class="h3">Project settings</h3>
+    <p class="small muted">Control how this project is configured.</p>
+  <%% end %>
+
+  <%%= ui_card(id: "card-export", data: { panel: "export" }) do %>
+    <h3 class="h3">Output formats</h3>
+    <p class="small muted">Files are generated on every change.</p>
+  <%% end %>
+</div>

@@ -1,0 +1,8 @@
+<%%# locals: () -%>
+<%%= ui_outline(items: [
+      { label: "Getting started", href: "#", level: 1, current: true },
+      { label: "Installation", href: "#", level: 2 },
+      { label: "Configuration", href: "#", level: 2 },
+      { label: "A worked example", href: "#", level: 3 },
+      { label: "Reference", href: "#", level: 1 }
+    ]) %>

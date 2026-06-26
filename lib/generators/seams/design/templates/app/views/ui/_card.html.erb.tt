@@ -1,0 +1,2 @@
+<%%# locals: (content: nil, **attrs) -%>
+<%%= tag.div class: "card", **attrs do %><%%= content %><%% end %>

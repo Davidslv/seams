@@ -1,0 +1,25 @@
+<%%# locals: (columns:, rows:, **attrs) -%>
+<%%= tag.div class: "table-wrap", **attrs do %>
+  <%%= tag.table class: "table" do %>
+    <thead>
+      <tr>
+        <%% columns.each do |col| -%>
+          <%%= tag.th scope: "col",
+                class: class_names("sortable" => col[:sortable], "num" => col[:num]),
+                "aria-sort": col[:sort] do %>
+            <%%= col[:label] %><%% if col[:sortable] %><%%= tag.span "↕", class: "ar", "aria-hidden": "true" %><%% end %>
+          <%% end %>
+        <%% end -%>
+      </tr>
+    </thead>
+    <tbody>
+      <%% rows.each do |row| -%>
+        <tr>
+          <%% row.each_with_index do |cell, i| -%>
+            <%%= tag.td cell, class: class_names("num" => columns[i] && columns[i][:num]) %>
+          <%% end -%>
+        </tr>
+      <%% end -%>
+    </tbody>
+  <%% end %>
+<%% end %>

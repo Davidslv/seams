@@ -1,0 +1,12 @@
+<%%# locals: (file:, lines:, **attrs) -%>
+<%%= tag.div class: "diff", **attrs do %>
+  <%%= tag.p file, class: "diff-file" %>
+  <%% lines.each do |kind, text| -%>
+    <%% sign = kind == :add ? "+" : kind == :del ? "−" : " " -%>
+    <%% sign_label = kind == :add ? "added" : kind == :del ? "removed" : nil -%>
+    <%%= tag.div class: class_names("diff-row", "diff-#{kind}") do %>
+      <%%= tag.span sign, class: "diff-sign", "aria-label": sign_label %>
+      <%%= tag.span text, class: "diff-text" %>
+    <%% end %>
+  <%% end -%>
+<%% end %>

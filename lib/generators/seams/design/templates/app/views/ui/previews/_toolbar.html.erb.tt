@@ -1,0 +1,11 @@
+<%%# locals: () -%>
+<%%= ui_toolbar(
+      label: "Text formatting",
+      items: [
+        { label: "Heading" },
+        { label: "Bold" },
+        { label: "Italic" },
+        { label: "Link", icon: :edit, sep_before: true },
+        { label: "Preview", icon: :eye }
+      ]
+    ) %>

@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_meter(value: 38400, max: 60000, state: :under, label: "Usage") %>
+  <%%= ui_meter(value: 60200, max: 60000, state: :at, label: "Usage") %>
+  <%%= ui_meter(value: 71900, max: 60000, state: :over, label: "Usage") %>
+</div>

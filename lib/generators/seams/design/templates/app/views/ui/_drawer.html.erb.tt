@@ -1,0 +1,7 @@
+<%%# locals: (title:, content: nil, **attrs) -%>
+<%%= tag.aside class: "drawer", "aria-label": title, **attrs do %>
+  <div class="drawer-head">
+    <%%= tag.h2 title %>
+  </div>
+  <div class="drawer-body"><%%= content %></div>
+<%% end %>

@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_pagination(current: 1, total: 5) %>
+  <%%= ui_pagination(current: 3, total: 5) %>
+</div>

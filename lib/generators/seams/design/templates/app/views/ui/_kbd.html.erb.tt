@@ -1,0 +1,4 @@
+<%%# locals: (keys:, **attrs) -%>
+<%%= tag.span **attrs do -%>
+<%%= safe_join(keys.map { |key| tag.span(key, class: "kbd") }, " ") %>
+<%% end -%>

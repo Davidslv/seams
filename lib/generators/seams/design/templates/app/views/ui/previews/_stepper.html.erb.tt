@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_stepper(steps: ["Account", "Details", "Plan", "Payment", "Review"], current: 3) %>
+  <%%= ui_stepper(steps: ["Account", "Details", "Plan", "Payment", "Review"], current: 1) %>
+  <%%= ui_stepper(steps: ["Account", "Details", "Plan", "Payment", "Review"], current: 5) %>
+</div>

@@ -1,0 +1,12 @@
+<%%# locals: (current:, total:, **attrs) -%>
+<%%= tag.nav class: "pagination", "aria-label": "Pagination", **attrs do %>
+  <%%= tag.button "‹", type: "button", "aria-label": "Previous page",
+        disabled: (current <= 1) %>
+  <%% (1..total).each do |page| -%>
+    <%%= tag.button page, type: "button",
+          "aria-current": (page == current ? "page" : nil),
+          "aria-label": "Page #{page}" %>
+  <%% end -%>
+  <%%= tag.button "›", type: "button", "aria-label": "Next page",
+        disabled: (current >= total) %>
+<%% end %>

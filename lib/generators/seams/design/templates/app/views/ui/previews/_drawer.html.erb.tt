@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<%%= ui_drawer(title: "History") do %>
+  <p class="small muted mb-3">Every saved revision, newest first.</p>
+  <p class="small">You can restore any version or compare it with the current draft.</p>
+<%% end %>

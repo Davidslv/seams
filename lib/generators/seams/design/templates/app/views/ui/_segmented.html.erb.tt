@@ -1,0 +1,7 @@
+<%%# locals: (name:, options:, selected: nil, label: nil, **attrs) -%>
+<%%= tag.div class: "seg", role: "group", "aria-label": label, **attrs do %>
+  <%% options.each do |value, option_label| -%>
+    <%%= tag.button option_label, type: "button", name: name, value: value,
+          "aria-pressed": (value.to_s == selected.to_s).to_s %>
+  <%% end -%>
+<%% end %>

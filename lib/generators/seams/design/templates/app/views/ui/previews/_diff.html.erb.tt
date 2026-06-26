@@ -1,0 +1,10 @@
+<%%# locals: () -%>
+<%%= ui_diff(
+  file: "config/application.rb",
+  lines: [
+    [:ctx, "config.load_defaults 8.0"],
+    [:del, "config.time_zone = \"UTC\""],
+    [:add, "config.time_zone = \"London\""],
+    [:ctx, "config.eager_load = true"]
+  ]
+) %>

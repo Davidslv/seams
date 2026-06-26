@@ -1,0 +1,8 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_banner(message: "A new version is available", kind: :info) %>
+  <%%= ui_banner(message: "Something went wrong — please try again", kind: :alert) %>
+  <%%= ui_banner(message: "Scheduled maintenance Sunday 02:00 UTC", kind: :info) do %>
+    <%%= ui_button(variant: :primary, size: :sm) { "Learn more" } %>
+  <%% end %>
+</div>

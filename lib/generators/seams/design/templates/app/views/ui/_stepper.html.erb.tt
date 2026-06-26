@@ -1,0 +1,12 @@
+<%%# locals: (steps:, current: 1, **attrs) -%>
+<%%= tag.ol class: "stepper", **attrs do %>
+  <%% steps.each_with_index do |label, idx| -%>
+    <%% i = idx + 1 -%>
+    <%% done = i < current -%>
+    <%%= tag.li class: class_names("done" => done, "current" => i == current),
+          "aria-current": (i == current ? "step" : nil) do %>
+      <%%= tag.span class: "dot" do %><%% if done %><%%= ui_icon(:check, size: :sm) %><span class="sr-only">Completed</span><%% else %><%%= i %><%% end %><%% end %>
+      <%%= label %>
+    <%% end %>
+  <%% end -%>
+<%% end %>
