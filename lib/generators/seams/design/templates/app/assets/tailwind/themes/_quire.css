@@ -1,0 +1,42 @@
+/* ---------------------------------------------------------------------------
+   Example theme: "quire" — warm paper / garnet / Spectral + IBM Plex.
+
+   The worked proof that retheming the whole seams design system is a TOKEN
+   OVERRIDE and nothing more. This file overrides ONLY the @theme tokens the
+   neutral default declared; it touches no component CSS, no markup, no helper.
+   Every ui_* component reskins because each reads the short aliases (var(--ink),
+   var(--accent) …), which resolve to these overridden @theme values.
+
+   To apply it, add ONE line to app/assets/tailwind/application.css, AFTER the
+   "seams:design tokens" block (so these win):
+
+       @import "themes/quire";
+
+   To go back to the neutral default, delete that line. That is the entire
+   retheme surface. See doc/DESIGN_SYSTEM_THEMING.md.
+
+   Lineage: this is quire-saas's original Compositor palette + type pairing, the
+   design system this engine was extracted from. --------------------------- */
+@theme {
+  --color-paper:#fbf8f3; --color-paper-raised:#f4efe7; --color-card:#ffffff;
+  --color-ink:#1a1714; --color-ink-2:#423b33; --color-muted:#72675b; --color-faint:#797166;
+  --color-line:#e7ded2; --color-line-2:#d8ccba;
+  /* The neutral default's accent -> quire's garnet. The component layer reads
+     var(--accent) (aliased from --color-accent), so this is the only colour
+     swap the accent needs. */
+  --color-accent:#7a1f1f; --color-accent-deep:#591616;
+  --color-ready:#047857; --color-ready-bg:#e6f4ec; --color-ready-line:#a7d8bd;
+  --color-progress:#aa4e08; --color-progress-bg:#fbf1e0; --color-progress-line:#eccf97;
+  --color-alert:#cb2323; --color-alert-bg:#fbeceb; --color-alert-line:#f1b6b3;
+  /* Display face -> Spectral (a serif); UI + data -> IBM Plex. Self-host the
+     faces or load them in the host layout; the token is the single switch. */
+  --color-focus:#1a1714;
+  --font-display:"Spectral",Georgia,"Times New Roman",serif;
+  --font-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+
+/* quire pinned the focus ring to ink rather than the accent. The alias layer
+   reads --focus, so override that one alias to match. (Everything else inherits
+   from the @theme overrides above.) */
+:root{ --focus:var(--color-ink); }
