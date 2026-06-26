@@ -1,0 +1,14 @@
+<%%# locals: (format:, state: :queued, percent: 0, **attrs) -%>
+<%% width = [[percent.to_i, 0].max, 100].min -%>
+<%% status, label = { ready: [:ready, "Ready"], running: [:progress, "Building…"], queued: [:neutral, "Queued"] }.fetch(state, [:neutral, "Queued"]) -%>
+<%%= tag.div class: "buildrow", **attrs do %>
+  <%%= tag.span format, class: "fmt" %>
+  <%%= tag.span class: "meter" do %>
+    <%%= tag.div class: "meter-track", role: "progressbar",
+          "aria-valuenow": width, "aria-valuemin": 0, "aria-valuemax": 100,
+          "aria-label": "#{format} build progress" do %>
+      <%%= tag.div class: class_names("meter-fill", state == :ready ? "at" : nil), style: "width:#{width}%" %>
+    <%% end %>
+  <%% end %>
+  <%%= ui_tag(label: label, status: status) %>
+<%% end %>

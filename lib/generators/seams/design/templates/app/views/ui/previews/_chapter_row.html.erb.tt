@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<ul class="chapter-list">
+  <%%= ui_chapter_row(index: 1, title: "Getting started", status: :ready, status_label: "Saved") %>
+  <%%= ui_chapter_row(index: 2, title: "Core concepts", status: :progress, status_label: "Editing") %>
+  <%%= ui_chapter_row(index: 3, title: "Advanced usage", status: :neutral, status_label: "Draft") %>
+</ul>

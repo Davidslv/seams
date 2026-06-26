@@ -1,0 +1,14 @@
+<%%# locals: () -%>
+<%%= ui_data_table(
+      columns: [
+        { label: "Invoice" },
+        { label: "Date", sortable: true, sort: "descending" },
+        { label: "Status" },
+        { label: "Amount", num: true, sortable: true, sort: "none" }
+      ],
+      rows: [
+        ["INV-2031", "12 Jun 2026", ui_tag(label: "Paid", status: :ready), "$1,240.00"],
+        ["INV-2030", "28 May 2026", ui_tag(label: "Pending", status: :progress), "$860.50"],
+        ["INV-2029", "14 May 2026", ui_tag(label: "Overdue", status: :alert), "$2,015.75"]
+      ]
+    ) %>

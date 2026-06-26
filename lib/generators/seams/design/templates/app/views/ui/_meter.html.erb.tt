@@ -1,0 +1,15 @@
+<%%# locals: (value:, max:, state: nil, label: nil, **attrs) -%>
+<%% pct = [(value.to_f / max * 100).round, 100].min -%>
+<%%= tag.div class: "meter", **attrs do %>
+  <%% if label -%>
+    <div class="meter-label">
+      <%%= tag.span label %>
+      <%%= tag.span "#{value} / #{max}", class: "tnum" %>
+    </div>
+  <%% end -%>
+  <%%= tag.div class: "meter-track", role: "progressbar",
+        "aria-valuenow": value, "aria-valuemin": 0, "aria-valuemax": max,
+        "aria-label": label do %>
+    <%%= tag.div class: class_names("meter-fill", state), style: "width: #{pct}%" %>
+  <%% end %>
+<%% end %>
