@@ -44,6 +44,7 @@ module Seams
     # what each canonical engine registers from its engine.rb.
     DEFAULT_GRANTS = {
       "member" => %w[
+        identity.read.auth
         invoice.read.billing
         subscription.read.billing
         team.read.teams
@@ -52,6 +53,7 @@ module Seams
         notification.read.notifications
       ].freeze,
       "admin" => %w[
+        identity.manage.auth
         invoice.manage.billing
         subscription.manage.billing
         plan.manage.billing
@@ -61,6 +63,7 @@ module Seams
         invitation.manage.teams
         account.manage.accounts
         membership.manage.accounts
+        notification.manage.notifications
         preference.manage.notifications
       ].freeze
     }.freeze

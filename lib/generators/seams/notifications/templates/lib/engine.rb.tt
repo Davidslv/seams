@@ -22,6 +22,7 @@ module Notifications
       # `manage` is the admin-level mutate. Host grant maps reference
       # these codes; see Seams::Permissions::DEFAULT_GRANTS.
       Seams::PermissionRegistry.register("notification.read.notifications",   owned_by: "Notifications")
+      Seams::PermissionRegistry.register("notification.manage.notifications", owned_by: "Notifications")
       Seams::PermissionRegistry.register("preference.manage.notifications",   owned_by: "Notifications")
       # Follow-up generators that ship new notifications abilities register them here.
       # seams:insertion-point notifications.engine.abilities
