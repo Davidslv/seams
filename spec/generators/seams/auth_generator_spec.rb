@@ -123,6 +123,24 @@ RSpec.describe Seams::Generators::AuthGenerator do
         expect(content).to include("Auth::ResetPassword.complete")
       end
     end
+
+    # Regression: the engine base controller gates every action with
+    # `before_action :authenticate_identity!`, so the signed-out auth
+    # entry points must explicitly opt out or they redirect to themselves.
+    it "opts the signed-out entry points out of authenticate_identity!", :aggregate_failures do
+      assert_file "engines/auth/app/controllers/auth/sessions_controller.rb" do |content|
+        expect(content).to include("skip_before_action :authenticate_identity!, only: %i[new create]")
+      end
+      assert_file "engines/auth/app/controllers/auth/registrations_controller.rb" do |content|
+        expect(content).to include("skip_before_action :authenticate_identity!, only: %i[new create]")
+      end
+      assert_file "engines/auth/app/controllers/auth/password_resets_controller.rb" do |content|
+        expect(content).to include("skip_before_action :authenticate_identity!, only: %i[new create edit update]")
+      end
+      assert_file "engines/auth/app/controllers/auth/oauth/callbacks_controller.rb" do |content|
+        expect(content).to include("skip_before_action :authenticate_identity!, only: %i[start callback]")
+      end
+    end
   end
 
   describe "services" do
