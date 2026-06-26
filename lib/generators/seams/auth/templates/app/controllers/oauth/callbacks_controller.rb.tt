@@ -11,6 +11,9 @@ module Auth
     # can trick a victim into linking the attacker's OAuth identity to
     # the victim's account.
     class CallbacksController < ApplicationController
+      # The OAuth dance happens while signed out, so it must bypass the
+      # engine base controller's `authenticate_identity!`.
+      skip_before_action :authenticate_identity!, only: %i[start callback]
       skip_before_action :verify_authenticity_token, only: %i[callback]
 
       rescue_from Auth::OAuthProviderUnknown do |e|

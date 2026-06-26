@@ -2,6 +2,11 @@
 
 module Auth
   class SessionsController < ApplicationController
+    # The sign-in form must be reachable while signed out, or the engine
+    # base controller's `before_action :authenticate_identity!` redirects
+    # the login page to itself. `destroy` stays gated.
+    skip_before_action :authenticate_identity!, only: %i[new create]
+
     # 10 attempts per minute per IP. Rails 8's built-in rate_limit
     # uses Solid Cache by default; configure cache_store in your host
     # if you need to override.

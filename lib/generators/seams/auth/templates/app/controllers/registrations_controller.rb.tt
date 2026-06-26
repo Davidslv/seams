@@ -2,6 +2,11 @@
 
 module Auth
   class RegistrationsController < ApplicationController
+    # Sign-up must be reachable while signed out (the engine base
+    # controller gates every action by default, which would redirect the
+    # sign-up form to the sign-in page).
+    skip_before_action :authenticate_identity!, only: %i[new create]
+
     # 5 sign-ups per hour per IP. Tighter than sign-in because each
     # successful row also sends a welcome email + provisions side
     # effects. Rails 8's built-in rate_limit uses Solid Cache.
