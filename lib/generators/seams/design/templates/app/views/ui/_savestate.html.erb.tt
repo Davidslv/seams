@@ -1,0 +1,5 @@
+<%%# locals: (state: :saved, text: nil, **attrs) -%>
+<%% default = { "saved" => "All changes saved", "saving" => "Saving…", "unsaved" => "Unsaved" }[state.to_s] -%>
+<%%= tag.span (text || default),
+      class: class_names("savestate", "saving" => state.to_s == "saving", "unsaved" => state.to_s == "unsaved"),
+      role: "status", **attrs %>

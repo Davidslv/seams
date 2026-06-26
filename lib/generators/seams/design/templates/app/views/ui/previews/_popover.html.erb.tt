@@ -1,0 +1,2 @@
+<%%# locals: () -%>
+<%%= ui_popover(content: "Changes save automatically as you type.") %>

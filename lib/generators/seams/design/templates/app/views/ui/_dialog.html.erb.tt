@@ -1,0 +1,14 @@
+<%%# locals: (id:, title:, trigger:, destructive: false, content: nil, **attrs) -%>
+<%%= tag.div data: { controller: "ui-dialog" }, **attrs do %>
+  <%%= ui_button(variant: (destructive ? :danger : :default), data: { action: "ui-dialog#open" }) { trigger } %>
+  <%%= tag.dialog id: id, class: "cdialog", "aria-labelledby": "#{id}-title",
+        data: { "ui-dialog-target": "dialog" } do %>
+    <div class="dialog">
+      <div class="dialog-head">
+        <%%= tag.h2 title, id: "#{id}-title" %>
+        <button type="button" class="x" aria-label="Close" data-action="ui-dialog#close"><%%= ui_icon(:close) %></button>
+      </div>
+      <div class="dialog-body"><%%= content %></div>
+    </div>
+  <%% end %>
+<%% end %>

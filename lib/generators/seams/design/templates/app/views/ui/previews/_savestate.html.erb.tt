@@ -1,0 +1,4 @@
+<%%# locals: () -%>
+<%%= ui_savestate(state: :saved) %>
+<%%= ui_savestate(state: :saving) %>
+<%%= ui_savestate(state: :unsaved) %>
