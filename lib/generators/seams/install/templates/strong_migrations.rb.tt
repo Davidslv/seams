@@ -1,0 +1,26 @@
+# frozen_string_literal: true
+
+# strong_migrations rejects unsafe database migrations (lock-heavy ALTERs,
+# non-concurrent indexes, add_column with a volatile default on an existing
+# table, …) before they reach production. It is a development/CI guard — the
+# gem lives in the :development, :test groups and is NOT loaded in production,
+# so this initializer is guarded accordingly. CI runs every migration from an
+# empty database, which is where the checks actually fire.
+return unless defined?(StrongMigrations)
+
+# A fresh host has nothing in production yet, so audit ALL migrations rather
+# than grandfathering them. Once you go live, set this to the latest applied
+# version so a from-scratch migrate doesn't re-check historical migrations.
+StrongMigrations.start_after = 0
+
+# Match your production Postgres major version so the right checks run in
+# development and CI. Uncomment and set:
+# StrongMigrations.target_version = 16
+
+# Safety timeouts. If you use PgBouncer in transaction mode, remove these and
+# set timeouts on the database user instead.
+StrongMigrations.lock_timeout = 10.seconds
+StrongMigrations.statement_timeout = 1.hour
+
+# Refresh planner statistics after an index is added.
+StrongMigrations.auto_analyze = true

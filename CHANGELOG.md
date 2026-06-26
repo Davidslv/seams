@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Install generator: ships an opinionated quality toolchain by default — a host
+  is hardened from the first CLI run. `seams:install` now installs **herb**
+  (HTML+ERB lint + `.herb.yml`), **strong_migrations** (+ initializer, audits
+  all migrations via `start_after = 0`), and **lefthook** (`lefthook.yml`:
+  pre-commit rubocop+herb, pre-push specs), and wires herb-lint + a from-scratch
+  `db:migrate` safety check into the generated CI. The rubocop/brakeman/
+  bundle-audit gems the generated CI shells out to are now injected into the
+  host Gemfile too. Each tool is opt-out: `--no-herb`, `--no-strong-migrations`,
+  `--no-lefthook`. Also closes two gaps where Seams generated views and
+  migrations that nothing validated — the host CI now lints/vets them.
+
 ### Changed
 
 - Engine generator: ApplicationController now requires authentication by default. Opt out via `skip_before_action :authenticate_identity!` in controllers serving public flows. [BREAKING for hosts that explicitly relied on engines being unauthenticated by default.]

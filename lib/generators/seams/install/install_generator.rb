@@ -18,6 +18,16 @@ module Seams
 
       source_root File.expand_path("templates", __dir__)
 
+      # The quality toolchain is installed by DEFAULT — Seams is opinionated and
+      # sets a host up for success from the first CLI run. Opt out per tool with
+      # --no-herb / --no-strong-migrations / --no-lefthook.
+      class_option :herb, type: :boolean, default: true,
+                          desc: "Install herb (HTML+ERB linter) + .herb.yml + CI lint step"
+      class_option :strong_migrations, type: :boolean, default: true,
+                                       desc: "Install strong_migrations + initializer + CI migration-safety step"
+      class_option :lefthook, type: :boolean, default: true,
+                              desc: "Install lefthook + lefthook.yml (pre-commit lint, pre-push specs)"
+
       def create_initializer
         template "seams.rb.tt", "config/initializers/seams.rb"
       end
@@ -129,6 +139,41 @@ module Seams
         File.chmod(0o755, full_path) if File.exist?(full_path)
       end
 
+      # --- Quality toolchain (default on; opt out per tool) -----------------
+
+      def create_herb_config
+        return unless options[:herb]
+
+        template_if_missing "herb.yml.tt", ".herb.yml"
+      end
+
+      def create_strong_migrations_initializer
+        return unless options[:strong_migrations]
+
+        template_if_missing "strong_migrations.rb.tt", "config/initializers/strong_migrations.rb"
+      end
+
+      def create_lefthook_config
+        return unless options[:lefthook]
+
+        template_if_missing "lefthook.yml.tt", "lefthook.yml"
+      end
+
+      def install_quality_gems
+        # The CI workflow (and lefthook) shell out to these, so make sure the
+        # gems are in the host Gemfile. All idempotent — skipped if present.
+        host_inject_gem("rubocop", group: :development)
+        host_inject_gem("brakeman", group: :development)
+        host_inject_gem("bundler-audit", group: :development)
+        host_inject_gem("herb", group: :development) if options[:herb]
+        host_inject_gem("lefthook", group: :development) if options[:lefthook]
+        # strong_migrations is a dev/CI guard — it vets migrations where they're
+        # written and in CI, and is kept OUT of the production path. The
+        # initializer is guarded with `if defined?(StrongMigrations)` so a
+        # production boot (where the gem isn't loaded) is unaffected.
+        host_inject_gem("strong_migrations", group: %i[development test]) if options[:strong_migrations]
+      end
+
       # Phase 1.5 — per-host helper scripts and architecture doc.
       def create_helper_scripts
         template_if_missing "script/collate_coverage.rb.tt",   "script/collate_coverage.rb"
@@ -171,6 +216,16 @@ module Seams
         say ""
         say "  Seams is installed. Generate your first engine with:", :green
         say "    bin/seams core          (or bin/rails generate seams:core)"
+        say ""
+        say "  Quality toolchain (installed by default — opt out with --no-<tool>):", :yellow
+        say "    rubocop + brakeman + bundle-audit (in CI)" \
+            "#{", herb (HTML+ERB lint)" if options[:herb]}" \
+            "#{", strong_migrations" if options[:strong_migrations]}"
+        say "    bundle install   then   bin/rails db:prepare"
+        if options[:lefthook]
+          say "    Activate the git hooks (pre-commit lint, pre-push specs):", :yellow
+          say "    bundle exec lefthook install"
+        end
         say ""
         say "  Canonical generators (run in this order):", :yellow
         say "    bin/seams core          - Core engine (concerns, audit log)"

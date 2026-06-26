@@ -338,6 +338,17 @@ RSpec.describe Seams::Generators::AuthGenerator do
       expect(content).to include("identity_id")
     end
 
+    # The class name must match the "OAuth" acronym the engine registers, or
+    # the migrator raises `uninitialized constant CreateAuthOAuthProviders`
+    # on a from-scratch db:migrate.
+    it "names the oauth-providers migration class with the OAuth acronym" do
+      file = Dir[File.join(destination_root, "engines/auth/db/migrate",
+                           "*_create_auth_oauth_providers.rb")].first
+      content = File.read(file)
+      expect(content).to include("class CreateAuthOAuthProviders")
+      expect(content).not_to include("class CreateAuthOauthProviders")
+    end
+
     it "OAuth::Authenticator service publishes the canonical signed_up/signed_in events" do
       assert_file "engines/auth/app/services/auth/oauth/authenticator.rb" do |content|
         expect(content).to include("Auth.oauth(@provider)")

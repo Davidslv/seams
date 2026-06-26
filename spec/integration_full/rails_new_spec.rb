@@ -57,21 +57,33 @@ RSpec.describe "rails new integration", type: :integration_full do
   # them lets us bundle install ONCE up-front; the per-generator
   # host_inject_gem calls are idempotent and just re-confirm. pg is
   # added by `rails new --database=postgresql`.
+  # Pre-add seams + every gem the canonical generators and seams:install
+  # inject, so the single up-front bundle install picks them all up; the
+  # generators' host_inject_gem calls are then idempotent no-ops. brakeman
+  # ships with `rails new`, so it isn't repeated here.
   def add_gems_to_gemfile
-    File.open(File.join(host_path, "Gemfile"), "a") do |f|
-      f.puts
-      f.puts %(gem "seams",    path: "#{seams_gem_path}")
-      f.puts %(gem "bcrypt",   "~> 3.1")
-      f.puts %(gem "faraday",  "~> 2.0")
-      f.puts %(gem "stripe",   "~> 13.0")
-      f.puts %(gem "ice_cube", ">= 0.16")
-      f.puts
-      f.puts "group :test do"
-      f.puts %(  gem "rspec-rails",       "~> 7.1")
-      f.puts %(  gem "factory_bot_rails", "~> 6.4")
-      f.puts %(  gem "webmock",           "~> 3.23")
-      f.puts "end"
-    end
+    File.write(File.join(host_path, "Gemfile"), <<~RUBY, mode: "a")
+
+      gem "seams",    path: "#{seams_gem_path}"
+      gem "bcrypt",   "~> 3.1"
+      gem "faraday",  "~> 2.0"
+      gem "stripe",   "~> 13.0"
+      gem "ice_cube", ">= 0.16"
+
+      group :development, :test do
+        gem "strong_migrations"
+        gem "rubocop"
+        gem "bundler-audit"
+        gem "herb"
+        gem "lefthook"
+      end
+
+      group :test do
+        gem "rspec-rails",       "~> 7.1"
+        gem "factory_bot_rails", "~> 6.4"
+        gem "webmock",           "~> 3.23"
+      end
+    RUBY
   end
 
   def run_rails_new

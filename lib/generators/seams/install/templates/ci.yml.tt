@@ -16,7 +16,7 @@ env:
 
 jobs:
   lint:
-    name: RuboCop
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,10 @@ jobs:
           ruby-version: ".ruby-version"
           bundler-cache: true
       - run: bundle exec rubocop --parallel
+<% if options[:herb] -%>
+      - name: Lint HTML+ERB (herb)
+        run: bundle exec herb lint "**/*.html.erb"
+<% end -%>
 
   security:
     name: Security (brakeman + bundle-audit)
@@ -120,4 +124,10 @@ jobs:
         with:
           ruby-version: ".ruby-version"
           bundler-cache: true
+<% if options[:strong_migrations] -%>
+      - name: Migrations are safe (strong_migrations runs every migration from an empty database)
+        env:
+          RAILS_ENV: test
+        run: bundle exec rails db:create db:migrate
+<% end -%>
       - run: bundle exec rspec spec
