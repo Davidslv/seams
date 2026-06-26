@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<%%= ui_panel do %>
+  <p class="label">Summary</p>
+  <p class="mt-2">A panel groups related content on a raised surface. Use it to set a region apart from the page without the full weight of a card.</p>
+<%% end %>

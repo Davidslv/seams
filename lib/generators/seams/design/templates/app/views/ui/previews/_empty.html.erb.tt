@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<%%= ui_empty(title: "Nothing here yet") do %>
+  <p class="muted">There's nothing to show right now. Create your first item to get started.</p>
+  <%%= ui_button(variant: :primary) { "Create item" } %>
+<%% end %>

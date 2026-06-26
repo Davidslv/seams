@@ -174,6 +174,29 @@ module Seams
         end
       end
 
+      # The Primitives & icons component set (Phase 2, GROUPKEY = primitives).
+      # The icon + icon_sprite primitives ship from create_icon_partials above;
+      # this set adds the remaining low-level building blocks, ported faithfully
+      # from quire-saas's compositor (compositor_* -> ui_*, quire copy
+      # neutralised in the previews), each carrying its baked-in accessibility:
+      #
+      #   - panel   a plain raised content surface (a content-block wrapper);
+      #   - diff    a per-line add/del/ctx list whose +/- signs are aria-labelled
+      #             "added"/"removed" so the glyph alone is not load-bearing;
+      #   - empty   an empty-state with a required title + content-block body.
+      #
+      # Each ships with a companion preview, which is what makes it "public": the
+      # auto-wire derives ui_<name> from the preview and the gallery lists it.
+      # Eject-aware so a host can own a component without losing it on regenerate.
+      def create_primitive_components
+        %w[panel diff empty].each do |name|
+          template_unless_ejected "app/views/ui/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/_#{name}.html.erb")
+          template_unless_ejected "app/views/ui/previews/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/previews/_#{name}.html.erb")
+        end
+      end
+
       # The living gallery (dev/test only). The controller renders every
       # component from its preview so the docs cannot drift; the route is guarded
       # to Rails.env.local? both in the controller (404 in production) and at the

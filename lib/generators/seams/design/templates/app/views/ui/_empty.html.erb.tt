@@ -1,0 +1,5 @@
+<%%# locals: (title:, content: nil, **attrs) -%>
+<%%= tag.div class: "empty", **attrs do %>
+  <%%= tag.h3 title, class: "h3" %>
+  <%%= content %>
+<%% end %>
