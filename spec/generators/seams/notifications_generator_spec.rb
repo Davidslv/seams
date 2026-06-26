@@ -49,7 +49,7 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
         expect(content).to include('initializer "notifications.register_abilities"')
         expect(content).to include('owned_by: "Notifications"')
         %w[
-          notification.read.notifications preference.manage.notifications
+          notification.read.notifications notification.manage.notifications preference.manage.notifications
         ].each do |code|
           expect(content).to include(%("#{code}"))
         end

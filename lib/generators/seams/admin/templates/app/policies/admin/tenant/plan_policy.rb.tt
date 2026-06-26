@@ -36,6 +36,13 @@ module Admin
 
       private
 
+      # Read actions (index/show) resolve through the global plan
+      # catalogue ability; writes short-circuit on the staff? overrides
+      # above (tenant admins must not mutate the shared catalogue).
+      def permission_ability
+        "plan.manage.billing"
+      end
+
       # Plans are global; per-record tenant guard always passes for
       # the read actions, and the write actions short-circuit on the
       # staff? predicates above.

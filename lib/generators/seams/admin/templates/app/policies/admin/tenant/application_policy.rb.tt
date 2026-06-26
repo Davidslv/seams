@@ -3,10 +3,24 @@
 module Admin
   module Tenant
     # Abstract base for every tenant-mode admin policy. Tenant mode
-    # gates on `Accounts::Membership.role` for the currently-resolved
-    # membership (`Seams::Admin::Context#membership`). Staff Identities
-    # always pass the gate too — a platform staff member can drop into
-    # any tenant's admin without rejoining as an account-admin.
+    # resolves access through `Seams::Permissions.can?` — the gem's
+    # single source of truth for authorisation — keyed by the
+    # currently-resolved membership's role
+    # (`Seams::Admin::Context#membership.role`) and the ability code
+    # the concrete policy owns (see `permission_ability`). There is
+    # deliberately no `role == "admin"` literal here: the
+    # owner/admin/member hierarchy and the grant map live in
+    # `Seams::Permissions::ROLE_HIERARCHY` and
+    # `Seams.configuration.permission_grants`, so the admin surface and
+    # the host controllers decide from the same map and never drift.
+    #
+    # Two bypass tiers remain explicit and intentional, mirroring
+    # `Accounts::Authorization#authorize_permission!`:
+    #   - Platform staff (`Auth::Identity#staff?`) always pass — a
+    #     platform staff member can drop into any tenant's admin without
+    #     rejoining as an account-admin.
+    #   - The `system` pseudo-role bypasses inside
+    #     `Seams::Permissions.can?` itself (trusted internal callers).
     #
     # The `Scope` inner class is overridden per-policy; this base
     # returns `scope.none` so a subclass that forgets to override gets
@@ -118,16 +132,43 @@ module Admin
 
       private
 
-      # Permitted when (a) the Identity is staff (platform admins drop
-      # into every tenant), or (b) the resolved Accounts::Membership
-      # carries an admin/owner role for the current Account.
+      # Permitted when (a) the Identity is platform staff (the bypass
+      # tier — platform admins drop into every tenant), or (b) the
+      # resolved Accounts::Membership's role holds this policy's ability
+      # in the gem's permission registry. Resolution is delegated to
+      # `Seams::Permissions.can?` so the owner/admin/member hierarchy
+      # and the host grant map are the only place access is decided.
       def permitted?
+        permitted_to?(permission_ability)
+      end
+
+      # Shared resolution path for every tenant policy: apply the staff
+      # bypass, then defer to `Seams::Permissions.can?` with the
+      # membership role and the given ability code. Concrete policies
+      # never re-implement the role logic — they only name their
+      # ability via `permission_ability`.
+      #
+      # Fail closed: a request with no resolved membership, or a policy
+      # that names no ability, is denied (only platform staff pass).
+      def permitted_to?(ability)
         return true if user&.identity&.staff?
+        return false if ability.nil?
 
-        membership = user&.membership
-        return false if membership.nil?
+        role = user&.membership&.role
+        return false if role.nil?
 
-        %w[owner admin].include?(membership.role.to_s)
+        ::Seams::Permissions.can?(role: role.to_s, ability: ability)
+      end
+
+      # The owning engine's ability code (resource.action.engine) this
+      # policy resolves through. Each concrete tenant policy overrides
+      # this to name its resource's `manage` ability — the code the
+      # owning engine registers at boot and that
+      # `Seams::Permissions::DEFAULT_GRANTS` grants to the admin tier.
+      # nil here fails closed (only platform staff pass), so a subclass
+      # that forgets to name its ability never silently grants access.
+      def permission_ability
+        nil
       end
 
       def account_id

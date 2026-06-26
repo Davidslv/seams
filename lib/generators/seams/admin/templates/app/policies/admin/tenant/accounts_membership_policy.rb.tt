@@ -19,6 +19,12 @@ module Admin
           scope.where(account_id: account_id)
         end
       end
+
+      private
+
+      def permission_ability
+        "membership.manage.accounts"
+      end
     end
   end
 end

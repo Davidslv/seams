@@ -46,6 +46,19 @@ module Auth
       # seams:insertion-point auth.engine.events
     end
 
+    initializer "auth.register_abilities" do
+      # Ability codes this engine owns, registered exactly like events
+      # (resource.action.engine). `read` is the member-level view;
+      # `manage` is the admin-level mutate. Host grant maps reference
+      # these codes; see Seams::Permissions::DEFAULT_GRANTS. The admin
+      # engine's tenant Identity policy resolves through
+      # `identity.manage.auth`.
+      Seams::PermissionRegistry.register("identity.read.auth",   owned_by: "Auth")
+      Seams::PermissionRegistry.register("identity.manage.auth", owned_by: "Auth")
+      # Follow-up generators that ship new auth abilities register them here.
+      # seams:insertion-point auth.engine.abilities
+    end
+
     initializer "auth.append_migrations" do |app|
       unless app.root == root
         config.paths["db/migrate"].expanded.each do |expanded_path|

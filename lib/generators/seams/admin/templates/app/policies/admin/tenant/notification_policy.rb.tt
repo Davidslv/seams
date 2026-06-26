@@ -20,6 +20,12 @@ module Admin
           scope.where(account_id: account_id)
         end
       end
+
+      private
+
+      def permission_ability
+        "notification.manage.notifications"
+      end
     end
   end
 end
