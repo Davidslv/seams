@@ -69,6 +69,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       gem "faraday",  "~> 2.0"
       gem "stripe",   "~> 13.0"
       gem "ice_cube", ">= 0.16"
+      gem "tailwindcss-rails", "~> 4.0"
 
       group :development, :test do
         gem "strong_migrations"
@@ -658,6 +659,56 @@ RSpec.describe "rails new integration", type: :integration_full do
     expect(missing).to be_empty,
                        "every-function smoke probe regressed:\n  - missing: #{missing.join("\n  - ")}\n\n" \
                        "Full output:\n#{smoke}"
+
+    # ------------------------------------------------------------------
+    # HTTP smoke — prove the host SERVES correctly, not just that the
+    # engines load. Every probe above is a Ruby-level `bin/rails runner`
+    # call; nothing drove a real request through the middleware + filter
+    # chain. That blind spot is how #40 (auth front-door lockout) and #41
+    # (--shell unstyled) both reached a human. These guard that class.
+    # ------------------------------------------------------------------
+
+    # #40: every signed-out auth entry point must render (200), not
+    # 302-loop back to the sign-in page. The engine base controller gates
+    # every action with authenticate_identity!; the signed-out actions
+    # opt out, so these pages are reachable while logged out.
+    auth_http = boot_probe_full(<<~'RUBY')
+      session = ActionDispatch::Integration::Session.new(Rails.application)
+      # runner boots in development, where ActionDispatch::HostAuthorization
+      # blocks the default integration host (www.example.com) with a 403.
+      # localhost is permitted in development.
+      session.host = "localhost"
+      %w[/auth/session/new /auth/registration/new /auth/password_reset/new].each do |path|
+        session.get(path)
+        puts "AUTH_HTTP #{path} => #{session.response.status}"
+      end
+    RUBY
+
+    %w[/auth/session/new /auth/registration/new /auth/password_reset/new].each do |path|
+      expect(auth_http).to include("AUTH_HTTP #{path} => 200"),
+                           "signed-out #{path} must return 200, not a redirect loop.\n#{auth_http}"
+    end
+
+    # #41: generate the opt-in app shell and assert the served root links
+    # the COMPILED "tailwind" build (the @theme tokens + ui_* layer), not
+    # the empty "application" manifest. Propshaft needs the asset to
+    # exist, so stub the build output (we don't run the tailwind binary).
+    shell(["bin/rails", "generate", "seams:design", "--shell"])
+    FileUtils.mkdir_p(File.join(host_path, "app/assets/builds"))
+    File.write(File.join(host_path, "app/assets/builds/tailwind.css"), "/* integration build stub */\n")
+
+    shell_http = boot_probe_full(<<~'RUBY')
+      session = ActionDispatch::Integration::Session.new(Rails.application)
+      session.host = "localhost"
+      session.get("/")
+      puts "SHELL_HTTP / => #{session.response.status}"
+      puts "SHELL_LINKS_TAILWIND=#{session.response.body.include?('tailwind')}"
+    RUBY
+
+    expect(shell_http).to include("SHELL_HTTP / => 200"),
+                          "the --shell dashboard root must return 200.\n#{shell_http}"
+    expect(shell_http).to include("SHELL_LINKS_TAILWIND=true"),
+                          "the --shell layout must link the compiled tailwind build.\n#{shell_http}"
   end
 
   # Phase 1.9 round-trip: the generic engine generator + the remove
