@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_switch(label: "Make this project private", name: "private") %>
+  <%%= ui_switch(label: "Email me on activity", name: "activity_email", checked: true) %>
+</div>

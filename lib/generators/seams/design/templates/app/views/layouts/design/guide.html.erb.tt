@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%%= content_for(:title) || "Design — component guide" %></title>
+  <%%= csrf_meta_tags %>
+  <%%= csp_meta_tag %>
+  <%%# The host's Tailwind build carries the @theme tokens this engine injected. %>
+  <%%= stylesheet_link_tag "application", "data-turbo-track": "reload" if defined?(stylesheet_link_tag) %>
+</head>
+<body>
+  <%%# The design-system icon sprite, so ui_icon and any sprite-referencing
+      component resolves on the guide page without the host layout. %>
+  <%%= render "ui/icon_sprite" %>
+  <%%= yield %>
+</body>
+</html>

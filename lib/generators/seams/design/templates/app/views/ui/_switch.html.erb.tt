@@ -1,0 +1,6 @@
+<%%# locals: (label:, name:, checked: false, **attrs) -%>
+<%%= tag.label class: "switch", **attrs do %>
+  <%%= tag.input type: "checkbox", name: name, checked: checked, role: "switch" %>
+  <%%= tag.span class: "track" %>
+  <%%= tag.span label %>
+<%% end %>

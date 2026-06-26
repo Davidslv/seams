@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+module Design
+  # The living gallery: renders every component from its preview partial, so the
+  # documentation cannot drift from the implementation and a newly added
+  # component (a partial + a preview under app/views/ui/) appears here with no
+  # extra wiring.
+  #
+  # Dev/test only — `guide_available?` returns 404 outside Rails.env.local?, so
+  # the page never ships to production. It subclasses ActionController::Base
+  # (NOT the host's ApplicationController) so it carries no auth, account or
+  # tenancy filters: the guide is a pure render of the design system.
+  class GuideController < ActionController::Base
+    layout "design/guide"
+
+    before_action :guide_available?
+
+    def index
+      @components = Design.component_names
+    end
+
+    private
+
+    def guide_available?
+      head :not_found unless Rails.env.local?
+    end
+  end
+end

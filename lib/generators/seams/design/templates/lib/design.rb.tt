@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+require "design/version"
+require "design/components"
+require "design/engine"
+
+# Design — the seams design system, as a callable component library.
+#
+# A component is a strict-locals ERB partial under app/views/ui/ that has a
+# companion preview under app/views/ui/previews/. The preview is what makes a
+# component "public": it gives the auto-wired `ui_<name>` helper and the living
+# guide their list. Internal partials (icon, icon_sprite) have no preview, so
+# they get no helper and never appear in the guide.
+#
+# Plain ERB by design — the whole surface stays inside the host's Herb + RuboCop
+# gate, with no view framework and no extra dependency.
+module Design
+end

@@ -1,0 +1,9 @@
+<%%# locals: () -%>
+<div class="row-wrap">
+  <%%= ui_button(variant: :primary) { "Primary" } %>
+  <%%= ui_button { "Default" } %>
+  <%%= ui_button(variant: :ghost) { "Ghost" } %>
+  <%%= ui_button(variant: :danger) { "Danger" } %>
+  <%%= ui_button(variant: :primary, size: :sm) { "Small" } %>
+  <%%= ui_button(disabled: true) { "Disabled" } %>
+</div>

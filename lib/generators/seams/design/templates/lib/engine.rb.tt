@@ -1,0 +1,38 @@
+# frozen_string_literal: true
+
+module Design
+  # A deliberately NON-isolated engine (proposals/design_system_engine.md, D4):
+  # its app/views/ui partials and its UiHelper must be visible to the host AND
+  # to every other engine's views, so a component can be invoked anywhere. Rails
+  # appends the engine's app/views to the application's view paths automatically;
+  # the helper (and the auto-derived ui_<name> component helpers) are wired into
+  # ActionController::Base explicitly below.
+  #
+  # This engine intentionally does NOT isolate its namespace — that is the whole
+  # point. An isolated engine would scope the partials and keep the helper out of
+  # the host's controllers, which is exactly what this engine must NOT do.
+  class Engine < ::Rails::Engine
+    config.generators do |g|
+      g.test_framework :rspec
+    end
+
+    initializer "design.helpers" do |app|
+      app.config.to_prepare do
+        # Re-derive on every reload so a newly added component (a new preview
+        # partial under app/views/ui/previews/) gets its ui_<name> helper
+        # without a server restart.
+        Design.reset_component_names!
+        Design::UiHelper.define_component_helpers!
+        ActionController::Base.helper(Design::UiHelper)
+      end
+    end
+
+    initializer "design.append_migrations" do |app|
+      unless app.root == root
+        config.paths["db/migrate"].expanded.each do |expanded_path|
+          app.config.paths["db/migrate"] << expanded_path
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,8 @@
+<%%# locals: () -%>
+<div class="row-wrap">
+  <%%= ui_tag(label: "Ready", status: :ready) %>
+  <%%= ui_tag(label: "Building", status: :progress) %>
+  <%%= ui_tag(label: "Failed", status: :alert) %>
+  <%%= ui_tag(label: "Draft", status: :neutral) %>
+  <%%= ui_tag(label: "No dot", status: :neutral, dot: false) %>
+</div>

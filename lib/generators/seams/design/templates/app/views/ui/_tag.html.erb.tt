@@ -1,0 +1,2 @@
+<%%# locals: (label:, status: :neutral, dot: true, **attrs) -%>
+<%%= tag.span label, class: class_names("tag", "tag-#{status}", "tag-plain" => !dot), **attrs %>

@@ -1,0 +1,5 @@
+<%%# locals: (variant: :default, content: nil, **attrs) -%>
+<%%# TODO: build the <%= file_name %> component from the design system's classes.
+    Bake in accessibility (roles, aria-*, label association). Splat **attrs onto
+    the root element so callers can pass id / data-* / aria-* without forking. -%>
+<%%= tag.div class: class_names("<%= file_name %>", "<%= file_name %>-#{variant}" => variant.to_s != "default"), **attrs do %><%%= content %><%% end %>

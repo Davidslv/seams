@@ -1,0 +1,19 @@
+<%% content_for :title, "Design — component guide" %>
+<main id="main" style="max-width:var(--shell-max);margin:0 auto;padding:var(--s-7) var(--s-5) var(--s-9);font-family:var(--sans);color:var(--ink)">
+  <p style="font-size:var(--t-cap);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Design · living gallery</p>
+  <h1 style="font-family:var(--display);font-size:var(--t-display);margin:var(--s-3) 0 0">Components, rendered from the real partials</h1>
+  <p style="font-size:var(--t-body);color:var(--ink-2);max-width:var(--measure);margin:var(--s-4) 0 0">Every example below is the real <code><%%= "ui_*" %></code> helper rendering its
+    strict-locals partial. This page is built from the components themselves — add one (a partial + a preview under
+    <code>app/views/ui/</code>) and it appears here, with its helper, automatically.</p>
+  <p style="font-size:var(--t-sm);color:var(--muted);margin:var(--s-4) 0 0"><%%= @components.size %> components</p>
+
+  <div style="display:flex;flex-direction:column;gap:var(--s-7);margin-top:var(--s-7)">
+    <%% @components.each do |name| %>
+      <section>
+        <p style="font-size:var(--t-cap);letter-spacing:.04em;color:var(--muted);font-family:var(--mono)">ui_<%%= name %></p>
+        <h2 style="font-size:var(--t-h2);margin:var(--s-2) 0 var(--s-4)"><%%= name.humanize %></h2>
+        <div style="padding:var(--s-5);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card)"><%%= render "ui/previews/#{name}" %></div>
+      </section>
+    <%% end %>
+  </div>
+</main>

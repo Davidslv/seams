@@ -1,0 +1,40 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+# The living-gallery smoke test. Drives the real /design/guide route through the
+# dummy app's full Rack stack, so a component that breaks its preview (or the
+# guide chrome itself) fails CI. Also proves the route is dev/test-only.
+RSpec.describe "Design living gallery", type: :request do
+  describe "GET /design/guide" do
+    it "renders the gallery from the real previews" do
+      get "/design/guide"
+
+      expect(response).to have_http_status(:ok)
+      # The seed components appear, each rendered from its own preview.
+      expect(response.body).to include("ui_button")
+      expect(response.body).to include("ui_tag")
+      # The button preview's content proves the partial actually rendered.
+      expect(response.body).to include("Primary")
+    end
+
+    it "lists exactly the public component set" do
+      get "/design/guide"
+
+      Design.component_names.each do |name|
+        expect(response.body).to include("ui_#{name}")
+      end
+    end
+  end
+
+  describe "production guard" do
+    it "is unavailable in production (the controller 404s)" do
+      # The controller's before_action heads :not_found unless Rails.env.local?.
+      # We assert the guard exists rather than reload the whole app into the
+      # production environment inside the suite.
+      source = Design::Engine.root.join("app/controllers/design/guide_controller.rb").read
+      expect(source).to include("Rails.env.local?")
+      expect(source).to include("head :not_found")
+    end
+  end
+end

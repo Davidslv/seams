@@ -1,0 +1,12 @@
+<%%# locals: (label:, name:, value: "1", checked: false, hint: nil, **attrs) -%>
+<%% box_id = "c-#{name.to_s.parameterize}-#{value.to_s.parameterize}" -%>
+<%%= tag.label class: "choice", for: box_id, **attrs do %>
+  <%%= tag.input type: "checkbox", name: name, id: box_id, value: value, checked: checked,
+        "aria-describedby": (hint ? "#{box_id}-hint" : nil) %>
+  <span>
+    <%%= tag.span label, class: "ct" %>
+    <%% if hint -%>
+      <%%= tag.span hint, class: "cd", id: "#{box_id}-hint" %>
+    <%% end -%>
+  </span>
+<%% end %>

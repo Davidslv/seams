@@ -1,0 +1,70 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+# The strict-locals contract + a per-component render smoke test for the seed
+# component set. Lives under spec/runtime so it renders through the dummy app's
+# real view stack (the engine's ui/ partials are on its view path because the
+# engine is non-isolated).
+#
+# What it guards:
+#
+#   - every component partial declares a `locals:` magic comment, so its public
+#     surface is explicit (the contract that makes the auto-wire + the override
+#     story honest);
+#   - a required strict local that is omitted RAISES rather than silently
+#     rendering nothing — the heart of the "strict locals" contract;
+#   - every seed component renders without error from its own preview.
+#
+# Rendering is done through ApplicationController so the auto-wired ui_* helpers
+# (mixed into ActionController::Base by the engine) resolve inside the previews.
+RSpec.describe "Design ui_* components", type: :integration do
+  # Render a partial the way a view would, with the design helpers available.
+  def render_partial(path, **locals)
+    ApplicationController.render(partial: path, locals: locals)
+  end
+
+  describe "the strict-locals contract" do
+    it "every component partial declares a `locals:` magic comment" do
+      root = Design::Engine.root.join("app", "views", "ui")
+      partials = Dir[root.join("_*.html.erb")]
+      expect(partials).not_to be_empty
+
+      partials.each do |partial|
+        first_line = File.foreach(partial).first.to_s
+        expect(first_line).to match(/locals:/),
+                              "#{File.basename(partial)} is missing its `# locals:` strict-locals header"
+      end
+    end
+
+    it "raises when a required local is omitted (ui/tag needs label:)" do
+      # _tag.html.erb declares `locals: (label:, ...)` — label: is required, so
+      # rendering without it must raise rather than render an empty tag.
+      expect { render_partial("ui/tag") }.to raise_error(ArgumentError)
+    end
+
+    it "renders ui/tag when the required local is supplied" do
+      html = render_partial("ui/tag", label: "Ready", status: :ready)
+      expect(html).to include("Ready")
+    end
+  end
+
+  describe "the seed components render from their previews" do
+    it "renders every public component's preview without error", :aggregate_failures do
+      Design.component_names.each do |name|
+        expect { render_partial("ui/previews/#{name}") }
+          .not_to raise_error, "ui/previews/_#{name} failed to render"
+      end
+    end
+
+    it "ships the button + tag seed components" do
+      expect(Design.component_names).to include("button", "tag")
+    end
+
+    it "renders ui_button with its block content" do
+      html = render_partial("ui/button", variant: :primary, content: "Save")
+      expect(html).to include("Save")
+      expect(html).to include("btn-primary")
+    end
+  end
+end

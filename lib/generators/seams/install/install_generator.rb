@@ -239,6 +239,9 @@ module Seams
         say "    bin/seams admin         - Admin engine (Administrate-backed dashboards"
         say "                              for the canonical models, Pundit-gated,"
         say "                              audit-log auto-write). Requires auth + accounts."
+        say "    bin/seams design        - Design engine (ui_* component partials,"
+        say "                              Tailwind v4 tokens, Design::FormBuilder)."
+        say "                              Non-isolated: ui_* helpers resolve host-wide."
         say ""
         say "  Follow-up generators (extend an already-installed engine):", :yellow
         say "    bin/rails generate seams:auth:add_oauth_provider <name>"

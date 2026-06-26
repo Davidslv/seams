@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<div class="grid grid-2">
+  <%%= ui_input_group(name: "price", value: "9.99", prefix: "$", suffix: "/mo") %>
+  <%%= ui_input_group(name: "subdomain", value: "acme", suffix: ".example.com", placeholder: "your-team") %>
+</div>

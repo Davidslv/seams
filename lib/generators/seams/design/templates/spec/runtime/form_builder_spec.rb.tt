@@ -1,0 +1,97 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+# Design::FormBuilder — the host default builder (#19). Renders real forms
+# through the dummy app's view stack so the ui/field partial + the aria/error
+# wiring are exercised end to end, not stubbed.
+#
+# What it guards:
+#
+#   - Design::FormBuilder is the app-wide default, so `form_with` yields it
+#     without passing `builder:` — f.ui_text_field is available;
+#   - f.ui_text_field renders the ui/field markup: an associated <label>, a
+#     value-bound .input, and (when given) a hint linked via aria-describedby;
+#   - on a model with a validation error, the field switches to the error state:
+#     aria-invalid="true", the error message, and aria-describedby pointing at
+#     the error node instead of the hint.
+RSpec.describe "Design::FormBuilder", type: :integration do
+  # A minimal ActiveModel object so we can drive validations + errors through a
+  # real form, with no schema or table.
+  let(:form_model_class) do
+    Class.new do
+      include ActiveModel::Model
+      attr_accessor :title
+
+      validates :title, presence: true
+
+      def self.name = "Project"
+    end
+  end
+
+  # Render a form the way a view would, through ApplicationController so the
+  # host-default builder + the engine's ui/ partials resolve. An inline template
+  # is the reliable way to exercise form_with's block + the ui/field partial
+  # outside a request.
+  def render_form(model)
+    ApplicationController.render(
+      inline: <<~ERB,
+        <%%= form_with(model: @model, url: "/", builder: Design::FormBuilder) do |form| %>
+          <%%= form.ui_text_field :title, label: "Title", hint: "Shown everywhere." %>
+        <%% end %>
+      ERB
+      assigns: { model: model }
+    )
+  end
+
+  describe "the default builder" do
+    it "only ADDS ui_* helpers — it is safe to make the app-wide default" do
+      # The standard field helpers are untouched, which is what makes it safe to
+      # set as config.action_view.default_form_builder (the generator does this
+      # in the host's config/application.rb; covered by the generator spec).
+      expect(Design::FormBuilder.ancestors).to include(ActionView::Helpers::FormBuilder)
+      expect(Design::FormBuilder.instance_methods).to include(:ui_text_field, :ui_submit)
+    end
+
+    it "renders an associated label + value-bound input" do
+      model = form_model_class.new(title: "Acme")
+      html = render_form(model)
+
+      expect(html).to include(">Title</label>")
+      expect(html).to include('class="input"')
+      expect(html).to include('value="Acme"')
+      # the label's `for` targets the input's id (association is not by guesswork)
+      label_for = html[/<label[^>]*for="([^"]+)"/, 1]
+      expect(html).to include(%(id="#{label_for}"))
+    end
+
+    it "links the hint via aria-describedby when there is no error" do
+      model = form_model_class.new(title: "Acme")
+      html = render_form(model)
+
+      hint_id = html[/<p[^>]*class="hint"[^>]*id="([^"]+)"/, 1]
+      expect(hint_id).to end_with("-hint")
+      expect(html).to include(%(aria-describedby="#{hint_id}"))
+      expect(html).to include("Shown everywhere.")
+      expect(html).not_to include('aria-invalid="true"')
+    end
+  end
+
+  describe "the error state" do
+    it "wires aria-invalid + aria-describedby to the error, and drops the hint" do
+      model = form_model_class.new(title: nil)
+      model.validate
+      html = render_form(model)
+
+      expect(html).to include('aria-invalid="true"')
+      # the message comes from the model's errors, rendered into the error node
+      error_id = html[/<p[^>]*class="hint"[^>]*id="([^"]+)"/, 1]
+      expect(error_id).to end_with("-error")
+      expect(html).to include(%(aria-describedby="#{error_id}"))
+      expect(html).to include(model.errors[:title].first)
+      # in the error state the hint is suppressed, so describedby points at the
+      # error rather than the hint
+      expect(html).not_to include("Shown everywhere.")
+    end
+  end
+end

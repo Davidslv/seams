@@ -1,0 +1,5 @@
+<%%# locals: (label:, name:, value:, checked: false, **attrs) -%>
+<%%= tag.label class: "choice", **attrs do %>
+  <%%= tag.input type: "radio", name: name, value: value, checked: checked %>
+  <%%= tag.span label, class: "ct" %>
+<%% end %>

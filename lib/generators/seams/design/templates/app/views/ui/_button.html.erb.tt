@@ -1,0 +1,4 @@
+<%%# locals: (variant: :default, size: nil, type: "button", content: nil, **attrs) -%>
+<%%= tag.button type: type,
+      class: class_names("btn", "btn-#{variant}" => variant.to_s != "default", "btn-#{size}" => size.present?),
+      **attrs do %><%%= content %><%% end %>

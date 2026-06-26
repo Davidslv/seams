@@ -1,0 +1,56 @@
+/* ---------------------------------------------------------------------------
+   seams:design tokens — the neutral default design tokens, owned by Tailwind @theme.
+   This is the SINGLE SOURCE every ui_* component reads. Retheme the whole system
+   by overriding these values; nothing else changes. (seams design)
+
+   One strong, neutral default: refined paper/ink surfaces, a single restrained
+   indigo accent, and a clean type pairing. Every text token below is WCAG-AA on
+   the surfaces it sits on (faint is decorative-only / AA-large).
+
+   Type: Inter is named first but is NOT self-hosted — it degrades gracefully to
+   the system sans stack, so the default boots with zero web-font requests. Host
+   Inter (or any pairing) by adding it to the bundle and it takes over; the token
+   stays the single switch. --------------------------------------------------- */
+@theme {
+  --color-paper:#ffffff; --color-paper-raised:#f5f6f8; --color-card:#ffffff;
+  --color-ink:#15171c; --color-ink-2:#3a3f48; --color-muted:#5c636f; --color-faint:#767d8a;
+  --color-line:#e6e8ec; --color-line-2:#d2d6dd;
+  --color-accent:#2456c7; --color-accent-deep:#1b3f96;
+  --color-ready:#0f6b41; --color-ready-bg:#e7f3ec; --color-ready-line:#a7d3bd;
+  --color-progress:#8a5208; --color-progress-bg:#fbf1e0; --color-progress-line:#eccf97;
+  --color-alert:#b81d31; --color-alert-bg:#fbecee; --color-alert-line:#f1b6bd;
+  --font-display:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+/* Short token aliases the component layer references (value lives once, in @theme).
+   Components read `var(--ink)`, `var(--accent)`, `var(--s-4)` …; theming the
+   system means overriding the @theme block above, never these aliases. */
+:root{
+  --paper:var(--color-paper); --paper-raised:var(--color-paper-raised); --card:var(--color-card);
+  --ink:var(--color-ink); --ink-2:var(--color-ink-2); --muted:var(--color-muted); --faint:var(--color-faint);
+  --line:var(--color-line); --line-2:var(--color-line-2);
+  --accent:var(--color-accent); --accent-deep:var(--color-accent-deep);
+  --ready:var(--color-ready); --ready-bg:var(--color-ready-bg); --ready-line:var(--color-ready-line);
+  --progress:var(--color-progress); --progress-bg:var(--color-progress-bg); --progress-line:var(--color-progress-line);
+  --alert:var(--color-alert); --alert-bg:var(--color-alert-bg); --alert-line:var(--color-alert-line);
+  --focus:var(--color-accent);
+  --display:var(--font-display); --sans:var(--font-sans); --mono:var(--font-mono);
+  --t-display-xl:44px; --t-display:34px; --t-h1:27px; --t-h2:21px; --t-h3:17px; --t-body:16px; --t-sm:14px; --t-cap:12.5px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px; --s-8:64px; --s-9:96px;
+  --r-sm:5px; --r:9px; --r-lg:14px; --r-pill:999px;
+  --shadow-sm:0 1px 2px rgba(21,23,28,.05); --shadow:0 6px 20px -10px rgba(21,23,28,.18); --shadow-pop:0 28px 64px -24px rgba(21,23,28,.40);
+  --ease:cubic-bezier(.2,.6,.2,1); --fast:120ms; --med:190ms;
+  --measure:68ch; --shell-max:1180px;
+  --z-base:0; --z-raised:10; --z-sticky:40; --z-popover:70; --z-overlay:80; --z-toast:95;
+  --bp-sm:680px; --bp-md:860px; --bp-lg:1080px;
+}
+
+/* Base bits Tailwind preflight doesn't cover (preflight owns the rest). */
+@layer base{
+  ::selection{background:var(--ink);color:var(--paper)}
+  :where(a,button,input,textarea,select,summary,[tabindex]):focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--r-sm)}
+  .skip{position:absolute;left:-9999px;top:var(--s-2);z-index:80;background:var(--ink);color:var(--paper);padding:var(--s-2) var(--s-4);border-radius:var(--r);font-weight:600}
+  .skip:focus{left:var(--s-2)}
+}

@@ -1,0 +1,22 @@
+# frozen_string_literal: true
+
+module Design
+  class << self
+    # Component names, derived from the preview partials under
+    # app/views/ui/previews/. Memoised; reset on code reload via the engine's
+    # to_prepare hook so new components appear without a server restart.
+    def component_names
+      @component_names ||= Dir[previews_root.join("_*.html.erb")]
+        .map { |path| File.basename(path).delete_prefix("_").delete_suffix(".html.erb") }
+        .sort
+    end
+
+    def reset_component_names!
+      @component_names = nil
+    end
+
+    def previews_root
+      Engine.root.join("app", "views", "ui", "previews")
+    end
+  end
+end
