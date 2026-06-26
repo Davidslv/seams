@@ -387,8 +387,7 @@ RSpec.describe Seams::Generators::InstallGenerator do
       run_generator
     end
 
-    it "creates the config files" do
-      assert_file ".herb.yml"
+    it "creates the config files", :aggregate_failures do
       assert_file "config/initializers/strong_migrations.rb" do |content|
         expect(content).to include("StrongMigrations.start_after = 0")
         # Guarded so a production boot (gem not loaded) is unaffected.
@@ -396,16 +395,21 @@ RSpec.describe Seams::Generators::InstallGenerator do
       end
       assert_file "lefthook.yml" do |content|
         expect(content).to include("pre-commit")
-        expect(content).to include("herb lint")
         expect(content).to include("rspec")
+        # herb is opt-in (arm64-darwin-only), so its hook step is absent by default.
+        expect(content).not_to include("herb lint")
       end
+      # herb is opt-in, so no .herb.yml is written by default.
+      expect(File.exist?(File.join(destination_root, ".herb.yml"))).to be(false)
     end
 
     it "injects the gems the CI workflow and hooks shell out to" do
       gemfile = File.read(File.join(destination_root, "Gemfile"))
-      %w[rubocop brakeman bundler-audit herb lefthook strong_migrations].each do |g|
+      %w[rubocop brakeman bundler-audit lefthook strong_migrations].each do |g|
         expect(gemfile).to match(/gem ["']#{g}["']/), "expected gem #{g} in Gemfile"
       end
+      # herb is opt-in — not injected unless --herb is passed.
+      expect(gemfile).not_to match(/gem ["']herb["']/)
     end
 
     it "keeps strong_migrations out of the production path (dev/test group)" do
@@ -413,10 +417,29 @@ RSpec.describe Seams::Generators::InstallGenerator do
       expect(gemfile).to match(/group :development, :test do\n\s*gem ["']strong_migrations["']/)
     end
 
-    it "wires herb + strong_migrations into the generated CI" do
+    it "wires strong_migrations into the generated CI, but not herb by default" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("db:create db:migrate")
+        # herb is opt-in, so its CI lint step is absent by default.
+        expect(content).not_to include("herb lint")
+      end
+    end
+  end
+
+  describe "herb — opt-in with --herb" do
+    before do
+      File.write(File.join(destination_root, "Gemfile"), "source \"https://rubygems.org\"\n")
+      run_generator(["--herb"])
+    end
+
+    it "installs the config, gem, CI step, and lefthook step", :aggregate_failures do
+      assert_file ".herb.yml"
+      expect(File.read(File.join(destination_root, "Gemfile"))).to match(/gem ["']herb["']/)
       assert_file ".github/workflows/ci.yml" do |content|
         expect(content).to include("herb lint")
-        expect(content).to include("db:create db:migrate")
+      end
+      assert_file "lefthook.yml" do |content|
+        expect(content).to include("herb lint")
       end
     end
   end

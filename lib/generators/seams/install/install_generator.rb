@@ -20,9 +20,16 @@ module Seams
 
       # The quality toolchain is installed by DEFAULT — Seams is opinionated and
       # sets a host up for success from the first CLI run. Opt out per tool with
-      # --no-herb / --no-strong-migrations / --no-lefthook.
-      class_option :herb, type: :boolean, default: true,
-                          desc: "Install herb (HTML+ERB linter) + .herb.yml + CI lint step"
+      # --no-strong-migrations / --no-lefthook.
+      #
+      # herb is the exception and is OPT-IN: it ships an arm64-darwin-only native
+      # gem with no Linux build, so on a Rails 8 multi-platform lock (which lists
+      # the Linux deploy platforms) `bundle` fails and the host won't boot. A
+      # fresh install booting matters more than a linter being on, so enable it
+      # explicitly with --herb once your lock can resolve it.
+      class_option :herb, type: :boolean, default: false,
+                          desc: "Install herb (HTML+ERB linter) + .herb.yml + CI/hook lint step. " \
+                                "Off by default: herb is arm64-darwin-only and breaks multi-platform locks."
       class_option :strong_migrations, type: :boolean, default: true,
                                        desc: "Install strong_migrations + initializer + CI migration-safety step"
       class_option :lefthook, type: :boolean, default: true,
@@ -221,6 +228,7 @@ module Seams
         say "    rubocop + brakeman + bundle-audit (in CI)" \
             "#{", herb (HTML+ERB lint)" if options[:herb]}" \
             "#{", strong_migrations" if options[:strong_migrations]}"
+        say "    HTML+ERB linting (herb) is opt-in — add --herb (arm64-darwin only).", :yellow unless options[:herb]
         say "    bundle install   then   bin/rails db:prepare"
         if options[:lefthook]
           say "    Activate the git hooks (pre-commit lint, pre-push specs):", :yellow
