@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<div class="buildlist">
+  <%%= ui_build_row(format: "HTML", state: :ready, percent: 100) %>
+  <%%= ui_build_row(format: "PDF", state: :running, percent: 72) %>
+  <%%= ui_build_row(format: "ZIP", state: :queued, percent: 0) %>
+</div>

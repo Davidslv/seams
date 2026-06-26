@@ -1,0 +1,2 @@
+<%%# locals: (current:, max:, **attrs) -%>
+<%%= tag.span class: class_names("counter", "warn" => current >= max * 0.9 && current < max, "over" => current > max), **attrs do %><%%= current %> / <%%= max %><%% end %>

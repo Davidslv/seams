@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<div class="row-wrap">
+  <%%= ui_counter(current: 2140, max: 4000) %>
+  <%%= ui_counter(current: 3902, max: 4000) %>
+  <%%= ui_counter(current: 4117, max: 4000) %>
+</div>

@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<div class="row-wrap">
+  <%%= ui_kbd(keys: ["⌘", "K"]) %>
+  <%%= ui_kbd(keys: ["g", "then", "w"]) %>
+</div>

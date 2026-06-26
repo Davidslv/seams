@@ -1,0 +1,11 @@
+<%%# locals: (index:, title:, status: :neutral, status_label: "Draft", **attrs) -%>
+<%%= tag.li class: "chapter-row", **attrs do %>
+  <%%= tag.span "⠿", class: "drag", "aria-hidden": "true" %>
+  <%%= tag.span format("%02d", index), class: "idx" %>
+  <%%= tag.span title, class: "title" %>
+  <%%= ui_tag(label: status_label, status: status) %>
+  <%%= tag.span class: "moves" do %>
+    <%%= tag.button "▲", type: "button", "aria-label": "Move up" %>
+    <%%= tag.button "▼", type: "button", "aria-label": "Move down" %>
+  <%% end %>
+<%% end %>
