@@ -158,9 +158,16 @@ module Seams
         File.join(destination_root, "engines", ENGINE_NAME, relative)
       end
 
-      # Write the neutral @theme token block into the host's Tailwind entrypoint.
-      # Phase 1 ships a minimal NEUTRAL default (paper/ink/accent + a system type
-      # stack); #17 owns the full WCAG-AA token layer. If the host has no
+      # Write the neutral @theme token layer into the host's Tailwind entrypoint.
+      # This is the SINGLE SOURCE every ui_* component reads (#17): the full,
+      # WCAG-AA-audited neutral default — the @theme palette/type tokens, the
+      # `:root` alias layer (type scale, spacing, radius, shadow, motion, layout,
+      # z-index, breakpoints) and the base focus/selection/skip-link rules. The
+      # block lives in templates/app/assets/tailwind/_tokens.css so it stays
+      # readable and diffable; the generator appends it verbatim.
+      #
+      # Also adds an `@source` line so Tailwind scans the engine's component
+      # partials and builds the utility classes they emit. If the host has no
       # application.css yet (no tailwindcss-rails installed at generate time),
       # create one with the `@import "tailwindcss"` line so the first boot has a
       # working stylesheet. Idempotent — skips if the token marker is present.
@@ -169,7 +176,17 @@ module Seams
 
         unless File.exist?(css_path)
           FileUtils.mkdir_p(File.dirname(css_path))
-          create_file css_path, %(@import "tailwindcss";\n)
+          create_file css_path, host_css_preamble
+        end
+
+        # Ensure Tailwind scans the engine's ui/ partials even when the host
+        # already had its own application.css (e.g. after tailwindcss:install).
+        unless File.read(css_path).include?(ENGINE_SOURCE_GLOB)
+          append_to_file css_path, <<~CSS
+
+            /* Scan the seams design engine so the classes its ui/ partials emit are built. */
+            @source "#{ENGINE_SOURCE_GLOB}";
+          CSS
         end
 
         return if File.read(css_path).include?(THEME_MARKER)
@@ -178,32 +195,28 @@ module Seams
         append_to_file css_path, "\n#{neutral_theme_block}"
       end
 
+      ENGINE_SOURCE_GLOB = "../../../engines/design/app/views"
+      private_constant :ENGINE_SOURCE_GLOB
+
       THEME_MARKER = "seams:design tokens"
       private_constant :THEME_MARKER
 
-      # The minimal NEUTRAL default theme. Not quire's garnet/Spectral — a
-      # restrained paper/ink palette, one cool accent, a system type stack.
-      # #17 replaces this with the full, audited token set; the marker comment
-      # keeps that injection idempotent and easy to find.
-      def neutral_theme_block
+      # The Tailwind entrypoint we create when the host has none yet: the import
+      # plus an @source line so Tailwind scans the engine's ui/ partials and
+      # builds the utility classes they emit.
+      def host_css_preamble
         <<~CSS
-          /* ---------------------------------------------------------------------------
-             #{THEME_MARKER} — the neutral default design tokens, owned by Tailwind @theme.
-             Retheme by overriding these values; nothing else changes. (seams design)
-             --------------------------------------------------------------------------- */
-          @theme {
-            --color-paper:#ffffff; --color-paper-raised:#f6f7f9; --color-card:#ffffff;
-            --color-ink:#16181d; --color-ink-2:#3a3f47; --color-muted:#646b76; --color-faint:#8a909a;
-            --color-line:#e6e8ec; --color-line-2:#d4d8df;
-            --color-accent:#2f5bd7; --color-accent-deep:#1f3f9c;
-            --color-ready:#137a4b; --color-ready-bg:#e7f4ed; --color-ready-line:#a8d6bd;
-            --color-progress:#9a5b06; --color-progress-bg:#fbf1e0; --color-progress-line:#eccf97;
-            --color-alert:#c5273a; --color-alert-bg:#fbecee; --color-alert-line:#f1b6bd;
-            --font-display:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-            --font-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-            --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-          }
+          @import "tailwindcss";
+
+          /* Scan the seams design engine so the classes its ui/ partials emit are built. */
+          @source "#{ENGINE_SOURCE_GLOB}";
         CSS
+      end
+
+      # The full neutral default token layer (#17), read verbatim from the
+      # template so the large CSS stays readable and reviewable in one place.
+      def neutral_theme_block
+        File.read(File.expand_path("templates/app/assets/tailwind/_tokens.css", __dir__))
       end
 
       # Make Design::FormBuilder the host's default form builder so every

@@ -235,6 +235,137 @@ RSpec.describe Seams::Generators::DesignGenerator do
         expect(content).not_to include("Spectral")
       end
     end
+
+    it "ships the single-source @theme palette + type tokens", :aggregate_failures do
+      assert_file "app/assets/tailwind/application.css" do |content|
+        %w[
+          --color-ink --color-ink-2 --color-muted --color-faint
+          --color-line --color-line-2 --color-accent-deep
+          --color-ready --color-progress --color-alert
+          --font-display --font-sans --font-mono
+        ].each { |token| expect(content).to include(token) }
+      end
+    end
+
+    it "ships the :root alias layer the components read", :aggregate_failures do
+      assert_file "app/assets/tailwind/application.css" do |content|
+        expect(content).to include(":root{")
+        # alias indirection: short name -> @theme value
+        expect(content).to include("--ink:var(--color-ink)")
+        expect(content).to include("--accent:var(--color-accent)")
+        expect(content).to include("--focus:var(--color-accent)")
+        # scale tokens the layout/spacing/radius/shadow system depends on
+        %w[--t-h1 --s-4 --r-lg --shadow --ease --measure --z-overlay --bp-md].each do |token|
+          expect(content).to include(token)
+        end
+      end
+    end
+
+    it "ships the base focus / selection / skip-link rules" do
+      assert_file "app/assets/tailwind/application.css" do |content|
+        expect(content).to include("@layer base{")
+        expect(content).to include("focus-visible")
+        expect(content).to include(".skip")
+      end
+    end
+
+    it "adds an @source line so Tailwind scans the engine's ui/ partials" do
+      assert_file "app/assets/tailwind/application.css" do |content|
+        expect(content).to include('@source "../../../engines/design/app/views"')
+      end
+    end
+  end
+
+  describe "host wiring — Tailwind tokens (host already has application.css)" do
+    let(:existing_css) { File.join(destination_root, "app/assets/tailwind/application.css") }
+
+    it "appends the @source + tokens without clobbering the host stylesheet", :aggregate_failures do
+      write_host "app/assets/tailwind/application.css", %(@import "tailwindcss";\n\n.host-rule{}\n)
+      run_generator
+
+      content = File.read(existing_css)
+      expect(content).to include(".host-rule{}")              # host's own CSS preserved
+      expect(content).to include("seams:design tokens")       # tokens appended
+      expect(content).to include('@source "../../../engines/design/app/views"')
+      # idempotent: no duplicate @source / token block on the second run above
+      expect(content.scan("seams:design tokens").size).to eq(1)
+      expect(content.scan('@source "../../../engines/design/app/views"').size).to eq(1)
+    end
+  end
+
+  # The neutral default theme's acceptance criterion (#17): every text token
+  # must clear WCAG-AA on the surfaces it sits on. Parse the shipped token file
+  # and compute contrast so a future palette edit that breaks AA fails CI.
+  describe "WCAG-AA contrast of the default text tokens" do
+    let(:tokens) do
+      css = File.read(
+        File.expand_path(
+          "../../../lib/generators/seams/design/templates/app/assets/tailwind/_tokens.css",
+          __dir__
+        )
+      )
+      css.scan(/--(color-[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})/).to_h
+    end
+
+    def linearize(channel)
+      ratio = channel / 255.0
+      ratio <= 0.03928 ? ratio / 12.92 : (((ratio + 0.055) / 1.055)**2.4)
+    end
+
+    def relative_luminance(hex)
+      red, green, blue = hex.delete("#").scan(/../).map { |pair| linearize(pair.to_i(16)) }
+      (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+    end
+
+    def contrast(foreground, background)
+      luminances = [relative_luminance(foreground), relative_luminance(background)]
+      (luminances.max + 0.05) / (luminances.min + 0.05)
+    end
+
+    # Body-text tokens that carry essential copy must clear AA (4.5:1) on every
+    # neutral surface. `faint` is decorative-only (IDs, separators, placeholder
+    # hints), so it is held to AA-large (3:1) instead — see the token comments.
+    surfaces = %w[color-paper color-paper-raised color-card]
+
+    %w[color-ink color-ink-2 color-muted].each do |text_token|
+      surfaces.each do |surface_token|
+        it "#{text_token} on #{surface_token} clears AA (4.5:1)" do
+          ratio = contrast(tokens.fetch(text_token), tokens.fetch(surface_token))
+          expect(ratio).to be >= 4.5
+        end
+      end
+    end
+
+    surfaces.each do |surface_token|
+      it "color-faint on #{surface_token} clears AA-large (3:1)" do
+        ratio = contrast(tokens.fetch("color-faint"), tokens.fetch(surface_token))
+        expect(ratio).to be >= 3.0
+      end
+    end
+
+    # State foregrounds must clear AA on their own tinted backgrounds, and the
+    # accent must read both as text on paper and as the label of an accent fill.
+    {
+      "color-ready" => "color-ready-bg",
+      "color-progress" => "color-progress-bg",
+      "color-alert" => "color-alert-bg"
+    }.each do |fg, bg|
+      it "#{fg} on #{bg} clears AA (4.5:1)" do
+        expect(contrast(tokens.fetch(fg), tokens.fetch(bg))).to be >= 4.5
+      end
+    end
+
+    it "color-accent clears AA on paper (4.5:1)" do
+      expect(contrast(tokens.fetch("color-accent"), tokens.fetch("color-paper"))).to be >= 4.5
+    end
+
+    it "white reads on the accent fill (4.5:1)" do
+      expect(contrast("#ffffff", tokens.fetch("color-accent"))).to be >= 4.5
+    end
+
+    it "paper reads on the ink primary fill (4.5:1)" do
+      expect(contrast(tokens.fetch("color-paper"), tokens.fetch("color-ink"))).to be >= 4.5
+    end
   end
 
   describe "host wiring — default form builder" do
