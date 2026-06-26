@@ -391,6 +391,8 @@ RSpec.describe Seams::Generators::InstallGenerator do
       assert_file ".herb.yml"
       assert_file "config/initializers/strong_migrations.rb" do |content|
         expect(content).to include("StrongMigrations.start_after = 0")
+        # Guarded so a production boot (gem not loaded) is unaffected.
+        expect(content).to include("return unless defined?(StrongMigrations)")
       end
       assert_file "lefthook.yml" do |content|
         expect(content).to include("pre-commit")
@@ -404,6 +406,11 @@ RSpec.describe Seams::Generators::InstallGenerator do
       %w[rubocop brakeman bundler-audit herb lefthook strong_migrations].each do |g|
         expect(gemfile).to match(/gem ["']#{g}["']/), "expected gem #{g} in Gemfile"
       end
+    end
+
+    it "keeps strong_migrations out of the production path (dev/test group)" do
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      expect(gemfile).to match(/group :development, :test do\n\s*gem ["']strong_migrations["']/)
     end
 
     it "wires herb + strong_migrations into the generated CI" do

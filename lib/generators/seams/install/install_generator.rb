@@ -167,9 +167,11 @@ module Seams
         host_inject_gem("bundler-audit", group: :development)
         host_inject_gem("herb", group: :development) if options[:herb]
         host_inject_gem("lefthook", group: :development) if options[:lefthook]
-        # strong_migrations runs wherever migrations run, including production,
-        # so it is NOT dev/test-only.
-        host_inject_gem("strong_migrations") if options[:strong_migrations]
+        # strong_migrations is a dev/CI guard — it vets migrations where they're
+        # written and in CI, and is kept OUT of the production path. The
+        # initializer is guarded with `if defined?(StrongMigrations)` so a
+        # production boot (where the gem isn't loaded) is unaffected.
+        host_inject_gem("strong_migrations", group: %i[development test]) if options[:strong_migrations]
       end
 
       # Phase 1.5 — per-host helper scripts and architecture doc.

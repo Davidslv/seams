@@ -116,7 +116,12 @@ module Seams
       def build_gem_line(name, args, group)
         version_part = args.first.is_a?(String) ? %(, "#{args.first}") : ""
         gem_line     = %(gem "#{name}"#{version_part})
-        gem_line     = "group #{group.inspect} do\n  #{gem_line}\nend" if group
+        # group may be a single symbol (:development) or several
+        # (%i[development test] -> `group :development, :test do`).
+        if group
+          groups   = Array(group).map(&:inspect).join(", ")
+          gem_line = "group #{groups} do\n  #{gem_line}\nend"
+        end
         gem_line
       end
     end
