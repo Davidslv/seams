@@ -174,6 +174,30 @@ module Seams
         end
       end
 
+      # The Overlays component set (Phase 2, GROUPKEY = overlays). Ported
+      # faithfully from quire-saas's compositor (compositor_* -> ui_*,
+      # compositor-dialog controller -> ui-dialog, quire copy neutralised in the
+      # previews), each carrying its baked-in overlay accessibility:
+      #
+      #   - dialog     a native <dialog aria-labelledby> with a labelled close
+      #                button, driven by a ui-dialog Stimulus controller the host
+      #                supplies (data-controller / data-action wiring baked in);
+      #   - drawer     an <aside aria-label> side-panel landmark;
+      #   - popover    a role=note annotation bubble;
+      #   - savestate  a role=status live region (saved / saving / unsaved).
+      #
+      # Each ships with a companion preview, which is what makes it "public": the
+      # auto-wire derives ui_<name> from the preview and the gallery lists it.
+      # Eject-aware so a host can own a component without losing it on regenerate.
+      def create_overlays_components
+        %w[dialog drawer popover savestate].each do |name|
+          template_unless_ejected "app/views/ui/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/_#{name}.html.erb")
+          template_unless_ejected "app/views/ui/previews/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/previews/_#{name}.html.erb")
+        end
+      end
+
       # The living gallery (dev/test only). The controller renders every
       # component from its preview so the docs cannot drift; the route is guarded
       # to Rails.env.local? both in the controller (404 in production) and at the

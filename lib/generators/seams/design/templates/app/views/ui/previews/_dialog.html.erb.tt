@@ -1,0 +1,8 @@
+<%%# locals: () -%>
+<%%= ui_dialog(id: "guide-del", title: "Delete this item?", trigger: "Delete item…", destructive: true) do %>
+  <p class="small muted mb-4">This removes the item and everything inside it. It can't be undone.</p>
+  <div class="row-wrap" style="justify-content:flex-end">
+    <%%= ui_button(data: { action: "ui-dialog#close" }) { "Keep it" } %>
+    <%%= ui_button(variant: :danger) { "Delete permanently" } %>
+  </div>
+<%% end %>
