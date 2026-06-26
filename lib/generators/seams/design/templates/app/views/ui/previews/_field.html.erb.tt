@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<div class="grid grid-2">
+  <%%= ui_field(label: "Project name", name: "name", value: "Acme", hint: "Shown across the app.") %>
+  <%%= ui_field(label: "Slug", name: "slug", value: "ac", error: "A slug needs at least 3 characters.") %>
+</div>

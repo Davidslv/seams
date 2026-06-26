@@ -203,6 +203,69 @@ RSpec.describe Seams::Generators::DesignGenerator do
     end
   end
 
+  describe "form components" do
+    it "ships the field partial with the aria-invalid / aria-describedby wiring", :aggregate_failures do
+      assert_file "engines/design/app/views/ui/_field.html.erb" do |content|
+        expect(content).to include("locals:")
+        # required strict locals
+        expect(content).to include("label:")
+        expect(content).to include("name:")
+        # the accessibility wiring is baked into the markup, not the builder
+        expect(content).to include("aria-invalid")
+        expect(content).to include("aria-describedby")
+        expect(content).to include("field-error")
+        # neutral default — no quire copy bled through
+        expect(content).not_to include("compositor")
+      end
+      assert_file "engines/design/app/views/ui/previews/_field.html.erb" do |content|
+        expect(content).to include("ui_field")
+        expect(content).not_to include("compositor_field")
+        # the preview drives both the value path and the error path
+        expect(content).to include("error:")
+      end
+    end
+
+    it "ships checkbox / radio / switch / input_group partials + previews", :aggregate_failures do
+      %w[checkbox radio switch input_group].each do |name|
+        assert_file "engines/design/app/views/ui/_#{name}.html.erb" do |content|
+          expect(content).to include("locals:")
+          expect(content).not_to include("compositor")
+        end
+        assert_file "engines/design/app/views/ui/previews/_#{name}.html.erb" do |content|
+          expect(content).to include("ui_#{name}")
+          expect(content).not_to include("compositor_#{name}")
+        end
+      end
+    end
+
+    it "makes the form components public — they appear in the auto-wire previews", :aggregate_failures do
+      # The auto-wire derives the public component list from the preview names,
+      # so a preview is what makes ui_<name> exist + list in the gallery.
+      %w[field checkbox radio switch input_group].each do |name|
+        full = File.join(destination_root, "engines/design/app/views/ui/previews/_#{name}.html.erb")
+        expect(File.exist?(full)).to be(true), "expected ui/previews/_#{name} so #{name} is public"
+      end
+    end
+
+    it "switch declares role=switch for assistive tech" do
+      assert_file "engines/design/app/views/ui/_switch.html.erb" do |content|
+        expect(content).to include('role: "switch"')
+      end
+    end
+  end
+
+  describe "form builder spec" do
+    it "ships the runtime FormBuilder spec covering the default builder + error aria", :aggregate_failures do
+      assert_file "engines/design/spec/runtime/form_builder_spec.rb" do |content|
+        expect(content).to include("Design::FormBuilder")
+        expect(content).to include("ui_text_field")
+        expect(content).to include("the error state")
+        expect(content).to include('aria-invalid="true"')
+        expect(content).to include("aria-describedby")
+      end
+    end
+  end
+
   describe "living gallery (guide)" do
     it "ships the dev/test-only guide controller (404 in production)", :aggregate_failures do
       assert_file "engines/design/app/controllers/design/guide_controller.rb" do |content|

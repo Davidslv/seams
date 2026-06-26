@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<div class="stack">
+  <%%= ui_checkbox(label: "Email", name: "channels[]", value: "email", checked: true) %>
+  <%%= ui_checkbox(label: "SMS", name: "channels[]", value: "sms", checked: true) %>
+  <%%= ui_checkbox(label: "Webhook", name: "channels[]", value: "webhook", hint: "POSTs a JSON payload") %>
+</div>

@@ -116,6 +116,30 @@ module Seams
                  engine_path("app/form_builders/design/form_builder.rb")
       end
 
+      # The form-input component set (#19): the building blocks Design::FormBuilder
+      # and hand-written forms render. Ported faithfully from quire-saas's
+      # compositor (compositor_* -> ui_*, quire copy neutralised in the previews):
+      #
+      #   - field        the label/input/hint/error wrapper with baked-in
+      #                  aria-invalid + aria-describedby wiring (what
+      #                  f.ui_text_field renders);
+      #   - checkbox     an accessible labelled checkbox with an optional hint;
+      #   - radio        a labelled radio (grouped by name in a fieldset);
+      #   - switch       a role="switch" toggle;
+      #   - input_group  a text input with an optional prefix/suffix affix.
+      #
+      # Each ships with a companion preview, which is what makes it "public": the
+      # auto-wire derives ui_<name> from the preview and the gallery lists it.
+      # Eject-aware so a host can own a component without losing it on regenerate.
+      def create_form_components
+        %w[field checkbox radio switch input_group].each do |name|
+          template_unless_ejected "app/views/ui/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/_#{name}.html.erb")
+          template_unless_ejected "app/views/ui/previews/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/previews/_#{name}.html.erb")
+        end
+      end
+
       # The icon sprite + icon partials — the minimum view surface the skeleton
       # needs so `render "ui/icon_sprite"` (wired into the host layout below) and
       # ui_icon resolve. #25 ships the full primitive + icon set; these two are
@@ -165,6 +189,8 @@ module Seams
                  engine_path("spec/runtime/design_boot_spec.rb")
         template "spec/runtime/ui_components_spec.rb.tt",
                  engine_path("spec/runtime/ui_components_spec.rb")
+        template "spec/runtime/form_builder_spec.rb.tt",
+                 engine_path("spec/runtime/form_builder_spec.rb")
         template "spec/runtime/guide_spec.rb.tt",
                  engine_path("spec/runtime/guide_spec.rb")
       end

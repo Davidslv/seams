@@ -1,0 +1,11 @@
+<%%# locals: (name:, value: nil, prefix: nil, suffix: nil, placeholder: nil, **attrs) -%>
+<%% input_id = "ig-#{name.to_s.parameterize}" -%>
+<div class="input-group">
+  <%% if prefix -%>
+    <%%= tag.span prefix, class: "affix" %>
+  <%% end -%>
+  <%%= tag.input class: "input", type: "text", name: name, id: input_id, value: value, placeholder: placeholder, **attrs %>
+  <%% if suffix -%>
+    <%%= tag.span suffix, class: "affix suffix" %>
+  <%% end -%>
+</div>

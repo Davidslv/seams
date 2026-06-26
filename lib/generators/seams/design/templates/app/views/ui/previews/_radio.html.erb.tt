@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<fieldset class="fieldset">
+  <legend>Default role</legend>
+  <%%= ui_radio(label: "Member", name: "role", value: "member", checked: true) %>
+  <%%= ui_radio(label: "Admin", name: "role", value: "admin") %>
+</fieldset>

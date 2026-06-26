@@ -1,0 +1,14 @@
+<%%# locals: (label:, name:, type: "text", hint: nil, error: nil, value: nil, id: nil, **attrs) -%>
+<%% field_id = id || "f-#{name.to_s.parameterize}" -%>
+<%% described_by = error ? "#{field_id}-error" : (hint ? "#{field_id}-hint" : nil) -%>
+<div class="field<%%= " field-error" if error %>">
+  <%%= tag.label label, class: "label", for: field_id %>
+  <%%= tag.input class: "input", type: type, name: name, id: field_id, value: value,
+        "aria-invalid": (error ? "true" : nil), "aria-describedby": described_by, **attrs %>
+  <%% if hint && !error -%>
+    <%%= tag.p hint, class: "hint", id: "#{field_id}-hint" %>
+  <%% end -%>
+  <%% if error -%>
+    <%%= tag.p error, class: "hint", id: "#{field_id}-error" %>
+  <%% end -%>
+</div>

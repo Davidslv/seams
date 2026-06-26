@@ -75,7 +75,10 @@ bin/rails seams:test[design]
 ## Roadmap
 
 Phase 1 ships the skeleton, the neutral token layer, the auto-wired `ui_*`
-helpers, the living gallery at `/design/guide`, and a seed component set
-(`button`, `tag`). Later units add the `Design::FormBuilder` field components,
-the `design:component` generator, the full ~33-component set, and the opt-in
-`--shell` layout. See `proposals/design_system_engine.md`.
+helpers, the living gallery at `/design/guide`, a seed component set
+(`button`, `tag`), and the `Design::FormBuilder` form components (`field`,
+`checkbox`, `radio`, `switch`, `input_group`) — so `form_with` produces styled,
+accessible fields (label association, `aria-invalid`, `aria-describedby`) out of
+the box. Later units add the `design:component` generator, the full
+~33-component set, and the opt-in `--shell` layout. See
+`proposals/design_system_engine.md`.
