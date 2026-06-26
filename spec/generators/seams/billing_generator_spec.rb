@@ -114,6 +114,20 @@ RSpec.describe Seams::Generators::BillingGenerator do
         expect(content).to include('"invoice.failed.billing"')
       end
     end
+
+    it "registers the billing ability catalog (resource.action.engine)" do
+      assert_file "engines/billing/lib/billing/engine.rb" do |content|
+        expect(content).to include('initializer "billing.register_abilities"')
+        expect(content).to include('owned_by: "Billing"')
+        %w[
+          invoice.read.billing invoice.manage.billing
+          subscription.read.billing subscription.manage.billing
+          plan.manage.billing lifetime.manage.billing
+        ].each do |code|
+          expect(content).to include(%("#{code}"))
+        end
+      end
+    end
   end
 
   describe "configuration" do
@@ -1130,6 +1144,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
   describe "insertion-point markers (Wave 10)" do
     {
       "billing.engine.events" => "engines/billing/lib/billing/engine.rb",
+      "billing.engine.abilities" => "engines/billing/lib/billing/engine.rb",
       "billing.engine.initializers" => "engines/billing/lib/billing/engine.rb",
       "billing.routes.before_webhook" => "engines/billing/config/routes.rb",
       "billing.configuration.attributes" => "engines/billing/lib/billing/configuration.rb",

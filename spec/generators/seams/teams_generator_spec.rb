@@ -38,6 +38,19 @@ RSpec.describe Seams::Generators::TeamsGenerator do
         expect(content).to include('"invitation.accepted.teams"')
       end
     end
+
+    it "registers the teams ability catalog (resource.action.engine)" do
+      assert_file "engines/teams/lib/teams/engine.rb" do |content|
+        expect(content).to include('initializer "teams.register_abilities"')
+        expect(content).to include('owned_by: "Teams"')
+        %w[
+          team.read.teams team.manage.teams
+          member.manage.teams invitation.manage.teams
+        ].each do |code|
+          expect(content).to include(%("#{code}"))
+        end
+      end
+    end
   end
 
   describe "configuration" do
@@ -498,6 +511,7 @@ RSpec.describe Seams::Generators::TeamsGenerator do
   describe "insertion-point markers (Wave 10)" do
     {
       "teams.engine.events" => "engines/teams/lib/teams/engine.rb",
+      "teams.engine.abilities" => "engines/teams/lib/teams/engine.rb",
       "teams.engine.subscribers" => "engines/teams/lib/teams/engine.rb",
       "teams.routes.before_teams" => "engines/teams/config/routes.rb",
       "teams.routes.after_invitations" => "engines/teams/config/routes.rb",

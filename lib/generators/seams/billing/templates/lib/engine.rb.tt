@@ -33,6 +33,21 @@ module Billing
       # seams:insertion-point billing.engine.events
     end
 
+    initializer "billing.register_abilities" do
+      # Ability codes this engine owns, registered exactly like events
+      # (resource.action.engine). `read` is the member-level view;
+      # `manage` is the admin-level mutate. Host grant maps reference
+      # these codes; see Seams::Permissions::DEFAULT_GRANTS.
+      Seams::PermissionRegistry.register("invoice.read.billing",        owned_by: "Billing")
+      Seams::PermissionRegistry.register("invoice.manage.billing",      owned_by: "Billing")
+      Seams::PermissionRegistry.register("subscription.read.billing",   owned_by: "Billing")
+      Seams::PermissionRegistry.register("subscription.manage.billing", owned_by: "Billing")
+      Seams::PermissionRegistry.register("plan.manage.billing",         owned_by: "Billing")
+      Seams::PermissionRegistry.register("lifetime.manage.billing",     owned_by: "Billing")
+      # Follow-up generators that ship new billing abilities register them here.
+      # seams:insertion-point billing.engine.abilities
+    end
+
     initializer "billing.append_migrations" do |app|
       unless app.root == root
         config.paths["db/migrate"].expanded.each do |expanded_path|

@@ -158,6 +158,14 @@ deliberately omitted — the eject CLI handles non-extensible needs.
   (`account.upgraded.accounts`, `account.suspended.accounts`)
   register them here.
 
+### accounts.engine.abilities
+
+- **File:** `engines/accounts/lib/accounts/engine.rb`
+- **Inside:** the `initializer "accounts.register_abilities"` block,
+  after the `membership.manage.accounts` registration.
+- **Purpose:** follow-up generators that ship new accounts ability
+  codes (`resource.action.accounts`) register them here.
+
 ### accounts.engine.initializers
 
 - **File:** `engines/accounts/lib/accounts/engine.rb`
@@ -194,6 +202,14 @@ deliberately omitted — the eject CLI handles non-extensible needs.
 - **Purpose:** follow-up generators that emit new teams events
   (`team.archived.teams`, `team.transferred.teams`,
   `invitation.revoked.teams`) register them here.
+
+### teams.engine.abilities
+
+- **File:** `engines/teams/lib/teams/engine.rb`
+- **Inside:** the `initializer "teams.register_abilities"` block, after
+  the `invitation.manage.teams` registration.
+- **Purpose:** follow-up generators that ship new teams ability codes
+  (`resource.action.teams`) register them here.
 
 ### teams.engine.subscribers
 
@@ -240,6 +256,14 @@ deliberately omitted — the eject CLI handles non-extensible needs.
 - **Purpose:** follow-up generators that ship new delivery semantics
   (`notification.bounced.notifications`,
   `notification.preferences_updated.notifications`) register them here.
+
+### notifications.engine.abilities
+
+- **File:** `engines/notifications/lib/notifications/engine.rb`
+- **Inside:** the `initializer "notifications.register_abilities"`
+  block, after the `preference.manage.notifications` registration.
+- **Purpose:** follow-up generators that ship new notifications ability
+  codes (`resource.action.notifications`) register them here.
 
 ### notifications.engine.subscribers
 
@@ -310,6 +334,14 @@ deliberately omitted — the eject CLI handles non-extensible needs.
 - **Purpose:** follow-up generators that ship new billing events
   (`subscription.discount_applied.billing`,
   `dispute.created.billing`, etc.) register them here.
+
+### billing.engine.abilities
+
+- **File:** `engines/billing/lib/billing/engine.rb`
+- **Inside:** the `initializer "billing.register_abilities"` block,
+  after the `lifetime.manage.billing` registration.
+- **Purpose:** follow-up generators that ship new billing ability codes
+  (`resource.action.billing`) register them here.
 
 ### billing.engine.initializers
 
