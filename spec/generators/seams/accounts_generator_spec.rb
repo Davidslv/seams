@@ -5,6 +5,21 @@ require "rails/generators/test_case"
 require "yaml"
 require "generators/seams/accounts/accounts_generator"
 
+ACCOUNTS_AUTHORIZATION_NEEDLES = [
+  "module Authorization",
+  'require "active_support/concern"',
+  "before_action :ensure_account_access",
+  "def disallow_account_scope",
+  "def require_access_without_membership",
+  "def ensure_admin",
+  "def ensure_staff",
+  "def authorize_permission!",
+  "def current_permission_role",
+  "Seams::Permissions.can?",
+  "Accounts::Current.account",
+  "Accounts::Current.membership"
+].freeze
+
 RSpec.describe Seams::Generators::AccountsGenerator do
   let(:destination_root) { File.expand_path("../../../tmp/accounts_generator", __dir__) }
 
@@ -57,6 +72,19 @@ RSpec.describe Seams::Generators::AccountsGenerator do
         expect(content).to include('Seams::EventRegistry.register("membership.created.accounts"')
         expect(content).to include('Seams::EventRegistry.register("membership.role_changed.accounts"')
         expect(content).to include('Seams::EventRegistry.register("membership.removed.accounts"')
+      end
+    end
+
+    it "registers the accounts ability catalog (resource.action.engine)" do
+      assert_file "engines/accounts/lib/accounts/engine.rb" do |content|
+        expect(content).to include('initializer "accounts.register_abilities"')
+        expect(content).to include('owned_by: "Accounts"')
+        %w[
+          account.read.accounts account.manage.accounts
+          membership.read.accounts membership.manage.accounts
+        ].each do |code|
+          expect(content).to include(%("#{code}"))
+        end
       end
     end
 
@@ -150,17 +178,7 @@ RSpec.describe Seams::Generators::AccountsGenerator do
 
     it "creates Accounts::Authorization with the default-on access check + opt-out helpers" do
       assert_file "engines/accounts/lib/accounts/concerns/authorization.rb" do |content|
-        [
-          "module Authorization",
-          'require "active_support/concern"',
-          "before_action :ensure_account_access",
-          "def disallow_account_scope",
-          "def require_access_without_membership",
-          "def ensure_admin",
-          "def ensure_staff",
-          "Accounts::Current.account",
-          "Accounts::Current.membership"
-        ].each { |needle| expect(content).to include(needle) }
+        ACCOUNTS_AUTHORIZATION_NEEDLES.each { |needle| expect(content).to include(needle) }
       end
     end
 
@@ -336,6 +354,7 @@ RSpec.describe Seams::Generators::AccountsGenerator do
   describe "insertion-point markers (Wave 10)" do
     {
       "accounts.engine.events" => "engines/accounts/lib/accounts/engine.rb",
+      "accounts.engine.abilities" => "engines/accounts/lib/accounts/engine.rb",
       "accounts.engine.initializers" => "engines/accounts/lib/accounts/engine.rb",
       "accounts.configuration.attributes" => "engines/accounts/lib/accounts/configuration.rb",
       "accounts.configuration.defaults" => "engines/accounts/lib/accounts/configuration.rb"

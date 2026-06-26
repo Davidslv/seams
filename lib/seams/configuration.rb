@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "seams/permissions"
+
 module Seams
   # Global Seams configuration. Set via Seams.configure { |c| ... } in
   # config/initializers/seams.rb of the host application.
@@ -15,7 +17,7 @@ module Seams
       @observability_adapter = "Seams::Observability::Adapters::RailsLogger"
       @event_namespace_separator = "."
       @host_app_name = nil
-      @permission_grants = {}
+      @permission_grants = Seams::Permissions::DEFAULT_GRANTS
     end
   end
 end

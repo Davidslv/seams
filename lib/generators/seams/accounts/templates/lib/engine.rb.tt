@@ -18,6 +18,19 @@ module Accounts
       # seams:insertion-point accounts.engine.events
     end
 
+    initializer "accounts.register_abilities" do
+      # Ability codes this engine owns, registered exactly like events
+      # (resource.action.engine). `read` is the member-level view;
+      # `manage` is the admin-level mutate. Host grant maps reference
+      # these codes; see Seams::Permissions::DEFAULT_GRANTS.
+      Seams::PermissionRegistry.register("account.read.accounts",       owned_by: "Accounts")
+      Seams::PermissionRegistry.register("account.manage.accounts",     owned_by: "Accounts")
+      Seams::PermissionRegistry.register("membership.read.accounts",    owned_by: "Accounts")
+      Seams::PermissionRegistry.register("membership.manage.accounts",  owned_by: "Accounts")
+      # Follow-up generators that ship new accounts abilities register them here.
+      # seams:insertion-point accounts.engine.abilities
+    end
+
     initializer "accounts.append_migrations" do |app|
       unless app.root == root
         config.paths["db/migrate"].expanded.each do |expanded_path|

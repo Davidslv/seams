@@ -44,6 +44,18 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
       end
     end
 
+    it "registers the notifications ability catalog (resource.action.engine)" do
+      assert_file "engines/notifications/lib/notifications/engine.rb" do |content|
+        expect(content).to include('initializer "notifications.register_abilities"')
+        expect(content).to include('owned_by: "Notifications"')
+        %w[
+          notification.read.notifications preference.manage.notifications
+        ].each do |code|
+          expect(content).to include(%("#{code}"))
+        end
+      end
+    end
+
     it "attaches the AuthSubscriber after_initialize" do
       assert_file "engines/notifications/lib/notifications/engine.rb" do |content|
         expect(content).to include("Notifications::AuthSubscriber.attach!")
@@ -773,6 +785,7 @@ RSpec.describe Seams::Generators::NotificationsGenerator do
   describe "insertion-point markers (Wave 10)" do
     {
       "notifications.engine.events" => "engines/notifications/lib/notifications/engine.rb",
+      "notifications.engine.abilities" => "engines/notifications/lib/notifications/engine.rb",
       "notifications.engine.subscribers" => "engines/notifications/lib/notifications/engine.rb",
       "notifications.configuration.attributes" => "engines/notifications/lib/notifications/configuration.rb",
       "notifications.configuration.defaults" => "engines/notifications/lib/notifications/configuration.rb",

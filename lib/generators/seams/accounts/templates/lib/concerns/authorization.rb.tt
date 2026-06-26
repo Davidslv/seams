@@ -85,8 +85,27 @@ module Accounts
     # bypass the per-account scope (e.g. impersonation, cross-account
     # search). Distinct from `ensure_admin`.
     def ensure_staff
-      identity = defined?(Auth::Current) ? Auth::Current.identity : nil
-      head :forbidden unless identity&.staff?
+      head :forbidden unless staff_actor?
+    end
+
+    # Per-account permission guard. Resolves the current membership's
+    # role for `Accounts::Current.account` and asks the gem registry
+    # whether that role holds the given ability code (the
+    # `resource.action.engine` strings each engine registers). Platform
+    # staff (`Auth::Identity#staff?`) are let through — the request-layer
+    # bypass `Seams::Permissions.can?` deliberately leaves to callers.
+    # Denies with 403 otherwise.
+    #
+    #   before_action -> { authorize_permission!("invoice.read.billing") }
+    #
+    # The role is read from the per-request membership, never a global,
+    # so the same Identity can hold different powers in different
+    # accounts.
+    def authorize_permission!(ability)
+      return if staff_actor?
+      return if Seams::Permissions.can?(role: current_permission_role, ability: ability)
+
+      head :forbidden
     end
 
     def redirect_existing_membership
@@ -100,6 +119,20 @@ module Accounts
 
     def authorization_redirect_path
       Accounts.configuration.after_account_create_url
+    end
+
+    # Role of the membership resolved for the current account/identity,
+    # or nil when there is no current membership (which denies, since
+    # no role holds any ability).
+    def current_permission_role
+      Accounts::Current.membership&.role
+    end
+
+    # Platform-admin actor? (Identity#staff?). Shared by `ensure_staff`
+    # and the `authorize_permission!` bypass.
+    def staff_actor?
+      identity = defined?(Auth::Current) ? Auth::Current.identity : nil
+      identity&.staff? || false
     end
   end
 end

@@ -16,6 +16,17 @@ module Notifications
       # seams:insertion-point notifications.engine.events
     end
 
+    initializer "notifications.register_abilities" do
+      # Ability codes this engine owns, registered exactly like events
+      # (resource.action.engine). `read` is the member-level view;
+      # `manage` is the admin-level mutate. Host grant maps reference
+      # these codes; see Seams::Permissions::DEFAULT_GRANTS.
+      Seams::PermissionRegistry.register("notification.read.notifications",   owned_by: "Notifications")
+      Seams::PermissionRegistry.register("preference.manage.notifications",   owned_by: "Notifications")
+      # Follow-up generators that ship new notifications abilities register them here.
+      # seams:insertion-point notifications.engine.abilities
+    end
+
     initializer "notifications.append_migrations" do |app|
       unless app.root == root
         config.paths["db/migrate"].expanded.each do |expanded_path|

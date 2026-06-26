@@ -18,6 +18,19 @@ module Teams
       # seams:insertion-point teams.engine.events
     end
 
+    initializer "teams.register_abilities" do
+      # Ability codes this engine owns, registered exactly like events
+      # (resource.action.engine). `read` is the member-level view;
+      # `manage` is the admin-level mutate. Host grant maps reference
+      # these codes; see Seams::Permissions::DEFAULT_GRANTS.
+      Seams::PermissionRegistry.register("team.read.teams",         owned_by: "Teams")
+      Seams::PermissionRegistry.register("team.manage.teams",       owned_by: "Teams")
+      Seams::PermissionRegistry.register("member.manage.teams",     owned_by: "Teams")
+      Seams::PermissionRegistry.register("invitation.manage.teams", owned_by: "Teams")
+      # Follow-up generators that ship new teams abilities register them here.
+      # seams:insertion-point teams.engine.abilities
+    end
+
     initializer "teams.append_migrations" do |app|
       unless app.root == root
         config.paths["db/migrate"].expanded.each do |expanded_path|
