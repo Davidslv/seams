@@ -335,6 +335,19 @@ RSpec.describe Seams::Generators::AccountsGenerator do
         ].each { |needle| expect(content).to include(needle) }
       end
     end
+
+    it "ships the authorization permission-tiers spec (deny/allow/staff bypass + cross-tenant)" do
+      assert_file "engines/accounts/spec/runtime/accounts_authorization_spec.rb" do |content|
+        [
+          "Accounts::Authorization permission tiers",
+          "type: :request",
+          "tier 1: deny-by-role",
+          "tier 2: allow-by-role",
+          "tier 3: staff bypass",
+          "cross-tenant isolation: the active membership decides, not the identity"
+        ].each { |needle| expect(content).to include(needle) }
+      end
+    end
   end
 
   describe "dummy app" do
