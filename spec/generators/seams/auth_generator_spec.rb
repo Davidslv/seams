@@ -44,6 +44,18 @@ RSpec.describe Seams::Generators::AuthGenerator do
         expect(content).to include("isolate_namespace Auth")
       end
     end
+
+    # Regression: the Zeitwerk inflection alone makes the OAuth constants
+    # autoloadable, but route -> controller resolution camelizes through
+    # ActiveSupport::Inflector. Without the acronym, `auth/oauth/callbacks`
+    # resolves to `Auth::Oauth::CallbacksController` and every OAuth route
+    # 500s with `uninitialized constant Auth::Oauth`.
+    it "registers the OAuth ActiveSupport acronym so OAuth routes resolve" do
+      assert_file "engines/auth/lib/auth/engine.rb" do |content|
+        expect(content).to include("ActiveSupport::Inflector.inflections(:en)")
+        expect(content).to include('inflect.acronym "OAuth"')
+      end
+    end
   end
 
   describe "models" do

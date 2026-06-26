@@ -20,6 +20,20 @@ module Auth
       Rails.autoloaders.main.inflector.inflect("oauth" => "OAuth")
     end
 
+    # The Zeitwerk inflection above only governs *autoloading* (file path
+    # → constant). Routing resolves a controller from its path through
+    # ActiveSupport::Inflector#camelize, which is a *separate* inflector:
+    # the route `auth/oauth/callbacks#start` camelizes to
+    # `Auth::Oauth::CallbacksController` (single-O) and raises
+    # `uninitialized constant Auth::Oauth`, because the real class is
+    # `Auth::OAuth::CallbacksController`. Registering "OAuth" as an acronym
+    # makes camelize agree with Zeitwerk, so the OAuth routes resolve.
+    initializer "auth.inflection_acronym", before: :set_autoload_paths do
+      ActiveSupport::Inflector.inflections(:en) do |inflect|
+        inflect.acronym "OAuth"
+      end
+    end
+
     initializer "auth.register_events" do
       Seams::EventRegistry.register("identity.signed_up.auth",   emitted_by: "Auth")
       Seams::EventRegistry.register("identity.signed_in.auth",   emitted_by: "Auth")
