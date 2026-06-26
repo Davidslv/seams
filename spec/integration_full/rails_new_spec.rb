@@ -674,6 +674,10 @@ RSpec.describe "rails new integration", type: :integration_full do
     # opt out, so these pages are reachable while logged out.
     auth_http = boot_probe_full(<<~'RUBY')
       session = ActionDispatch::Integration::Session.new(Rails.application)
+      # runner boots in development, where ActionDispatch::HostAuthorization
+      # blocks the default integration host (www.example.com) with a 403.
+      # localhost is permitted in development.
+      session.host = "localhost"
       %w[/auth/session/new /auth/registration/new /auth/password_reset/new].each do |path|
         session.get(path)
         puts "AUTH_HTTP #{path} => #{session.response.status}"
@@ -695,6 +699,7 @@ RSpec.describe "rails new integration", type: :integration_full do
 
     shell_http = boot_probe_full(<<~'RUBY')
       session = ActionDispatch::Integration::Session.new(Rails.application)
+      session.host = "localhost"
       session.get("/")
       puts "SHELL_HTTP / => #{session.response.status}"
       puts "SHELL_LINKS_TAILWIND=#{session.response.body.include?('tailwind')}"
