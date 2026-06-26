@@ -223,6 +223,73 @@ module Seams
         end
       end
 
+      # The Primitives & icons component set (Phase 2, GROUPKEY = primitives).
+      # The icon + icon_sprite primitives ship from create_icon_partials above;
+      # this set adds the remaining low-level building blocks, ported faithfully
+      # from quire-saas's compositor (compositor_* -> ui_*, quire copy
+      # neutralised in the previews), each carrying its baked-in accessibility:
+      #
+      #   - panel   a plain raised content surface (a content-block wrapper);
+      #   - diff    a per-line add/del/ctx list whose +/- signs are aria-labelled
+      #             "added"/"removed" so the glyph alone is not load-bearing;
+      #   - empty   an empty-state with a required title + content-block body.
+      #
+      # Each ships with a companion preview, which is what makes it "public": the
+      # auto-wire derives ui_<name> from the preview and the gallery lists it.
+      # Eject-aware so a host can own a component without losing it on regenerate.
+      def create_primitive_components
+        %w[panel diff empty].each do |name|
+          template_unless_ejected "app/views/ui/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/_#{name}.html.erb")
+          template_unless_ejected "app/views/ui/previews/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/previews/_#{name}.html.erb")
+        end
+      end
+
+      # The Actions & status component set (Phase 2, GROUPKEY = actions). Ported
+      # faithfully from quire-saas's compositor (compositor_* -> ui_*, quire copy
+      # neutralised in the previews), each carrying its baked-in accessibility:
+      #
+      #   - banner   a page-level role=region announcement with a tone variant;
+      #   - toast    a role=status transient notification;
+      #   - note     an inline annotation span.
+      #
+      # Each ships with a companion preview, which is what makes it "public": the
+      # auto-wire derives ui_<name> from the preview and the gallery lists it.
+      # Eject-aware so a host can own a component without losing it on regenerate.
+      def create_actions_components
+        %w[banner toast note].each do |name|
+          template_unless_ejected "app/views/ui/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/_#{name}.html.erb")
+          template_unless_ejected "app/views/ui/previews/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/previews/_#{name}.html.erb")
+        end
+      end
+
+      # The Data display component set (Phase 2, GROUPKEY = data). Ported
+      # faithfully from quire-saas's compositor (compositor_* -> ui_*, quire copy
+      # neutralised in the previews), each carrying its baked-in accessibility:
+      #
+      #   - card         a titled content surface;
+      #   - data_table   a <table> with a caption + scoped headers;
+      #   - chapter_row  a manuscript chapter list row;
+      #   - build_row    an export/build status list row;
+      #   - counter      a labelled numeric stat;
+      #   - meter        a <meter>-backed progress indicator;
+      #   - kbd          a <kbd> keyboard-shortcut glyph.
+      #
+      # Each ships with a companion preview, which is what makes it "public": the
+      # auto-wire derives ui_<name> from the preview and the gallery lists it.
+      # Eject-aware so a host can own a component without losing it on regenerate.
+      def create_data_components
+        %w[card data_table chapter_row build_row counter meter kbd].each do |name|
+          template_unless_ejected "app/views/ui/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/_#{name}.html.erb")
+          template_unless_ejected "app/views/ui/previews/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/previews/_#{name}.html.erb")
+        end
+      end
+
       # The living gallery (dev/test only). The controller renders every
       # component from its preview so the docs cannot drift; the route is guarded
       # to Rails.env.local? both in the controller (404 in production) and at the
