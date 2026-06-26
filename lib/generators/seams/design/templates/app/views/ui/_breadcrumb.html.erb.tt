@@ -1,0 +1,8 @@
+<%%# locals: (trail:, current:, **attrs) -%>
+<%%= tag.nav class: "crumbs", "aria-label": "Breadcrumb", **attrs do %>
+  <%% trail.each do |label, href| -%>
+    <%%= tag.a label, href: href %>
+    <%%= tag.span "/", class: "sep", "aria-hidden": "true" %>
+  <%% end -%>
+  <%%= tag.b current, "aria-current": "page" %>
+<%% end %>

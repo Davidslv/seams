@@ -1,0 +1,5 @@
+<%%# locals: () -%>
+<%%= ui_breadcrumb(
+      trail: [["Home", "/"], ["Settings", "/settings"]],
+      current: "Profile"
+    ) %>
