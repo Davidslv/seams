@@ -1,0 +1,102 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+# Request-layer regression for Accounts::Authorization#authorize_permission!
+# — the permission tiers the gem's role hierarchy resolves through at the
+# controller boundary. The role-picker behaviour (the escalation
+# safeguards) lives in accounts_memberships_flow_spec; this spec pins the
+# three authorisation tiers the concern enforces BEFORE the action runs:
+#
+#   1. deny-by-role: a membership whose role lacks the ability -> 403.
+#   2. allow-by-role: a membership whose role holds the ability -> through.
+#   3. staff bypass: a platform-staff Identity is let through regardless of
+#      the membership role (the request-layer bypass the gem deliberately
+#      leaves to the caller, not Seams::Permissions.can?).
+#
+# Cross-tenant isolation: the decision is read from the ACTIVE membership
+# (Accounts::Current.membership.role), never the Identity, so the same
+# person can be admin in one account and member in another and get
+# different powers per request. Flipping the active membership flips the
+# decision — pinned below.
+#
+# The memberships controller guards every action with
+# `authorize_permission!("membership.manage.accounts")`, so its index is a
+# faithful probe of the gate. As in accounts_memberships_flow_spec, the
+# per-request Current surface is stubbed with method stubs (they survive
+# the executor reset that clears CurrentAttributes values around requests).
+RSpec.describe "Accounts::Authorization permission tiers", type: :request do
+  def act_as(membership:, staff: false)
+    allow(Accounts::Current).to receive(:account).and_return(account)
+    allow(Accounts::Current).to receive(:membership).and_return(membership)
+    identity = staff ? Struct.new(:staff?).new(true) : nil
+    allow(Auth::Current).to receive(:identity).and_return(identity)
+  end
+
+  let(:owner_identity) do
+    Auth::Identity.create!(email: "owner-#{SecureRandom.hex(4)}@example.com", password: "verysecret")
+  end
+
+  let(:account) do
+    Accounts::Account.create_with_owner(
+      account: { name: "Acme #{SecureRandom.hex(2)}" },
+      owner:   Struct.new(:identity, :name).new(owner_identity, "Olive Owner")
+    )
+  end
+
+  let(:admin_membership)  { build_membership("admin",  "Adam Admin") }
+  let(:member_membership) { build_membership("member", "Mia Member") }
+
+  def build_membership(role, name)
+    identity = Auth::Identity.create!(
+      email: "#{role}-#{SecureRandom.hex(4)}@example.com", password: "verysecret"
+    )
+    account.memberships.create!(role: role, name: name, identity_id: identity.id, active: true)
+  end
+
+  def request_guarded_action
+    get "/accounts/memberships"
+  end
+
+  describe "tier 1: deny-by-role" do
+    it "forbids a plain member (member does not hold membership.manage.accounts)" do
+      act_as(membership: member_membership)
+
+      request_guarded_action
+
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
+
+  describe "tier 2: allow-by-role" do
+    it "lets an admin through (admin holds membership.manage.accounts)" do
+      act_as(membership: admin_membership)
+
+      request_guarded_action
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "tier 3: staff bypass" do
+    it "lets a platform-staff Identity through despite a member-role membership" do
+      act_as(membership: member_membership, staff: true)
+
+      request_guarded_action
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "cross-tenant isolation: the active membership decides, not the identity" do
+    it "flips the decision when the active membership role changes" do
+      act_as(membership: member_membership)
+      request_guarded_action
+      expect(response).to have_http_status(:forbidden)
+
+      act_as(membership: admin_membership)
+      request_guarded_action
+      expect(response).to have_http_status(:ok)
+    end
+  end
+end

@@ -179,6 +179,12 @@ module Seams
         # safeguards.
         template "spec/runtime/memberships_flow_spec.rb.tt",
                  engine_path("spec/runtime/accounts_memberships_flow_spec.rb")
+        # Wave 11B / #37 — request-layer regression for the permission
+        # tiers the Accounts::Authorization concern enforces:
+        # deny-by-role, allow-by-role, the platform-staff bypass, and the
+        # cross-tenant guarantee that the ACTIVE membership decides.
+        template "spec/runtime/authorization_spec.rb.tt",
+                 engine_path("spec/runtime/accounts_authorization_spec.rb")
       end
 
       def wire_into_host
