@@ -66,19 +66,64 @@ Nothing else changes.
 - The dev/test-only living-gallery route (`/design/guide`) drawn into the host
   routes, inside an `if Rails.env.local?` guard.
 
+## Generate
+
+```
+bin/seams design            # the component system (tokens, ui_* components, gallery, FormBuilder)
+bin/seams design --shell    # the above PLUS an app layout + starter dashboard + route
+```
+
+`--shell` is opt-in. Without it, no host layout or dashboard is generated — the
+host keeps its own. With it, the generator writes a default
+`app/views/layouts/application.html.erb` (header, nav, flash banners, footer —
+all built from `ui_*` components) and a starter signed-in dashboard
+(`Design::DashboardController`) wired to `root` + `/dashboard`, so the host boots
+looking like a product.
+
+## Extend — add a component
+
+```
+rails g design:component badge
+```
+
+This writes `app/views/ui/_badge.html.erb` (a strict-locals partial) and
+`app/views/ui/previews/_badge.html.erb`. The preview is what makes it public:
+`ui_badge` becomes callable and the component appears in `/design/guide`
+automatically — no registration.
+
+## Override — eject a component
+
+Take ownership of a shipped component (to change its markup or copy) without
+forking the engine:
+
+```
+bin/seams resolve --eject design/app/views/ui/_button.html.erb
+```
+
+This stamps the host file with an eject header. The generator then skips it on
+every future `bin/seams design`, so your version survives regenerates. The same
+works for the `--shell` layout and dashboard.
+
+## Retheme — override the tokens
+
+The `@theme` block in `app/assets/tailwind/application.css` is the single source
+every component reads (via the short `:root` aliases). Override those tokens and
+the whole app reskins — no component, markup, or helper changes.
+
+The generator ships a worked example, the **quire** theme (warm paper / garnet /
+Spectral), at `app/assets/tailwind/themes/_quire.css`. Apply it with one line in
+`application.css`, after the `seams:design tokens` block:
+
+```css
+@import "themes/quire";
+```
+
+Delete the line to return to the neutral default. See
+`doc/DESIGN_SYSTEM_THEMING.md` for the full token surface and how to author your
+own theme.
+
 ## Run the engine specs
 
 ```
 bin/rails seams:test[design]
 ```
-
-## Roadmap
-
-Phase 1 ships the skeleton, the neutral token layer, the auto-wired `ui_*`
-helpers, the living gallery at `/design/guide`, a seed component set
-(`button`, `tag`), and the `Design::FormBuilder` form components (`field`,
-`checkbox`, `radio`, `switch`, `input_group`) — so `form_with` produces styled,
-accessible fields (label association, `aria-invalid`, `aria-describedby`) out of
-the box. Later units add the `design:component` generator, the full
-~33-component set, and the opt-in `--shell` layout. See
-`proposals/design_system_engine.md`.

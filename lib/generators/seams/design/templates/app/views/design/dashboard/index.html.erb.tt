@@ -1,0 +1,38 @@
+<%% content_for :title, "Dashboard — <%= app_name %>" %>
+
+<div class="stack-lg">
+  <header class="stack">
+    <p class="eyebrow">Dashboard</p>
+    <h1 class="display">Welcome to <%= app_name %></h1>
+    <p class="lede">
+      This starter dashboard ships with <code>bin/seams design --shell</code>. It is
+      built entirely from <code>ui_*</code> components on the seams design system —
+      replace it with your real home page when you have data to show.
+    </p>
+    <div class="row-wrap">
+      <%%= ui_button(variant: :accent) { "Primary action" } %>
+      <%%= link_to "Component gallery", "/design/guide", class: "btn btn-ghost" if Rails.env.local? %>
+    </div>
+  </header>
+
+  <section class="stack">
+    <h2 class="h2">Add an engine</h2>
+    <p class="small muted">
+      A fresh host has no feature engines yet. Generate one with <code>bin/seams &lt;name&gt;</code>
+      and its styled views render on top of this design system.
+    </p>
+
+    <div class="grid grid-auto">
+      <%% @suggested_engines.each do |name, summary| %>
+        <%%= ui_card do %>
+          <div class="row">
+            <span class="mono small muted">bin/seams <%%= name %></span>
+            <%%= ui_tag(label: "available", status: :neutral) %>
+          </div>
+          <h3 class="h3" style="margin-top:var(--s-2)"><%%= name.capitalize %></h3>
+          <p class="small muted" style="margin-top:var(--s-1)"><%%= summary %></p>
+        <%% end %>
+      <%% end %>
+    </div>
+  </section>
+</div>

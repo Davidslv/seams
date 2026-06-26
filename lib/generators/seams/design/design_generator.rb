@@ -45,6 +45,15 @@ module Seams
 
       source_root File.expand_path("templates", __dir__)
 
+      # Opt-in app shell (#26). Off by default — the design system generates the
+      # component library only. With --shell, the generator additionally writes a
+      # default application layout (header, nav, flash, footer, all built from
+      # ui_* components) and a starter signed-in dashboard + route into the host,
+      # so the host boots looking like a product. This is the building block the
+      # future `seams new` orchestrator passes.
+      class_option :shell, type: :boolean, default: false,
+                           desc: "Also generate a default application layout + starter dashboard"
+
       ENGINE_NAME = "design"
 
       def create_base_engine
@@ -338,6 +347,39 @@ module Seams
         template "README.md.tt", engine_path("README.md"), force: true
       end
 
+      # The opt-in app shell (#26), generated ONLY with --shell. Without the
+      # flag none of these files appear and the host keeps its rails-new layout.
+      #
+      #   - app/views/layouts/application.html.erb — the HOST's default layout,
+      #     overwritten (force) with one built entirely from ui_* components
+      #     (header, nav, flash banners, footer). Eject-aware so a host that has
+      #     already customised it on a later run keeps its version.
+      #   - the starter signed-in dashboard controller + view, shipped INTO the
+      #     engine (Design::DashboardController subclasses the host's
+      #     ApplicationController), with an empty-state listing the engines the
+      #     host could add. The route + root are drawn in wire_into_host.
+      def create_shell
+        return unless shell?
+
+        say "  shell   generating the opt-in app shell (--shell)", :green
+        create_shell_layout
+        template "app/controllers/design/dashboard_controller.rb.tt",
+                 engine_path("app/controllers/design/dashboard_controller.rb")
+        template_unless_ejected "app/views/design/dashboard/index.html.erb.tt",
+                                engine_path("app/views/design/dashboard/index.html.erb")
+      end
+
+      # Ship the example "quire" theme (#27) into the host as a token overlay the
+      # host can opt into. It is NOT applied by default (the neutral theme owns
+      # the default, per the proposal) — it sits alongside application.css as the
+      # worked proof that retheming is a token override: add one
+      # `@import "themes/quire";` line and the whole app reskins. The theming
+      # guide (doc/DESIGN_SYSTEM_THEMING.md) documents it. Eject-aware.
+      def create_example_theme
+        template_unless_ejected "app/assets/tailwind/themes/_quire.css",
+                                host_path("app/assets/tailwind/themes/_quire.css")
+      end
+
       # --- Host wiring ----------------------------------------------------------
 
       def wire_into_host
@@ -349,6 +391,7 @@ module Seams
         set_host_default_form_builder
         render_sprite_in_host_layout
         draw_guide_route_in_host
+        draw_dashboard_route_in_host if shell?
       end
 
       def report_summary
@@ -388,6 +431,60 @@ module Seams
 
       def engine_path(relative)
         File.join(destination_root, "engines", ENGINE_NAME, relative)
+      end
+
+      def shell?
+        options[:shell]
+      end
+
+      # A human app name for the shell layout + dashboard copy, derived from the
+      # host's config/application.rb module (the `rails new` app name), falling
+      # back to a sensible default. Pure cosmetics — the host owns these files.
+      def app_name
+        @app_name ||= begin
+          application_rb = host_path("config/application.rb")
+          name = File.read(application_rb)[/module\s+([A-Z]\w+)/, 1] if File.exist?(application_rb)
+          (name || "App").gsub(/([a-z])([A-Z])/, '\1 \2')
+        end
+      end
+
+      # Write the HOST's application layout from the shell template. force: true
+      # because `rails new` already shipped a default application.html.erb we are
+      # deliberately replacing; eject-aware so a host that has stamped the eject
+      # header (to own its layout) keeps its version on a later regenerate.
+      def create_shell_layout
+        template_unless_ejected "app/views/layouts/application.html.erb.tt",
+                                host_path("app/views/layouts/application.html.erb"),
+                                force: true
+      end
+
+      # Draw the starter dashboard route into the HOST routes and point root at
+      # it, so a --shell host boots straight to the styled dashboard. The design
+      # engine is non-isolated, so Design::DashboardController lives on the host
+      # controller path and a plain host route reaches it. Idempotent: skips if
+      # the dashboard route is already drawn.
+      def draw_dashboard_route_in_host
+        routes = host_path("config/routes.rb")
+        unless File.exist?(routes)
+          return host_skip("config/routes.rb not found — add the dashboard route " \
+                           '(root "design/dashboard#index") yourself')
+        end
+
+        return if File.read(routes).include?('"design/dashboard#index"')
+
+        say "  inject  config/routes.rb (starter dashboard + root)", :green
+        # Only add a root route if the host has none yet — never clobber a
+        # host-defined root.
+        root_line = File.read(routes).match?(/^\s*root\s/) ? "" : %(  root "design/dashboard#index"\n)
+        block = <<~RUBY
+          # The seams design starter dashboard (--shell). A styled, signed-in home the
+          # host boots to; replace Design::DashboardController with your real home page.
+          get "dashboard" => "design/dashboard#index", as: :dashboard
+        RUBY
+        block = block.gsub(/^/, "  ") + root_line
+        inject_into_file routes, after: routes_draw_anchor do
+          block
+        end
       end
 
       # Write the neutral @theme token layer into the host's Tailwind entrypoint.
@@ -502,10 +599,22 @@ module Seams
         end
       end
 
+      def shell_summary_note
+        return "" unless shell?
+
+        <<~SHELL
+
+          App shell (--shell): a default app/views/layouts/application.html.erb
+          and a starter dashboard at root (and /dashboard) were generated.
+          Boot the host and you land on the styled dashboard.
+        SHELL
+      end
+
       def report_summary_text
         <<~TXT
 
           Design engine generated at engines/design/
+          #{shell_summary_note}
 
           Next steps:
             1. bundle install
@@ -524,7 +633,9 @@ module Seams
           everywhere, and Design::FormBuilder is the host default form builder.
 
           Retheme by overriding the @theme tokens in
-          app/assets/tailwind/application.css.
+          app/assets/tailwind/application.css. The example "quire" theme ships at
+          app/assets/tailwind/themes/_quire.css — apply it with one line:
+          `@import "themes/quire";` (see doc/DESIGN_SYSTEM_THEMING.md).
 
           Run the engine specs:
             bin/rails seams:test[design]
