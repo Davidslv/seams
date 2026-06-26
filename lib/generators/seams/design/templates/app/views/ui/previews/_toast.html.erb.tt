@@ -1,0 +1,6 @@
+<%%# locals: () -%>
+<div class="toaster" style="position:static;width:340px;max-width:100%">
+  <%%= ui_toast(message: "Changes saved", kind: :ok) %>
+  <%%= ui_toast(message: "Couldn't save — check your connection", kind: :alert) %>
+  <%%= ui_toast(message: "Copied to clipboard", kind: :info) %>
+</div>

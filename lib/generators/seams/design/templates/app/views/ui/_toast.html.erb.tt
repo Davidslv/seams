@@ -1,0 +1,12 @@
+<%%# locals: (message:, kind: :info, title: nil, **attrs) -%>
+<%% icon = { ok: :check, alert: :warning, info: :info }.fetch(kind, :info) -%>
+<%%= tag.div class: class_names("toast", "toast-#{kind}"), role: (kind == :alert ? "alert" : "status"), **attrs do %>
+  <%%= ui_icon(icon) %>
+  <div class="body">
+    <%% if title.present? -%>
+      <%%= tag.div title, class: "t" %>
+    <%% end -%>
+    <%%= tag.div message %>
+  </div>
+  <%%= tag.button class: "x", type: "button", "aria-label": "Dismiss" do %><%%= ui_icon(:close) %><%% end %>
+<%% end %>

@@ -1,0 +1,10 @@
+<%%# locals: (message:, kind: :info, content: nil, **attrs) -%>
+<%% icon = kind.to_sym == :alert ? :warning : :info -%>
+<%%= tag.div class: class_names("banner", "banner-#{kind}"), role: "status", **attrs do %>
+  <%%= ui_icon(icon) %>
+  <%%= tag.span message %>
+  <%% if content -%>
+    <%%= tag.span class: "spacer" %>
+    <%%= content %>
+  <%% end -%>
+<%% end %>
