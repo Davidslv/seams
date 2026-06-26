@@ -6,8 +6,11 @@
     <%%= csrf_meta_tags %>
     <%%= csp_meta_tag %>
     <%%= yield :head %>
-    <%%# The host's Tailwind build carries the seams:design @theme tokens + the
-        ui_* component layer the generator injected into application.css. %>
+    <%%# The "tailwind" build is the compiled entrypoint that carries the
+        seams:design @theme tokens + the ui_* component layer. It must be
+        linked, or the host boots unstyled. The "application" manifest is
+        kept so hosts can add their own non-Tailwind styles. %>
+    <%%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%%= javascript_importmap_tags if respond_to?(:javascript_importmap_tags) %>
   </head>

@@ -280,6 +280,9 @@ RSpec.describe Seams::Generators::DesignGenerator do
     it "ships the guide layout + index view rendering each preview", :aggregate_failures do
       assert_file "engines/design/app/views/layouts/design/guide.html.erb" do |content|
         expect(content).to include('render "ui/icon_sprite"')
+        # Regression (#41): must link the compiled "tailwind" build, not just
+        # the empty "application" manifest, or the guide renders unstyled.
+        expect(content).to include('stylesheet_link_tag "tailwind"')
       end
       assert_file "engines/design/app/views/design/guide/index.html.erb" do |content|
         expect(content).to include("@components")
@@ -292,6 +295,21 @@ RSpec.describe Seams::Generators::DesignGenerator do
       expect(host("config/routes.rb")).to include("Rails.env.local?")
       expect(host("config/routes.rb")).to include('get "design/guide" => "design/guide#index"')
       expect(host("config/routes.rb")).to include("as: :design_guide")
+    end
+  end
+
+  describe "app shell (--shell)" do
+    before do
+      prepare_destination
+      described_class.start(["--shell"], destination_root: destination_root)
+    end
+
+    # Regression (#41): the shell layout must link the compiled "tailwind"
+    # entrypoint (which carries the @theme tokens + ui_* component layer),
+    # not only the empty "application" manifest, or the host boots unstyled.
+    it "links the compiled tailwind build in the generated app layout" do
+      expect(host("app/views/layouts/application.html.erb"))
+        .to include('stylesheet_link_tag "tailwind"')
     end
   end
 

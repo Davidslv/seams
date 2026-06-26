@@ -6,7 +6,10 @@
   <title><%%= content_for(:title) || "Design — component guide" %></title>
   <%%= csrf_meta_tags %>
   <%%= csp_meta_tag %>
-  <%%# The host's Tailwind build carries the @theme tokens this engine injected. %>
+  <%%# The "tailwind" build is the compiled entrypoint carrying the @theme
+      tokens + ui_* component layer; link it or the guide renders unstyled.
+      The "application" manifest is kept for the host's own styles. %>
+  <%%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" if defined?(stylesheet_link_tag) %>
   <%%= stylesheet_link_tag "application", "data-turbo-track": "reload" if defined?(stylesheet_link_tag) %>
 </head>
 <body>
