@@ -61,6 +61,7 @@ hidden behind the gem.
 - [doc/ARCHITECTURE_WAVE_10.md](doc/ARCHITECTURE_WAVE_10.md) — Wave 10 addendum: insertion points, follow-up generators, eject CLI
 - [doc/ENGINE_CATALOGUE.md](doc/ENGINE_CATALOGUE.md)
 - [doc/CURRENT_ATTRIBUTES.md](doc/CURRENT_ATTRIBUTES.md) — per-request namespaces (Auth::Current, Accounts::Current, Teams::Current, Core::Current)
+- [doc/PERMISSIONS.md](doc/PERMISSIONS.md) — the authorisation layer: ability codes, role hierarchy, the grant map, `authorize_permission!`
 - [doc/INSERTION_POINTS.md](doc/INSERTION_POINTS.md) — marker format spec
 - [doc/INSERTION_POINTS_CATALOGUE.md](doc/INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers
 - [doc/WRITING_FOLLOW_UP_GENERATORS.md](doc/WRITING_FOLLOW_UP_GENERATORS.md) — write your own follow-up generator
