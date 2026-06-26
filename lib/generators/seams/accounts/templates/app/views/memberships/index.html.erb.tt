@@ -1,0 +1,52 @@
+<%%# Members of the current account with a per-member role picker. %>
+<%%# Owners and the acting member's own row are locked — the controller %>
+<%%# enforces the same rules server-side; the view just doesn't offer a %>
+<%%# control it knows will be refused. %>
+<%%# %>
+<%%# Plain, semantic ERB on purpose: the design engine is opt-in and may %>
+<%%# not be installed, so this view must NOT call ui_* helpers (they would %>
+<%%# raise when design is absent). Sensible class names let the design %>
+<%%# system style it if present, with zero hard dependency. %>
+<h1 class="accounts-memberships__title">Members</h1>
+
+<%%= content_tag :p, flash[:notice], class: "accounts-memberships__notice" if flash[:notice] %>
+<%%= content_tag :p, flash[:alert],  class: "accounts-memberships__alert"  if flash[:alert] %>
+
+<table class="accounts-memberships">
+  <thead>
+    <tr>
+      <th scope="col">Member</th>
+      <th scope="col">Role</th>
+      <th scope="col">Change role</th>
+    </tr>
+  </thead>
+  <tbody>
+    <%% @memberships.each do |membership| %>
+      <tr class="accounts-memberships__row">
+        <td class="accounts-memberships__name"><%%= membership.name %></td>
+        <td class="accounts-memberships__role"><%%= membership.role.titleize %></td>
+        <td class="accounts-memberships__actions">
+          <%% if membership.owner? || own_membership?(membership) %>
+            <span class="accounts-memberships__locked">Locked</span>
+          <%% else %>
+            <%%= form_with url: membership_path(membership), method: :patch,
+                          class: "accounts-memberships__form" do %>
+              <label class="accounts-memberships__label"
+                     for="membership_role_<%%= membership.id %>">Role</label>
+              <select id="membership_role_<%%= membership.id %>"
+                      name="membership[role]"
+                      class="accounts-memberships__select">
+                <%% assignable_roles.each do |role| %>
+                  <option value="<%%= role %>" <%%= "selected" if membership.role == role %>>
+                    <%%= role.titleize %>
+                  </option>
+                <%% end %>
+              </select>
+              <button type="submit" class="accounts-memberships__submit">Update</button>
+            <%% end %>
+          <%% end %>
+        </td>
+      </tr>
+    <%% end %>
+  </tbody>
+</table>
