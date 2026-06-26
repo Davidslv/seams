@@ -14,12 +14,21 @@ guide their list.
 
 ```erb
 <%%= ui_button(variant: :primary) { "Save" } %>
-<%%= ui_tag(:ready) { "Built" } %>
+<%%= ui_tag(label: "Built", status: :ready) %>
 
 <%%= form_with model: @record do |f| %>
   <%%= f.ui_text_field :title, label: "Title", hint: "Shown on the cover" %>
 <%% end %>
 ```
+
+## Living gallery (dev/test only)
+
+`/design/guide` renders every component from its real preview, so the docs
+cannot drift from the code. Add a component (a partial + a preview under
+`app/views/ui/`) and it appears in the gallery — with its `ui_<name>` helper —
+automatically. The route is dev/test-only: it is drawn inside an
+`if Rails.env.local?` guard in the host routes, and the controller 404s outside
+`Rails.env.local?`.
 
 ## Non-isolated by design
 
@@ -54,6 +63,8 @@ Nothing else changes.
   `f.text_field` / `f.select` / `f.submit` are untouched).
 - The icon sprite (`<%%= render "ui/icon_sprite" %>`) rendered once near the top
   of `<body>` in the host layout.
+- The dev/test-only living-gallery route (`/design/guide`) drawn into the host
+  routes, inside an `if Rails.env.local?` guard.
 
 ## Run the engine specs
 
@@ -63,7 +74,8 @@ bin/rails seams:test[design]
 
 ## Roadmap
 
-This is Phase 1 (skeleton). Later units add the full token layer, the ~33
-components, the auto-wired living gallery at `/design/guide`, the
-`design:component` generator, and the opt-in `--shell` layout. See
-`proposals/design_system_engine.md`.
+Phase 1 ships the skeleton, the neutral token layer, the auto-wired `ui_*`
+helpers, the living gallery at `/design/guide`, and a seed component set
+(`button`, `tag`). Later units add the `Design::FormBuilder` field components,
+the `design:component` generator, the full ~33-component set, and the opt-in
+`--shell` layout. See `proposals/design_system_engine.md`.

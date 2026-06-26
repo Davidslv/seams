@@ -66,8 +66,8 @@ module Seams
 
       # The base scaffold ships an isolated engine's ApplicationController and
       # ApplicationRecord under app/controllers/design/ and app/models/design/.
-      # A view-layer engine needs neither — it has no controllers and no models
-      # in Phase 1 — so remove them. (#18 adds the dev-only guide controller.)
+      # A view-layer engine needs neither — its only controller is the dev-only
+      # guide (created below) and it has no models — so remove the leftovers.
       def remove_isolated_leftovers
         # config/routes.rb is KEPT (an empty `Design::Engine.routes.draw do end`)
         # so the engine stays mountable in the dummy app + host; the dev-only
@@ -127,9 +127,46 @@ module Seams
                                 engine_path("app/views/ui/_icon_sprite.html.erb")
       end
 
+      # The seed component set — enough for the gallery + the contract/render
+      # tests to have something real to render. Ported faithfully from
+      # quire-saas's compositor (compositor_* -> ui_*, quire copy neutralised):
+      # _button (takes a content block + variant/size) and _tag (a required
+      # `label:` strict local — the contract test relies on it being required).
+      # Each ships with a companion preview, which is what makes it "public":
+      # the auto-wire derives ui_<name> from the preview, and the gallery lists
+      # it. Eject-aware so a host can own a component without losing it on
+      # regenerate. #21+ ship the full component set.
+      def create_seed_components
+        %w[button tag].each do |name|
+          template_unless_ejected "app/views/ui/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/_#{name}.html.erb")
+          template_unless_ejected "app/views/ui/previews/_#{name}.html.erb.tt",
+                                  engine_path("app/views/ui/previews/_#{name}.html.erb")
+        end
+      end
+
+      # The living gallery (dev/test only). The controller renders every
+      # component from its preview so the docs cannot drift; the route is guarded
+      # to Rails.env.local? both in the controller (404 in production) and at the
+      # host routes (drawn inside an `if Rails.env.local?` block). Ported from
+      # quire-saas's compositor guide. Eject-aware so a host can restyle the
+      # gallery chrome.
+      def create_guide
+        template "app/controllers/design/guide_controller.rb.tt",
+                 engine_path("app/controllers/design/guide_controller.rb")
+        template_unless_ejected "app/views/layouts/design/guide.html.erb.tt",
+                                engine_path("app/views/layouts/design/guide.html.erb")
+        template_unless_ejected "app/views/design/guide/index.html.erb.tt",
+                                engine_path("app/views/design/guide/index.html.erb")
+      end
+
       def create_runtime_spec
         template "spec/runtime/design_boot_spec.rb.tt",
                  engine_path("spec/runtime/design_boot_spec.rb")
+        template "spec/runtime/ui_components_spec.rb.tt",
+                 engine_path("spec/runtime/ui_components_spec.rb")
+        template "spec/runtime/guide_spec.rb.tt",
+                 engine_path("spec/runtime/guide_spec.rb")
       end
 
       def overwrite_readme
@@ -146,6 +183,7 @@ module Seams
         inject_theme_into_host_css
         set_host_default_form_builder
         render_sprite_in_host_layout
+        draw_guide_route_in_host
       end
 
       def report_summary
@@ -153,6 +191,35 @@ module Seams
       end
 
       private
+
+      # Draw the dev/test-only living-gallery route into the HOST's routes. The
+      # design engine is non-isolated, so its Design::GuideController lives on the
+      # host's controller path and a plain host route reaches it — matching how
+      # quire-saas exposes /compositor/guide. The route is wrapped in an
+      # `if Rails.env.local?` guard so it does not exist in production at all
+      # (defence in depth with the controller's own guard_available? 404).
+      # Idempotent: skips if the route is already drawn.
+      def draw_guide_route_in_host
+        routes = host_path("config/routes.rb")
+        unless File.exist?(routes)
+          return host_skip("config/routes.rb not found — add the guide route " \
+                           '(get "design/guide" => "design/guide#index") yourself')
+        end
+
+        return if File.read(routes).include?('"design/guide#index"')
+
+        say "  inject  config/routes.rb (design/guide — dev/test only)", :green
+        inject_into_file routes, after: routes_draw_anchor do
+          <<-RUBY
+  # The seams design living gallery — dev/test only. Renders every ui_*
+  # component from its preview so the docs cannot drift. Guarded here AND in
+  # the controller so it never reaches production.
+  if Rails.env.local?
+    get "design/guide" => "design/guide#index", as: :design_guide
+  end
+          RUBY
+        end
+      end
 
       def engine_path(relative)
         File.join(destination_root, "engines", ENGINE_NAME, relative)

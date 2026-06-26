@@ -172,6 +172,84 @@ RSpec.describe Seams::Generators::DesignGenerator do
     end
   end
 
+  describe "seed components" do
+    it "ships the button partial + preview (content block + variant/size)", :aggregate_failures do
+      assert_file "engines/design/app/views/ui/_button.html.erb" do |content|
+        expect(content).to include("locals:")
+        expect(content).to include("variant: :default")
+        expect(content).to include("content: nil")
+        expect(content).to include("tag.button")
+        # neutral default — no quire copy bled through
+        expect(content).not_to include("EPUB")
+        expect(content).not_to include("compositor")
+      end
+      assert_file "engines/design/app/views/ui/previews/_button.html.erb" do |content|
+        expect(content).to include("ui_button")
+        expect(content).not_to include("compositor_button")
+      end
+    end
+
+    it "ships the tag partial + preview with a REQUIRED label: local", :aggregate_failures do
+      assert_file "engines/design/app/views/ui/_tag.html.erb" do |content|
+        # label: is a required strict local — the contract test depends on it.
+        expect(content).to include("label:")
+        expect(content).to include("status: :neutral")
+        expect(content).to include("tag.span")
+      end
+      assert_file "engines/design/app/views/ui/previews/_tag.html.erb" do |content|
+        expect(content).to include("ui_tag")
+        expect(content).to include("label:")
+      end
+    end
+  end
+
+  describe "living gallery (guide)" do
+    it "ships the dev/test-only guide controller (404 in production)", :aggregate_failures do
+      assert_file "engines/design/app/controllers/design/guide_controller.rb" do |content|
+        expect(content).to include("module Design")
+        expect(content).to include("class GuideController < ActionController::Base")
+        expect(content).to include("Design.component_names")
+        expect(content).to include("Rails.env.local?")
+        expect(content).to include("head :not_found")
+      end
+    end
+
+    it "ships the guide layout + index view rendering each preview", :aggregate_failures do
+      assert_file "engines/design/app/views/layouts/design/guide.html.erb" do |content|
+        expect(content).to include('render "ui/icon_sprite"')
+      end
+      assert_file "engines/design/app/views/design/guide/index.html.erb" do |content|
+        expect(content).to include("@components")
+        # The index renders each component from its own preview partial.
+        expect(content).to include('render "ui/previews/')
+      end
+    end
+
+    it "draws the dev/test-only guide route into the HOST routes", :aggregate_failures do
+      expect(host("config/routes.rb")).to include("Rails.env.local?")
+      expect(host("config/routes.rb")).to include('get "design/guide" => "design/guide#index"')
+      expect(host("config/routes.rb")).to include("as: :design_guide")
+    end
+  end
+
+  describe "runtime specs (gallery + contract)" do
+    it "ships the strict-locals contract + render smoke spec", :aggregate_failures do
+      assert_file "engines/design/spec/runtime/ui_components_spec.rb" do |content|
+        expect(content).to include("the strict-locals contract")
+        expect(content).to include("raise_error(ArgumentError)")
+        expect(content).to include("Design.component_names")
+      end
+    end
+
+    it "ships the living-gallery request spec", :aggregate_failures do
+      assert_file "engines/design/spec/runtime/guide_spec.rb" do |content|
+        expect(content).to include('get "/design/guide"')
+        expect(content).to include("type: :request")
+        expect(content).to include("have_http_status(:ok)")
+      end
+    end
+  end
+
   describe "isolated-engine leftovers removed" do
     it "removes the base Design::ApplicationController" do
       full = File.join(destination_root, "engines/design/app/controllers/design/application_controller.rb")
@@ -390,6 +468,7 @@ RSpec.describe Seams::Generators::DesignGenerator do
       expect(host("app/assets/tailwind/application.css").scan("seams:design tokens").size).to eq(1)
       expect(host("config/application.rb").scan("default_form_builder").size).to eq(1)
       expect(host("app/views/layouts/application.html.erb").scan('render "ui/icon_sprite"').size).to eq(1)
+      expect(host("config/routes.rb").scan('"design/guide#index"').size).to eq(1)
     end
   end
 

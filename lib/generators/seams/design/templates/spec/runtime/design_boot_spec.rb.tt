@@ -17,45 +17,63 @@ require_relative "../rails_helper"
 # Later sub-issues add the token, component, gallery and FormBuilder-field
 # specs; this proves the load-bearing skeleton boots.
 RSpec.describe "Design engine boot", type: :integration do
-  it "loads the engine constant" do
-    expect(defined?(Design::Engine)).to eq("constant")
+  describe "the engine constant" do
+    it "loads" do
+      expect(defined?(Design::Engine)).to eq("constant")
+    end
+
+    it "is NON-isolated (no isolated namespace)" do
+      # An isolated engine sets Engine.isolated? true and scopes its helpers /
+      # routes. The design engine must NOT — its partials + helpers are host-wide.
+      expect(Design::Engine.isolated?).to be(false)
+    end
   end
 
-  it "is a NON-isolated engine (no isolated namespace)" do
-    # An isolated engine sets Engine.isolated? true and scopes its helpers /
-    # routes. The design engine must NOT — its partials + helpers are host-wide.
-    expect(Design::Engine.isolated?).to be(false)
+  describe "the auto-wire registry" do
+    it "derives the public component list from the preview partials" do
+      # The seed set (button, tag) each ships a preview, so they appear in the
+      # public list; the internal icon partials have no preview, so they don't.
+      expect(Design.component_names).to be_an(Array)
+      expect(Design.component_names).to include("button", "tag")
+    end
+
+    it "auto-derives a ui_<name> helper for every public component" do
+      Design::UiHelper.define_component_helpers!
+      helpers = ActionController::Base.helpers
+      expect(helpers).to respond_to(:ui_button)
+      expect(helpers).to respond_to(:ui_tag)
+    end
+
+    it "resets the memoised component list on demand" do
+      Design.component_names
+      expect { Design.reset_component_names! }.not_to raise_error
+    end
   end
 
-  it "derives the public component list from the preview partials" do
-    # With no previews shipped yet (Phase 1 ships only the internal icon
-    # partials, which have no preview), the list is empty but well-formed.
-    expect(Design.component_names).to be_an(Array)
+  describe "the host-wide UiHelper" do
+    it "exposes the hand-written ui_icon" do
+      expect(defined?(Design::UiHelper)).to eq("constant")
+      expect(Design::UiHelper.instance_methods).to include(:ui_icon)
+    end
+
+    it "is mixed into ActionController::Base so ui_* resolve host-wide" do
+      expect(ActionController::Base.helpers).to respond_to(:ui_icon)
+    end
   end
 
-  it "resets the memoised component list on demand" do
-    Design.component_names
-    expect { Design.reset_component_names! }.not_to raise_error
+  describe "Design::FormBuilder" do
+    it "subclasses the standard Rails builder" do
+      expect(defined?(Design::FormBuilder)).to eq("constant")
+      expect(Design::FormBuilder.ancestors).to include(ActionView::Helpers::FormBuilder)
+      expect(Design::FormBuilder.instance_methods).to include(:ui_text_field)
+    end
   end
 
-  it "exposes the host-wide UiHelper with the hand-written ui_icon" do
-    expect(defined?(Design::UiHelper)).to eq("constant")
-    expect(Design::UiHelper.instance_methods).to include(:ui_icon)
-  end
-
-  it "mixes UiHelper into ActionController::Base so ui_* resolve host-wide" do
-    expect(ActionController::Base.helpers).to respond_to(:ui_icon)
-  end
-
-  it "ships Design::FormBuilder subclassing the standard Rails builder" do
-    expect(defined?(Design::FormBuilder)).to eq("constant")
-    expect(Design::FormBuilder.ancestors).to include(ActionView::Helpers::FormBuilder)
-    expect(Design::FormBuilder.instance_methods).to include(:ui_text_field)
-  end
-
-  it "ships the icon sprite + icon partials in the engine view path" do
-    root = Design::Engine.root
-    expect(File.exist?(root.join("app/views/ui/_icon.html.erb"))).to be(true)
-    expect(File.exist?(root.join("app/views/ui/_icon_sprite.html.erb"))).to be(true)
+  describe "the engine view path" do
+    it "ships the icon sprite + icon partials" do
+      root = Design::Engine.root
+      expect(File.exist?(root.join("app/views/ui/_icon.html.erb"))).to be(true)
+      expect(File.exist?(root.join("app/views/ui/_icon_sprite.html.erb"))).to be(true)
+    end
   end
 end
