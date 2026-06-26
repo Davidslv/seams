@@ -18,6 +18,21 @@ RSpec.describe Seams do
       expect(described_class.configuration.observability_adapter)
         .to eq("Seams::Observability::Adapters::RailsLogger")
     end
+
+    it "defaults permission_grants to Seams::Permissions::DEFAULT_GRANTS" do
+      described_class.reset_configuration!
+
+      expect(described_class.configuration.permission_grants)
+        .to eq(Seams::Permissions::DEFAULT_GRANTS)
+    end
+
+    it "lets a host override permission_grants" do
+      described_class.configure { |c| c.permission_grants = { "member" => [] } }
+
+      expect(described_class.configuration.permission_grants).to eq("member" => [])
+    ensure
+      described_class.reset_configuration!
+    end
   end
 
   describe ".configure" do

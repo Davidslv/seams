@@ -35,6 +35,36 @@ module Seams
     # callers such as background jobs and system actors.
     SYSTEM_ROLE = "system"
 
+    # Sensible default grant map so `can?` allows things out of the box,
+    # keyed by role. `member` may read; `admin` may manage. `owner`
+    # inherits everything granted to `admin` (and through it `member`)
+    # via ROLE_HIERARCHY, and `system` bypasses checks entirely — so
+    # neither needs its own entry here. Hosts override the whole map
+    # through `Seams.configuration.permission_grants`. The codes mirror
+    # what each canonical engine registers from its engine.rb.
+    DEFAULT_GRANTS = {
+      "member" => %w[
+        invoice.read.billing
+        subscription.read.billing
+        team.read.teams
+        account.read.accounts
+        membership.read.accounts
+        notification.read.notifications
+      ].freeze,
+      "admin" => %w[
+        invoice.manage.billing
+        subscription.manage.billing
+        plan.manage.billing
+        lifetime.manage.billing
+        team.manage.teams
+        member.manage.teams
+        invitation.manage.teams
+        account.manage.accounts
+        membership.manage.accounts
+        preference.manage.notifications
+      ].freeze
+    }.freeze
+
     def self.valid_name?(name)
       NAME_PATTERN.match?(name.to_s)
     end
