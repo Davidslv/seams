@@ -579,8 +579,13 @@ RSpec.describe Seams::Generators::AdminGenerator do
           expect(content).to include("class Scope")
           expect(content).to include("scope.none")
           expect(content).to include("permitted?")
-          expect(content).to include("owner")
-          expect(content).to include("admin")
+          # Phase 3: tenant policies resolve through the gem's
+          # permission registry, not a hardcoded role literal. The
+          # shared resolver defers to Seams::Permissions.can? with the
+          # membership role; the role == "admin" literal must be gone.
+          expect(content).to include("permission_ability")
+          expect(content).to include("Seams::Permissions.can?")
+          expect(content).not_to match(/%w\[owner admin\]\.include\?/)
           # Phase 4: per-record tenant guard — show?/update?/destroy?
           # also assert the record's own account_id matches the
           # caller's account_id, so a tenant-admin can't load
@@ -669,6 +674,35 @@ RSpec.describe Seams::Generators::AdminGenerator do
         it "Admin::Tenant::#{basename.camelize}Policy::Scope filters by account_id" do
           assert_file "engines/admin/app/policies/admin/tenant/#{basename}_policy.rb" do |content|
             expect(content).to include("where(account_id: account_id)")
+          end
+        end
+      end
+    end
+
+    # Phase 3 — each tenant policy names the owning engine's ability
+    # code so the shared resolver (`permitted_to?`) can decide via
+    # Seams::Permissions.can?. The mapping is the single point where a
+    # dashboard resource is bound to a registered ability; it must
+    # stay in lock-step with the engine catalogs + DEFAULT_GRANTS.
+    describe "tenant policies bind each resource to a registered ability code" do
+      {
+        "identity" => "identity.manage.auth",
+        "account" => "account.manage.accounts",
+        "accounts_membership" => "membership.manage.accounts",
+        "team" => "team.manage.teams",
+        "teams_membership" => "member.manage.teams",
+        "invitation" => "invitation.manage.teams",
+        "notification" => "notification.manage.notifications",
+        "notification_preference" => "preference.manage.notifications",
+        "plan" => "plan.manage.billing",
+        "subscription" => "subscription.manage.billing",
+        "invoice" => "invoice.manage.billing",
+        "lifetime_pass" => "lifetime.manage.billing"
+      }.each do |basename, ability|
+        it "Admin::Tenant::#{basename.camelize}Policy resolves through #{ability}" do
+          assert_file "engines/admin/app/policies/admin/tenant/#{basename}_policy.rb" do |content|
+            expect(content).to include("def permission_ability")
+            expect(content).to include(%("#{ability}"))
           end
         end
       end

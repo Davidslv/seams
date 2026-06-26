@@ -39,6 +39,18 @@ RSpec.describe Seams::Generators::AuthGenerator do
       end
     end
 
+    it "registers the auth ability catalog (resource.action.engine)" do
+      assert_file "engines/auth/lib/auth/engine.rb" do |content|
+        expect(content).to include('initializer "auth.register_abilities"')
+        expect(content).to include('owned_by: "Auth"')
+        %w[
+          identity.read.auth identity.manage.auth
+        ].each do |code|
+          expect(content).to include(%("#{code}"))
+        end
+      end
+    end
+
     it "uses isolate_namespace Auth" do
       assert_file "engines/auth/lib/auth/engine.rb" do |content|
         expect(content).to include("isolate_namespace Auth")
