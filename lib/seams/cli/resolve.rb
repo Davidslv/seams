@@ -45,12 +45,15 @@ module Seams
     # scope and the methods are kept linear and well-commented.
     # rubocop:disable Naming/PredicateMethod, Metrics/AbcSize, Metrics/CyclomaticComplexity
     class Resolve
+      # Default directory that holds the generated engines.
       DEFAULT_ENGINES_ROOT = "engines"
 
       # Header injected at the top of every ejected file. Position
       # matters: future regenerations check the FIRST line of an
       # existing destination file for this exact prefix.
       EJECT_HEADER_PREFIX = "# seams:ejected from"
+
+      # Builds the full ejected-file header block for a given event/source.
       EJECT_HEADER_LINES  = lambda do |from|
         <<~HEADER
           #{EJECT_HEADER_PREFIX} #{from}
@@ -78,6 +81,8 @@ module Seams
         @error        = error
       end
 
+      # Execute the selected resolve mode (:eject / :list_markers / :list_ejected).
+      # @return [Boolean] true on success, false on a handled failure.
       def call
         case @mode
         when :eject         then run_eject

@@ -138,6 +138,9 @@ module Seams
           end
         end
 
+        # Detach a subscriber handle from the adapter.
+        # @param subscriber [Object] the handle a subscribe call returned.
+        # @return [void]
         def unsubscribe(subscriber)
           adapter.unsubscribe(subscriber)
         end
@@ -166,6 +169,9 @@ module Seams
           subscriptions.reject { |name| EventRegistry.registered?(name) }.uniq
         end
 
+        # The configured event-bus adapter, instantiated lazily.
+        # @return [Seams::Events::Adapter] the adapter instance.
+        # @raise [Seams::ConfigurationError] if the configured class can't be loaded.
         def adapter
           @adapter ||= build_adapter
         end

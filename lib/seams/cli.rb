@@ -19,10 +19,19 @@ module Seams
   module CLI
     module_function
 
+    # List every engine and the events it emits/subscribes to.
+    # @param engines_root [String] directory holding the engines.
+    # @param output [IO] stream to write the report to.
+    # @return [Boolean] true on success.
     def list(engines_root: "engines", output: $stdout)
       Seams::CLI::List.new(engines_root: engines_root, output: output).call
     end
 
+    # Run the specs of every engine changed since +base+.
+    # @param base [String] the git ref to diff against.
+    # @param engines_root [String] directory holding the engines.
+    # @param output [IO] stream to write progress to.
+    # @return [Boolean] true if all selected suites pass.
     def test_changed(base: "main", engines_root: "engines", output: $stdout)
       Seams::CLI::TestChanged.new(
         base: base,
@@ -31,10 +40,21 @@ module Seams
       ).call
     end
 
+    # Run rubocop across every engine.
+    # @param engines_root [String] directory holding the engines.
+    # @param output [IO] stream to write progress to.
+    # @return [Boolean] true if every engine lints clean.
     def quality(engines_root: "engines", output: $stdout)
       Seams::CLI::Quality.new(engines_root: engines_root, output: output).call
     end
 
+    # Drive the eject / insertion-point escape hatch.
+    # @param mode [Symbol] :eject, :list_markers, or :list_ejected.
+    # @param argument [String, nil] mode-specific argument (e.g. "<engine>/<file>").
+    # @param engines_root [String] directory holding the engines.
+    # @param output [IO] stream for normal output.
+    # @param error [IO] stream for error output.
+    # @return [Boolean] true on success.
     def resolve(mode:, argument: nil, engines_root: "engines", output: $stdout, error: $stderr)
       Seams::CLI::Resolve.new(
         mode: mode,

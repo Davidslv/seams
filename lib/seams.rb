@@ -6,8 +6,13 @@ require "seams/version"
 #
 # See https://github.com/Davidslv/seams for documentation.
 module Seams
+  # Base class for all Seams errors.
   class Error < StandardError; end
+
+  # Raised when Seams is misconfigured (e.g. an adapter class can't be loaded).
   class ConfigurationError < Error; end
+
+  # Raised when a generator hits an unrecoverable problem.
   class GeneratorError < Error; end
 end
 

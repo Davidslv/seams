@@ -9,6 +9,7 @@ module Seams
   # effects synchronously, so that the publisher's transaction can commit
   # quickly and side effects can retry independently.
   module Events
+    # Base class for event-bus errors.
     class Error < Seams::Error; end
 
     # Raised when an event name is published that no engine has registered.

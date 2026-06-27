@@ -11,7 +11,7 @@ RuboCop::RakeTask.new
 # UP — raise it as more of the public API gets YARD comments, never
 # lower it. Run `bundle exec yard stats --list-undoc` to see what's
 # missing. The published reference lives at rubydoc.info/gems/seams.
-YARD_COVERAGE_FLOOR = 48.0
+YARD_COVERAGE_FLOOR = 65.0
 
 namespace :yard do
   desc "Fail if YARD documentation coverage drops below the floor"

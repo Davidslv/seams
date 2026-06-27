@@ -14,6 +14,7 @@ module Seams
     #
     # Returns true when every gate that ran passed; false otherwise.
     class Quality
+      # Default directory that holds the generated engines.
       DEFAULT_ENGINES_ROOT = "engines"
 
       def initialize(engines_root: DEFAULT_ENGINES_ROOT, output: $stdout)
@@ -22,6 +23,8 @@ module Seams
         @results      = {}
       end
 
+      # Run the quality gates across every engine.
+      # @return [Boolean] true when every gate that ran passed.
       def call
         run_rubocop
         run_brakeman

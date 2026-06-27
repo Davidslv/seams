@@ -9,13 +9,19 @@ module Seams
   # logs can be parsed and filtered uniformly by the host application's
   # log aggregator.
   module Observability
+    # Base class for observability errors.
     class Error < Seams::Error; end
 
     class << self
+      # The configured observability adapter, instantiated lazily.
+      # @return [Seams::Observability::Adapter] the adapter instance.
+      # @raise [Seams::ConfigurationError] if the configured class can't be loaded.
       def adapter
         @adapter ||= build_adapter
       end
 
+      # Drop the memoized adapter so the next call rebuilds it. Test hook.
+      # @return [void]
       def reset!
         @adapter = nil
       end
