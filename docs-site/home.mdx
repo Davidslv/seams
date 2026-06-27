@@ -1,0 +1,67 @@
+---
+title: Seams
+description: Seams generates modular Rails engines you own — clear boundaries, independent tests, and team autonomy, without the operational cost of microservices. One Rails app, clear seams.
+template: splash
+hero:
+  tagline: Microservice boundaries without the operational cost. Generate modular Rails engines you own — one app, clear seams.
+  actions:
+    - text: Get started
+      link: /seams/tutorial/
+      icon: right-arrow
+      variant: primary
+    - text: Engine catalogue
+      link: /seams/engine_catalogue/
+      icon: open-book
+    - text: GitHub
+      link: https://github.com/Davidslv/seams
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Why Seams
+
+<CardGrid>
+	<Card title="Real engines, in your repo" icon="seti:ruby">
+		Every `bin/seams` command writes editable Rails engines under `engines/`.
+		The code is yours — nothing is hidden behind the gem.
+	</Card>
+	<Card title="Boundaries enforced" icon="approve-check">
+		Four custom RuboCop cops keep engines apart; they talk through a
+		synchronous event bus with explicit subscribers — no HTTP between services.
+	</Card>
+	<Card title="Batteries included" icon="puzzle">
+		Auth, accounts, billing, teams, notifications, an admin panel, and a
+		themeable design system — generated, not hand-rolled.
+	</Card>
+	<Card title="One process" icon="rocket">
+		The architectural benefits of microservices — clear seams, independent
+		tests, team autonomy — with the operational cost of a monolith.
+	</Card>
+</CardGrid>
+
+## Start here
+
+<CardGrid>
+	<LinkCard
+		title="First engine in 10 minutes"
+		href="/seams/tutorial/"
+		description="From rails new to a booting, styled host."
+	/>
+	<LinkCard
+		title="Engine catalogue"
+		href="/seams/engine_catalogue/"
+		description="Every canonical engine, model, and event."
+	/>
+	<LinkCard
+		title="Architecture"
+		href="/seams/architecture/"
+		description="Why Seams is built the way it is."
+	/>
+	<LinkCard
+		title="API reference"
+		href="https://rubydoc.info/gems/seams"
+		description="The public Ruby API, on rubydoc.info."
+	/>
+</CardGrid>
