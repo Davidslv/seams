@@ -29,6 +29,10 @@ jobs:
       - name: Check links
         id: lychee
         uses: lycheeverse/lychee-action@v2
+        env:
+          # Lets lychee authenticate github.com requests and avoid the
+          # unauthenticated rate limit (flaky 429s on link-heavy docs).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           # README + every doc; --cache keeps reruns fast. On PRs we want
           # this to block, so don't pass fail:false there.

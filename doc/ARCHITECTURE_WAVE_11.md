@@ -17,7 +17,7 @@ write), and **a reinterpretation of the AdminUser-separation rule**
 boolean `staff?` flag is the right granularity). The framework
 selection — Administrate over ActiveAdmin, Avo, Trestle, Motor, and
 RailsAdmin — is recorded in
-[`../proposals/admin_engine_administrate.md`](../proposals/admin_engine_administrate.md).
+`../proposals/admin_engine_administrate.md`.
 
 Wave 11A doesn't change any existing runtime shapes. The admin engine
 is **opt-in**: a host that runs only the canonical six (core, auth,
@@ -241,7 +241,7 @@ The reinterpretation is documented in three places:
   [`Why staff? on Identity, not a separate AdminUser table?`](../lib/generators/seams/admin/templates/README.md.tt)
   section).
 - The Wave 11A proposal
-  ([`proposals/wave_11a_admin_engine.md`](../proposals/wave_11a_admin_engine.md)).
+  (`proposals/wave_11a_admin_engine.md`).
 - The auto-memory entry
   (`feedback_user_vs_admin_separation.md`) was updated 2026-05-10 to
   reflect the context-dependent reading.
@@ -303,8 +303,8 @@ follow-up generators that target its markers grow.
 
 ## See also
 
-- [`../proposals/wave_11a_admin_engine.md`](../proposals/wave_11a_admin_engine.md) — five-phase orchestration and risks.
-- [`../proposals/admin_engine_administrate.md`](../proposals/admin_engine_administrate.md) — framework selection rationale (the May 2026 research report).
+- `../proposals/wave_11a_admin_engine.md` — five-phase orchestration and risks.
+- `../proposals/admin_engine_administrate.md` — framework selection rationale (the May 2026 research report).
 - [`../lib/generators/seams/admin/admin_generator.rb`](../lib/generators/seams/admin/admin_generator.rb) — the `bin/rails generate seams:admin` implementation.
 - [`../lib/generators/seams/admin/templates/README.md.tt`](../lib/generators/seams/admin/templates/README.md.tt) — the engine README a fresh host operator reads first.
 - [`INSERTION_POINTS_CATALOGUE.md#admin-engine-wave-11a`](INSERTION_POINTS_CATALOGUE.md) — the five admin markers in the canonical catalogue.

@@ -208,7 +208,7 @@ behaviour until it runs `bin/seams admin`. It introduces a new
 authorization pattern (the platform/tenant policy split) rather than
 new domain models. The framework selection (Administrate over
 ActiveAdmin, Avo, Trestle, Motor, RailsAdmin) is recorded in
-[proposals/archive/admin_engine_administrate-accomplished.md](../proposals/archive/admin_engine_administrate-accomplished.md).
+`proposals/archive/admin_engine_administrate-accomplished.md`.
 Full walk-through: [ARCHITECTURE_WAVE_11.md](ARCHITECTURE_WAVE_11.md).
 
 ## Design

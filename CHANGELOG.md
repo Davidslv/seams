@@ -90,7 +90,7 @@ single command. Dashboards, two-mode authorization, audit-log
 auto-write, and the four config knobs all ship out of the box. See
 [`doc/ARCHITECTURE_WAVE_11.md`](doc/ARCHITECTURE_WAVE_11.md) for the
 new architecture material; the framework selection rationale lives in
-[`proposals/admin_engine_administrate.md`](proposals/admin_engine_administrate.md).
+`proposals/admin_engine_administrate.md`.
 
 #### Added
 
