@@ -20,6 +20,17 @@ module Seams
     # convention that the boundary review catches.
     module Publisher
       class << self
+        # Publish a domain event to every subscriber.
+        #
+        # @param event_name [String, Symbol] the event name, in
+        #   +resource.action.engine+ form (e.g. "subscription.created.billing").
+        # @param payload [Hash] data handed to each subscriber block.
+        # @raise [Seams::Events::InvalidEventNameError] if the name is malformed.
+        # @raise [Seams::Events::UnregisteredEventError] if no engine has
+        #   registered the event via {Seams::EventRegistry.register}.
+        # @return [void]
+        # @example
+        #   Seams::Events::Publisher.publish("invoice.paid.billing", invoice_id: 42)
         def publish(event_name, payload = {})
           Events.assert_valid_name!(event_name)
           name = event_name.to_s
@@ -34,6 +45,18 @@ module Seams
           adapter.publish(name, payload)
         end
 
+        # Subscribe a block to an event. Subscribers run **synchronously**
+        # in the publisher's thread — enqueue a background job for any
+        # network side effect rather than performing it inline. For a
+        # reload-safe, idempotent subscription prefer {attach_class}.
+        #
+        # @param event_name [String, Symbol] the event to listen for.
+        # @yieldparam payload [Hash] the published payload.
+        # @return [Object] an adapter-specific subscriber handle.
+        # @example
+        #   Seams::Events::Publisher.subscribe("identity.signed_up.auth") do |payload|
+        #     WelcomeJob.perform_later(payload[:identity_id])
+        #   end
         def subscribe(event_name, &)
           Events.assert_valid_name!(event_name)
           name = event_name.to_s
