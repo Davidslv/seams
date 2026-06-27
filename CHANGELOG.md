@@ -9,16 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Install generator: ships an opinionated quality toolchain by default — a host
-  is hardened from the first CLI run. `seams:install` now installs **herb**
-  (HTML+ERB lint + `.herb.yml`), **strong_migrations** (+ initializer, audits
-  all migrations via `start_after = 0`), and **lefthook** (`lefthook.yml`:
-  pre-commit rubocop+herb, pre-push specs), and wires herb-lint + a from-scratch
-  `db:migrate` safety check into the generated CI. The rubocop/brakeman/
-  bundle-audit gems the generated CI shells out to are now injected into the
-  host Gemfile too. Each tool is opt-out: `--no-herb`, `--no-strong-migrations`,
-  `--no-lefthook`. Also closes two gaps where Seams generated views and
-  migrations that nothing validated — the host CI now lints/vets them.
+- Install generator: ships an opinionated quality toolchain — a host is hardened
+  from the first CLI run. `seams:install` installs **strong_migrations**
+  (+ initializer, audits all migrations via `start_after = 0`) and **lefthook**
+  (`lefthook.yml`: pre-commit rubocop, pre-push specs) by default, and wires a
+  from-scratch `db:migrate` safety check into the generated CI. The rubocop/
+  brakeman/bundle-audit gems the generated CI shells out to are now injected
+  into the host Gemfile too. **herb** (HTML+ERB lint + `.herb.yml`) is available
+  but **off by default** — opt in with `--herb` — because its platform-specific
+  native gem breaks cold installs on multi-platform lockfiles (see commit
+  6c16c52). strong_migrations and lefthook are opt-out via
+  `--no-strong-migrations` / `--no-lefthook`. Also closes two gaps where Seams
+  generated migrations that nothing validated — the host CI now vets them.
+- Permissions engine (`bin/seams permissions`): generates a host-editable
+  role → ability grant map at `config/initializers/seams_permissions.rb`, backed
+  by `Seams::PermissionRegistry` / `Seams::Permissions` and the
+  `authorize_permission!` controller helper. See [doc/PERMISSIONS.md].
+- Admin engine (`bin/seams admin`): opt-in Administrate dashboards with a Pundit
+  `Platform`/`Tenant` policy split and an admin audit trail writing
+  `Core::AuditLog` rows. See [doc/ARCHITECTURE_WAVE_11.md].
+- Design engine (`bin/seams design`, `--shell`): a themeable design system —
+  33 `ui_*` components, Tailwind v4 `@theme` tokens + component CSS,
+  `Design::FormBuilder`, a `/design/guide` gallery, and a `design:component`
+  generator; `--shell` also generates an application layout and a starter
+  signed-in dashboard. See [doc/DESIGN_SYSTEM.md].
 
 ### Changed
 

@@ -1,9 +1,17 @@
 # Engine Catalogue
 
-The six canonical engines that ship with seams. Each one is a
-generator, not a runtime gem — your host application owns the
-generated code, can edit it, and never has to wait for an upstream
-release to fix a bug.
+The canonical engines that ship with seams. Each one is a generator,
+not a runtime gem — your host application owns the generated code, can
+edit it, and never has to wait for an upstream release to fix a bug.
+
+The **six core engines** (Core, Auth, Accounts, Notifications,
+Billing, Teams) form the canonical SaaS spine and are documented in
+full below. Three further engines are **opt-in** and ship later in the
+build order:
+
+- **[Permissions](#permissions)** — the role → ability grant map.
+- **[Admin](#admin)** — Administrate dashboards with a platform/tenant policy split.
+- **[Design](#design)** — the themeable design system + optional app shell.
 
 Wave 9 reworked the identity / account / team boundaries: the old
 `Auth::User` (which conflated credential state and tenant
@@ -164,6 +172,72 @@ the email link doesn't leak the team_id and is short enough to
 share. The accept action locks the invitation row and short-circuits
 on already-accepted, so a double-clicked link redirects gracefully.
 
+## Permissions
+
+```bash
+bin/seams permissions
+```
+
+| | |
+| --- | --- |
+| Generates | `config/initializers/seams_permissions.rb` — a host-editable role → ability grant map |
+| Runtime | `Seams::PermissionRegistry`, `Seams::Permissions`, and the `authorize_permission!` controller helper |
+
+Permissions is the authorisation layer: it maps a role hierarchy to
+ability codes through a grant map you own and edit in the host. Unlike
+the six core engines it adds no models or migrations — it ships the
+grant map plus the registry that resolves it. See
+[PERMISSIONS.md](PERMISSIONS.md) for the ability codes, the role
+hierarchy, and the `authorize_permission!` contract.
+
+## Admin
+
+```bash
+bin/seams admin
+```
+
+| | |
+| --- | --- |
+| Framework | [Administrate](https://github.com/thoughtbot/administrate) dashboards |
+| Authorization | Pundit `policy_namespace` selecting at request time between `Admin::Platform::*` (staff) and `Admin::Tenant::*` (account-scoped) policies |
+| Audit | an `after_action` (`record_admin_audit`) writes a `Core::AuditLog` row for every successful write |
+| Identity model | reuses Wave 9's credential-only `Auth::Identity` + a boolean `staff?` flag (no separate AdminUser table) |
+
+Admin is **opt-in**: a host running only the canonical six sees no new
+behaviour until it runs `bin/seams admin`. It introduces a new
+authorization pattern (the platform/tenant policy split) rather than
+new domain models. The framework selection (Administrate over
+ActiveAdmin, Avo, Trestle, Motor, RailsAdmin) is recorded in
+[proposals/archive/admin_engine_administrate-accomplished.md](../proposals/archive/admin_engine_administrate-accomplished.md).
+Full walk-through: [ARCHITECTURE_WAVE_11.md](ARCHITECTURE_WAVE_11.md).
+
+## Design
+
+```bash
+bin/seams design            # the design system
+bin/seams design --shell    # plus an app layout + starter dashboard
+```
+
+| | |
+| --- | --- |
+| Components | 33 strict-locals `ui_*` partials, auto-wired as view helpers (`ui_button`, `f.ui_field`, …) |
+| Tokens | Tailwind v4 `@theme` neutral tokens + the component CSS layer (`.btn`, `.card`, `.field`, …) |
+| Forms | `Design::FormBuilder` |
+| Gallery | a `/design/guide` living component gallery |
+| Generator | `bin/rails generate design:component <name>` — host-local generator (shipped by the engine) to scaffold a new component |
+| `--shell` | also writes an application layout + a signed-in starter dashboard (`Design::DashboardController`, `/dashboard`, `root` route) |
+
+Design is the only **non-isolated** canonical engine: its partials and
+helpers are host-wide by design (D4 in the proposal). Tailwind v4 is a
+hard dependency (D2) — retheming is a token override, demonstrated by
+the example `_quire.css` theme. See
+[DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) and its companions
+([foundations](DESIGN_SYSTEM_FOUNDATIONS.md),
+[components](DESIGN_SYSTEM_COMPONENTS.md),
+[forms](DESIGN_SYSTEM_FORMS.md),
+[theming](DESIGN_SYSTEM_THEMING.md),
+[accessibility](DESIGN_SYSTEM_ACCESSIBILITY.md)).
+
 ## Pulling them together
 
 A real B2B SaaS using all six:
@@ -208,5 +282,5 @@ class User < ApplicationRecord
 end
 ```
 
-That's a Bullet-Train-class app surface in five `bin/seams`
+That's a Bullet-Train-class app surface in six `bin/seams`
 commands. The code is yours; nothing is hidden behind a gem.
