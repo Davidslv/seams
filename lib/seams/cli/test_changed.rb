@@ -17,7 +17,9 @@ module Seams
     # The caller (rake task or bin/seams) translates that to an exit
     # code.
     class TestChanged
+      # Default git ref to diff the working tree against.
       DEFAULT_BASE         = "main"
+      # Default directory that holds the generated engines.
       DEFAULT_ENGINES_ROOT = "engines"
 
       def initialize(base: DEFAULT_BASE, engines_root: DEFAULT_ENGINES_ROOT, output: $stdout)
@@ -26,6 +28,8 @@ module Seams
         @output       = output
       end
 
+      # Run the specs of every engine changed since {DEFAULT_BASE}.
+      # @return [Boolean] true if all selected suites pass.
       def call
         engines = changed_engines
         if engines.empty?
@@ -59,7 +63,7 @@ module Seams
       end
 
       # Array-form shell-out: no interpolation into a shell, so a
-      # @base value like `; rm -rf /` passes as one argv element to
+      # +@base+ value like `; rm -rf /` passes as one argv element to
       # git rather than getting evaluated. shell_escape is defence in
       # depth on top of that.
       def resolve_merge_base

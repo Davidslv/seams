@@ -67,3 +67,25 @@ jobs:
       # Rakefile. The public API reference is published automatically by
       # rubydoc.info on every gem push (it reads .yardopts).
       - run: bundle exec rake yard:coverage
+
+  prose:
+    name: Prose lint (advisory)
+    runs-on: ubuntu-latest
+    # ADVISORY for now: the docs predate Vale. It reports issues as PR
+    # annotations but must never block — the Vale step carries
+    # continue-on-error, keeping the job (and its check) green. Once the
+    # prose is clean, drop these to make it a gate (see .vale.ini).
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Vale
+        continue-on-error: true
+        uses: errata-ai/vale-action@reviewdog
+        with:
+          files: '["README.md", "doc"]'
+          reporter: github-pr-check
+          fail_on_error: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

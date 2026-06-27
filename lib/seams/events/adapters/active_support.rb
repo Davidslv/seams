@@ -7,21 +7,25 @@ require "seams/events/adapter"
 
 module Seams
   module Events
+    # Namespace for the built-in event-bus adapters.
     module Adapters
       # Default in-process adapter, backed by ActiveSupport::Notifications.
       # Suitable for monolithic deployments — every engine in the host app
       # shares the same process, so subscribers fire synchronously after
       # the publisher's call returns.
       class ActiveSupport < Seams::Events::Adapter
+        # (see Seams::Events::Adapter#publish)
         def publish(event_name, payload)
           payload = { payload: payload } unless payload.is_a?(Hash)
           ::ActiveSupport::Notifications.instrument(event_name, payload)
         end
 
+        # (see Seams::Events::Adapter#subscribe)
         def subscribe(event_name, &)
           ::ActiveSupport::Notifications.subscribe(event_name, &)
         end
 
+        # (see Seams::Events::Adapter#unsubscribe)
         def unsubscribe(subscriber)
           ::ActiveSupport::Notifications.unsubscribe(subscriber)
         end

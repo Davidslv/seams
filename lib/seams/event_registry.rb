@@ -41,18 +41,25 @@ module Seams
         end
       end
 
+      # @param name [String, Symbol] an event name.
+      # @return [Boolean] whether any engine has registered it.
       def registered?(name)
         @registry.key?(name.to_s)
       end
 
+      # @param name [String, Symbol] an event name.
+      # @return [String, nil] the owning engine, or nil if unregistered.
       def emitter_of(name)
         @registry[name.to_s]
       end
 
+      # @return [Hash{String=>String}] a copy of the full event => owner map.
       def all
         @registry.dup
       end
 
+      # Clear the registry. Intended for test teardown.
+      # @return [void]
       def reset!
         @mutex.synchronize { @registry.clear }
       end

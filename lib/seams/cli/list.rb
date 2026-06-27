@@ -8,8 +8,10 @@ module Seams
     # engine under engines/, looks up its registered events in
     # Seams::EventRegistry, and prints a summary.
     class List
+      # Default directory that holds the generated engines.
       DEFAULT_ENGINES_ROOT = "engines"
 
+      # Matches the top-level `module Foo` declaration in an engine file.
       MODULE_DECLARATION = /\bmodule\s+([A-Z][A-Za-z0-9_]*)\b/
 
       def initialize(engines_root: DEFAULT_ENGINES_ROOT, output: $stdout)
@@ -17,6 +19,8 @@ module Seams
         @output       = output
       end
 
+      # Discover the engines, gather their events, and print the report.
+      # @return [Boolean] true on success.
       def call
         engines = discover_engines
         @output.puts("seams: #{engines.size} engine(s) installed")
