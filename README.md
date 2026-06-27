@@ -2,8 +2,13 @@
 
 [![Gem Version](https://img.shields.io/gem/v/seams.svg)](https://rubygems.org/gems/seams)
 [![CI](https://github.com/Davidslv/seams/actions/workflows/ci.yml/badge.svg)](https://github.com/Davidslv/seams/actions/workflows/ci.yml)
+[![Docs site](https://img.shields.io/badge/docs-davidslv.github.io%2Fseams-blue.svg)](https://davidslv.github.io/seams/)
 [![API docs](https://img.shields.io/badge/api-rubydoc.info-blue.svg)](https://rubydoc.info/gems/seams)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+> 📖 **Documentation site: [davidslv.github.io/seams](https://davidslv.github.io/seams/)**
+> — the guides below, searchable and grouped by Diátaxis, with the
+> [API reference](https://davidslv.github.io/seams/api/) alongside.
 
 > A CLI framework that generates modular Rails engines.
 

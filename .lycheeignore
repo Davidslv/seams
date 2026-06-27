@@ -1,0 +1,6 @@
+# Links the link-checker should not fail on.
+
+# The docs site is published BY this repo (.github/workflows/docs-site.yml).
+# Its URL only resolves once this has merged and Pages is enabled, so the
+# link check would otherwise 404 on our own not-yet-live site.
+https://davidslv.github.io/seams
