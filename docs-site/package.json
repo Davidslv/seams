@@ -1,0 +1,20 @@
+{
+  "name": "seams-docs-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Astro Starlight documentation site for the Seams gem. Content is synced from ../doc and ../README.md at build time (no file moves).",
+  "scripts": {
+    "sync": "node scripts/sync-content.mjs",
+    "prebuild": "npm run sync",
+    "predev": "npm run sync",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.1",
+    "astro": "^7.0.3",
+    "sharp": "^0.35.2"
+  }
+}
