@@ -1,0 +1,66 @@
+name: Docs site
+
+# Builds the Astro Starlight site (content synced from doc/ + README) and
+# the YARD API reference, and deploys both to GitHub Pages.
+#
+# Requires Pages to be enabled with "GitHub Actions" as the source
+# (Settings → Pages). The site is served at
+# https://davidslv.github.io/seams/ and the API at /seams/api/.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site + API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Build the Starlight site
+        working-directory: docs-site
+        run: |
+          npm ci
+          npm run build
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ".ruby-version"
+          bundler-cache: true
+
+      - name: Build the YARD API reference into the site
+        run: bundle exec yard doc --output-dir docs-site/dist/api
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/dist
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
