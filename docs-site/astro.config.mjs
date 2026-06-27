@@ -10,6 +10,12 @@ const SITE = "https://davidslv.uk";
 const BASE = "/seams";
 const ORIGIN = `${SITE}${BASE}`;
 const OG_IMAGE = `${ORIGIN}/og.png`;
+// >= 100 chars: short descriptions trip the LinkedIn Post Inspector
+// warning and make a weak meta description / og:description.
+const DESCRIPTION =
+  "Seams generates modular Rails engines you own — clear boundaries, independent " +
+  "tests, and team autonomy, without the operational cost of microservices. " +
+  "One Rails app, clear seams.";
 
 // Render ```mermaid fenced code blocks. Convert them to <pre class="mermaid">
 // before Expressive Code sees them; the client script (in `head`) loads
@@ -54,7 +60,7 @@ const jsonLd = {
       "@id": `${ORIGIN}/#website`,
       url: `${ORIGIN}/`,
       name: "Seams",
-      description: "A CLI framework that generates modular Rails engines.",
+      description: DESCRIPTION,
       publisher: { "@id": `${SITE}/#person` },
       inLanguage: "en",
     },
@@ -62,7 +68,7 @@ const jsonLd = {
       "@type": "SoftwareSourceCode",
       "@id": `${ORIGIN}/#software`,
       name: "Seams",
-      description: "A CLI framework that generates modular Rails engines.",
+      description: DESCRIPTION,
       url: `${ORIGIN}/`,
       codeRepository: "https://github.com/Davidslv/seams",
       programmingLanguage: "Ruby",
@@ -84,7 +90,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Seams",
-      description: "A CLI framework that generates modular Rails engines.",
+      description: DESCRIPTION,
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/Davidslv/seams" },
       ],

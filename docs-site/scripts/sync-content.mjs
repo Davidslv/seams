@@ -87,8 +87,13 @@ async function run() {
   await fs.rm(outDir, { recursive: true, force: true });
   await fs.mkdir(outDir, { recursive: true });
 
-  // The README becomes the site home page.
-  await emit(path.join(repoRoot, "README.md"), "index.md", "Seams");
+  // The home page is an authored Starlight splash (hero + cards), copied
+  // verbatim — it already carries its own frontmatter and MDX components.
+  // (The README stays GitHub-facing; it is no longer the site home page.)
+  await fs.copyFile(
+    path.join(__dirname, "..", "home.mdx"),
+    path.join(outDir, "index.mdx"),
+  );
 
   // Every top-level doc, preserving filename case so relative .md links
   // between docs keep resolving.
