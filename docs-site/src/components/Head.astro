@@ -1,0 +1,26 @@
+---
+// Extends Starlight's default <head> to point og:image / twitter:image at
+// this page's generated card (src/pages/og/[...routes].ts). The static
+// site-wide image was removed from astro.config's `head` so there is
+// exactly one og:image per page.
+import Default from "@astrojs/starlight/components/Head.astro";
+
+const { entry } = Astro.locals.starlightRoute;
+// Matches the key in src/pages/og/[...routes].ts (home id "" -> "index").
+const id = entry.id || "index";
+const ogImage = new URL(
+  `${import.meta.env.BASE_URL}og/${id}.png`,
+  Astro.site,
+).href;
+const alt = `${entry.data.title} — Seams documentation`;
+---
+
+<Default><slot /></Default>
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:secure_url" content={ogImage} />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={alt} />
+<meta name="twitter:image" content={ogImage} />
+<meta name="twitter:image:alt" content={alt} />
