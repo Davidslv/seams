@@ -94,19 +94,14 @@ export default defineConfig({
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/Davidslv/seams" },
       ],
-      // SEO + social: Starlight already emits og:title/description/url/type
-      // and twitter:card, but no image. Add the share image, the icon set,
-      // theme-color, JSON-LD, and the mermaid client renderer.
+      // Per-page og:image / twitter:image are set by the custom Head
+      // component (it points at the generated card for each page); the
+      // global head only carries what's the same on every page.
+      components: {
+        Head: "./src/components/Head.astro",
+      },
       head: [
-        { tag: "meta", attrs: { property: "og:image", content: OG_IMAGE } },
-        { tag: "meta", attrs: { property: "og:image:secure_url", content: OG_IMAGE } },
-        { tag: "meta", attrs: { property: "og:image:type", content: "image/png" } },
-        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
-        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
-        { tag: "meta", attrs: { property: "og:image:alt", content: "Seams — a CLI framework that generates modular Rails engines" } },
         { tag: "meta", attrs: { property: "og:locale", content: "en_GB" } },
-        { tag: "meta", attrs: { name: "twitter:image", content: OG_IMAGE } },
-        { tag: "meta", attrs: { name: "twitter:image:alt", content: "Seams — a CLI framework that generates modular Rails engines" } },
         { tag: "link", attrs: { rel: "apple-touch-icon", href: `${BASE}/apple-touch-icon.png` } },
         { tag: "meta", attrs: { name: "theme-color", content: "#0b0d10" } },
         { tag: "script", attrs: { type: "application/ld+json" }, content: JSON.stringify(jsonLd) },
