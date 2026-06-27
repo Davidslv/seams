@@ -86,10 +86,16 @@ bin/rails db:migrate
 ## 4. Generate more engines
 
 ```bash
-bin/seams accounts          # tenant boundary + Membership + system actor
-bin/seams notifications     # outbound email/SMS, swappable adapters
-bin/seams billing           # Stripe subscriptions + webhooks
-bin/seams teams             # multi-tenant teams + invitations
+bin/seams core                          # shared primitives (Current, AuditLog, concerns)
+bin/seams accounts                      # tenant boundary + Membership + system actor
+bin/seams notifications                 # outbound email/SMS, swappable adapters
+bin/seams notifications --channels in_app,email   # or pick a subset (default: all)
+bin/seams billing                       # Stripe subscriptions + webhooks
+bin/seams teams                         # multi-tenant teams + invitations
+bin/seams teams --with roles            # or pick a subset of team features (default: all)
+bin/seams permissions                   # host-editable role → ability grant map
+bin/seams admin                         # Administrate dashboards (opt-in; see ARCHITECTURE_WAVE_11.md)
+bin/seams design --shell                # design system + app layout + starter dashboard
 ```
 
 Every time you generate a new engine the existing engines'
@@ -99,7 +105,10 @@ the new engine without manual edits.
 The recommended order is `core → auth → accounts → notifications →
 billing → teams`. Some engines depend on each other (accounts on
 auth, billing on accounts) — see each engine's README for the
-"Requires:" line.
+"Requires:" line. `permissions`, `admin`, and `design` are opt-in and
+can be added at any time. Run `bin/seams design --shell` to also get a
+ready-to-boot application layout and signed-in dashboard, which makes
+the other engines visible in a real, styled UI.
 
 ## 5. Inspect what you have
 
@@ -131,7 +140,10 @@ of them in parallel (one job per engine).
 
 - [ADDING_AN_ENGINE.md](ADDING_AN_ENGINE.md) — Build your own engine on top of the generic generator.
 - [WRITING_AN_ADAPTER.md](WRITING_AN_ADAPTER.md) — Swap in Mailgun, Twilio, Paddle, etc.
-- [ENGINE_CATALOGUE.md](ENGINE_CATALOGUE.md) — The six canonical engines in detail.
+- [ENGINE_CATALOGUE.md](ENGINE_CATALOGUE.md) — The canonical engines in detail.
+- [PERMISSIONS.md](PERMISSIONS.md) — Role → ability grant map and `authorize_permission!`.
+- [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) — The design engine: components, tokens, theming.
+- [ARCHITECTURE_WAVE_11.md](ARCHITECTURE_WAVE_11.md) — The admin engine.
 - [CURRENT_ATTRIBUTES.md](CURRENT_ATTRIBUTES.md) — Per-request namespaces (Auth::Current, Accounts::Current, Teams::Current).
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Why Seams is built this way.
 - [UPGRADING_FROM_WAVE_8.md](UPGRADING_FROM_WAVE_8.md) — If you adopted seams pre-Wave-9.

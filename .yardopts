@@ -1,0 +1,11 @@
+--markup markdown
+--protected
+--no-private
+--output-dir doc/api
+--readme README.md
+--title "Seams API reference"
+lib/seams.rb
+lib/seams/**/*.rb
+-
+CHANGELOG.md
+LICENSE

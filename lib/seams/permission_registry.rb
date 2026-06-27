@@ -12,6 +12,16 @@ module Seams
     @mutex    = Mutex.new
 
     class << self
+      # Declare that an engine understands an ability code. Call this from
+      # the engine that owns the ability so authorisation lookups have a
+      # single source of truth.
+      #
+      # @param ability [String, Symbol] the ability code (e.g. "billing.manage").
+      # @param owned_by [String] the owning engine (e.g. "Billing").
+      # @raise [Seams::Permissions::DuplicateAbilityError] if another engine owns it.
+      # @return [String] the owning engine name.
+      # @example
+      #   Seams::PermissionRegistry.register("billing.manage", owned_by: "Billing")
       def register(ability, owned_by:)
         Permissions.assert_valid_name!(ability)
         ability = ability.to_s

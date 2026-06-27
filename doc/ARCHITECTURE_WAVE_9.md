@@ -1,7 +1,7 @@
 # Seams architecture (post-Wave 9)
 
 This document is the canonical reference for how the seams gem is put
-together after [Wave 9](ROADMAP_2026_05.md#wave-9--identity--account--team-rework-breaking).
+together after Wave 9.
 Wave 9 was the breaking rework of the identity / account / team
 boundary; everything in this document reflects the post-Wave-9
 shape. If you've never seen the codebase before, read this end-to-end
@@ -342,7 +342,7 @@ subscriber doesn't hold the AccountsMemberships table lock and a
 raising subscriber doesn't roll back the persisted rows.
 [`accounts/templates/app/models/account.rb.tt`](../lib/generators/seams/accounts/templates/app/models/account.rb.tt#L69)
 is the canonical implementation; the seams-example
-[`db/seeds.rb`](../../seams-example/db/seeds.rb#L29) walks the same
+[`db/seeds.rb`](https://github.com/Davidslv/seams-example) walks the same
 path.
 
 ---
@@ -578,7 +578,7 @@ The phases at a glance:
    `template` call means a re-run picks up gem-side template
    changes — the trade-off Wave 10 will address with insertion-point
    markers and `bin/seams resolve --eject` (see the
-   [roadmap](ROADMAP_2026_05.md#wave-10--splicing-tooling-gap-report-11--12)).
+   roadmap).
 3. **Cop config.** `update_exposed_concerns` edits the engine's
    own `.rubocop.yml` to allowlist concerns the engine intentionally
    exposes (e.g. Auth allows `Auth::Authenticatable` and
@@ -1009,7 +1009,7 @@ checks via parallel jobs.
 
 ## 12. The seams-example demo
 
-[`/Users/davidslv/projects/seams-example/`](../../seams-example/) is
+[`seams-example/`](https://github.com/Davidslv/seams-example) is
 the canonical post-Wave-9 host. It's a regular Rails app with
 `engines/{auth, accounts, billing, core, notifications, teams}/`
 and the host wired into all six. Wave 9 regenerated the demo from
@@ -1067,7 +1067,7 @@ Six lines per row create the canonical multi-tenant SaaS surface:
 human + tenant + audit actor + welcome notification + paid-plan
 subscription + collaborative team + outstanding invite. The full
 seed is at
-[`/Users/davidslv/projects/seams-example/db/seeds.rb`](../../seams-example/db/seeds.rb).
+[`seams-example/db/seeds.rb`](https://github.com/Davidslv/seams-example).
 After `db:seed`, `bin/rails console` is enough to poke at every
 engine: `Auth::Identity.first`, `Accounts::Account.first.system_membership`,
 `Teams::Team.first.memberships`, etc.
@@ -1078,7 +1078,7 @@ engine: `Auth::Identity.first`, `Accounts::Account.first.system_membership`,
 
 Wave 9 was foundational. With the Identity / Account / Team shape
 locked in, the next wave can stop regenerating engines and start
-extending them. From the [roadmap](ROADMAP_2026_05.md):
+extending them. From the roadmap:
 
 - **Wave 10** (now shipped — see
   [`ARCHITECTURE_WAVE_10.md`](ARCHITECTURE_WAVE_10.md) for the
@@ -1130,9 +1130,9 @@ Where to find each piece of Wave 9 functionality, by claim:
    per-request cascade, in detail.
 6. [`UPGRADING_FROM_WAVE_8.md`](UPGRADING_FROM_WAVE_8.md) — only
    if you're maintaining a host that adopted seams pre-Wave-9.
-7. [`/Users/davidslv/projects/seams-example/README.md`](../../seams-example/README.md) —
+7. [`seams-example/README.md`](https://github.com/Davidslv/seams-example) —
    the canonical demo's overview.
-8. [`/Users/davidslv/projects/seams-example/db/seeds.rb`](../../seams-example/db/seeds.rb) —
+8. [`seams-example/db/seeds.rb`](https://github.com/Davidslv/seams-example) —
    the shortest end-to-end flow through every engine.
 
 After that, drill into the engine you care about: each canonical

@@ -390,6 +390,7 @@ GEM
       base64
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
+    yard (0.9.44)
     zeitwerk (2.7.5)
 
 PLATFORMS
@@ -417,6 +418,7 @@ DEPENDENCIES
   seams!
   simplecov (~> 0.22)
   sqlite3 (~> 2.0)
+  yard (~> 0.9)
 
 BUNDLED WITH
    2.7.2

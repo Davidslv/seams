@@ -171,7 +171,7 @@ considered and rejected:
 
 Five anti-patterns the wider Wave 10 review surfaced and the gem
 deliberately avoided are summarised in
-[`ROADMAP_2026_05.md`'s "Anti-patterns we won't import"](ROADMAP_2026_05.md#anti-patterns-we-wont-import).
+`ROADMAP_2026_05.md`'s "Anti-patterns we won't import".
 
 ---
 
