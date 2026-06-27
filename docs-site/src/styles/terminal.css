@@ -1,0 +1,74 @@
+/* Terminal cast on the home page (castplay.js). Sized for the docs
+   column rather than a full-screen slide. The body keeps a fixed height
+   so the box is reserved before the cast types in (no layout shift). */
+.seams-term {
+	margin: 2.5rem auto 0;
+	max-width: 46rem;
+	width: 100%;
+}
+
+.seams-term__win {
+	background: #1c1a17;
+	border: 1px solid rgba(255, 255, 255, 0.07);
+	border-radius: 12px;
+	overflow: hidden;
+	box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.seams-term__bar {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.6rem 0.85rem;
+	background: #2a2723;
+}
+
+.seams-term__dot {
+	width: 0.72rem;
+	height: 0.72rem;
+	border-radius: 50%;
+	background: var(--d);
+}
+
+.seams-term__title {
+	margin-left: 0.5rem;
+	color: #cfc7b6;
+	font: 600 0.75rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.seams-term__body {
+	margin: 0;
+	padding: 1rem 1.1rem;
+	height: 22rem;
+	overflow: hidden;
+	white-space: pre;
+	text-align: left;
+	color: #e9e4da;
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.82rem;
+	line-height: 1.55;
+	cursor: pointer;
+}
+
+.seams-term__cap {
+	margin-top: 0.75rem;
+	text-align: center;
+	color: var(--sl-color-gray-3);
+	font-size: 0.9rem;
+}
+
+.seams-term__hint {
+	color: var(--sl-color-gray-4);
+}
+
+.seams-term__fallback {
+	white-space: pre-wrap;
+	text-align: left;
+}
+
+@media (max-width: 50rem) {
+	.seams-term__body {
+		height: 20rem;
+		font-size: 0.72rem;
+	}
+}

@@ -91,6 +91,7 @@ export default defineConfig({
     starlight({
       title: "Seams",
       description: DESCRIPTION,
+      customCss: ["./src/styles/terminal.css"],
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/Davidslv/seams" },
       ],
