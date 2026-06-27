@@ -1,0 +1,38 @@
+---
+// A terminal "cast" on the home page: castplay.js types an asciinema
+// recording into a styled terminal (autoplays when scrolled into view;
+// click to pause/replay; renders the final frame instantly under
+// prefers-reduced-motion). Player + cast vendored from davidslv.uk.
+const base = import.meta.env.BASE_URL; // "/seams/"
+const ariaLabel =
+  "Terminal demo: bin/seams generates four engines (auth, billing, teams, " +
+  "notifications); the generated Stripe webhook controller is plain Rails; " +
+  "RuboCop's boundary cop rejects a cross-engine model access; and bin/seams " +
+  "list shows the synchronous, explicit event graph.";
+---
+
+<figure class="seams-term">
+	<div class="seams-term__win" role="img" aria-label={ariaLabel}>
+		<div class="seams-term__bar">
+			<span class="seams-term__dot" style="--d:#ff5f56"></span>
+			<span class="seams-term__dot" style="--d:#ffbd2e"></span>
+			<span class="seams-term__dot" style="--d:#27c93f"></span>
+			<span class="seams-term__title">bin/seams</span>
+		</div>
+		<div class="seams-term__body cast" data-cast={`${base}seams-demo.cast`}></div>
+	</div>
+	<figcaption class="seams-term__cap">
+		generate → it’s just Rails → the cop says no → the event graph
+		<span class="seams-term__hint">· click to pause / replay</span>
+	</figcaption>
+	<noscript>
+		<pre class="seams-term__fallback">$ bin/seams auth billing teams notifications
+  create  engines/auth · engines/billing · engines/teams · engines/notifications
+$ bundle exec rubocop engines/auth
+  Seams/NoCrossEngineModelAccess: engine `auth` must not access `Billing::Subscription` directly.
+$ bin/seams list
+  auth emits user.created · billing & notifications subscribe — synchronous, explicit, no magic.</pre>
+	</noscript>
+</figure>
+
+<script is:inline src={`${base}castplay.js`}></script>
