@@ -1,0 +1,20 @@
+# Code owners for Seams.
+# These owners are requested for review automatically. Pair this with a
+# branch ruleset ("Require review from Code Owners") to make docs and
+# generator changes route to a maintainer.
+
+# Default owner for everything.
+*                       @Davidslv
+
+# Documentation — the front door. Changes here should be reviewed for
+# accuracy against the code (the README has drifted before).
+/README.md              @Davidslv
+/doc/                   @Davidslv
+/CHANGELOG.md           @Davidslv
+
+# Generator templates: a change here is copied into every host, so it is
+# security- and contract-relevant. See CONTRIBUTING.md.
+/lib/generators/        @Davidslv
+
+# The public Ruby API surface (event bus, registries, adapters).
+/lib/seams/             @Davidslv

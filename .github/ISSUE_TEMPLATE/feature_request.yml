@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a new engine, generator, flag, or capability.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Larger ideas often start as a proposal under `proposals/` and an
+        Epic — but an issue is the right place to open the conversation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What can't you do today, or what's painful?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you add or change? A new generator? A flag on an existing one?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope / boundaries
+      description: Which engine(s) does this touch? Is it opt-in?

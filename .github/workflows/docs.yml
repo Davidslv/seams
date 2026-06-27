@@ -1,0 +1,65 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Nightly, to catch external links that rot after merge.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  links:
+    name: Link check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write # the scheduled run files an issue on failure
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check links
+        id: lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # README + every doc; --cache keeps reruns fast. On PRs we want
+          # this to block, so don't pass fail:false there.
+          args: >-
+            --cache
+            --max-cache-age 1d
+            --no-progress
+            './**/*.md'
+          # On scheduled runs we don't want a flaky external link to fail
+          # the workflow — we file an issue instead (see below).
+          fail: ${{ github.event_name != 'schedule' }}
+          output: ./lychee/out.md
+
+      - name: File an issue when nightly link check fails
+        if: ${{ github.event_name == 'schedule' && steps.lychee.outputs.exit_code != 0 }}
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: "Broken links detected by the nightly docs check"
+          content-filepath: ./lychee/out.md
+          labels: docs, broken-link
+
+  api-coverage:
+    name: API doc coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ".ruby-version"
+          bundler-cache: true
+      # Ratchet: fails if YARD coverage drops below the floor in the
+      # Rakefile. The public API reference is published automatically by
+      # rubydoc.info on every gem push (it reads .yardopts).
+      - run: bundle exec rake yard:coverage

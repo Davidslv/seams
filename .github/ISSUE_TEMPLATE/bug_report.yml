@@ -1,0 +1,56 @@
+name: Bug report
+description: Something Seams generated or did is wrong or broken.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Seams is a code generator, so the most
+        useful reports tell us **which generator** ran and **what the
+        generated code did** versus what you expected.
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      placeholder: "bin/seams teams --with roles"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Seams version / commit
+      description: "Output of `bundle show seams` or the commit SHA."
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Include the error, the offending generated file/path, or a diff.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Ideally from a fresh `rails new` host.
+      placeholder: |
+        1. rails new demo && cd demo
+        2. bundle add seams
+        3. bin/rails generate seams:install
+        4. bin/seams auth
+        5. ...
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Ruby version, Rails version, OS, database.
+      placeholder: "Ruby 3.3.5, Rails 8.1, macOS 15, Postgres 16"
