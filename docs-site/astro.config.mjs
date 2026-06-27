@@ -1,11 +1,86 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import { visit } from "unist-util-visit";
 
-// Project site on GitHub Pages: https://davidslv.github.io/seams/
+// Live at https://davidslv.uk/seams/ (custom domain on GitHub Pages).
+// `site` drives canonical URLs, og:url, and the sitemap, so it must be
+// the real serving origin — not the github.io fallback.
+const SITE = "https://davidslv.uk";
+const BASE = "/seams";
+const ORIGIN = `${SITE}${BASE}`;
+const OG_IMAGE = `${ORIGIN}/og.png`;
+
+// Render ```mermaid fenced code blocks. Convert them to <pre class="mermaid">
+// before Expressive Code sees them; the client script (in `head`) loads
+// mermaid and renders them in the browser. HTML-escape the source so the
+// raw markup survives, then mermaid reads it back via textContent.
+function remarkMermaid() {
+  return (tree) => {
+    visit(tree, "code", (node) => {
+      if (node.lang !== "mermaid") return;
+      const escaped = node.value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      node.type = "html";
+      node.value = `<pre class="mermaid not-content">${escaped}</pre>`;
+    });
+  };
+}
+
+const mermaidClientScript = `
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+const theme = document.documentElement.dataset.theme === "light" ? "default" : "dark";
+mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+const render = () => { try { mermaid.run({ querySelector: "pre.mermaid:not([data-processed])" }); } catch (e) { console.error(e); } };
+if (document.readyState !== "loading") render();
+else document.addEventListener("DOMContentLoaded", render);
+document.addEventListener("astro:after-swap", render);
+`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": `${SITE}/#person`,
+      name: "David Silva",
+      url: `${SITE}/`,
+      sameAs: ["https://github.com/Davidslv"],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${ORIGIN}/#website`,
+      url: `${ORIGIN}/`,
+      name: "Seams",
+      description: "A CLI framework that generates modular Rails engines.",
+      publisher: { "@id": `${SITE}/#person` },
+      inLanguage: "en",
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": `${ORIGIN}/#software`,
+      name: "Seams",
+      description: "A CLI framework that generates modular Rails engines.",
+      url: `${ORIGIN}/`,
+      codeRepository: "https://github.com/Davidslv/seams",
+      programmingLanguage: "Ruby",
+      runtimePlatform: "Ruby on Rails",
+      author: { "@id": `${SITE}/#person` },
+      image: OG_IMAGE,
+      license: "https://opensource.org/licenses/MIT",
+    },
+  ],
+};
+
 export default defineConfig({
-  site: "https://davidslv.github.io",
-  base: "/seams",
+  site: SITE,
+  base: BASE,
+  trailingSlash: "always",
+  markdown: {
+    remarkPlugins: [remarkMermaid],
+  },
   integrations: [
     starlight({
       title: "Seams",
@@ -13,9 +88,24 @@ export default defineConfig({
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/Davidslv/seams" },
       ],
-      // Content is synced from ../doc and ../README.md by
-      // scripts/sync-content.mjs (npm run sync). Sidebar is grouped by
-      // Diátaxis quadrant, mirroring doc/README.md.
+      // SEO + social: Starlight already emits og:title/description/url/type
+      // and twitter:card, but no image. Add the share image, the icon set,
+      // theme-color, JSON-LD, and the mermaid client renderer.
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: OG_IMAGE } },
+        { tag: "meta", attrs: { property: "og:image:secure_url", content: OG_IMAGE } },
+        { tag: "meta", attrs: { property: "og:image:type", content: "image/png" } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+        { tag: "meta", attrs: { property: "og:image:alt", content: "Seams — a CLI framework that generates modular Rails engines" } },
+        { tag: "meta", attrs: { property: "og:locale", content: "en_GB" } },
+        { tag: "meta", attrs: { name: "twitter:image", content: OG_IMAGE } },
+        { tag: "meta", attrs: { name: "twitter:image:alt", content: "Seams — a CLI framework that generates modular Rails engines" } },
+        { tag: "link", attrs: { rel: "apple-touch-icon", href: `${BASE}/apple-touch-icon.png` } },
+        { tag: "meta", attrs: { name: "theme-color", content: "#0b0d10" } },
+        { tag: "script", attrs: { type: "application/ld+json" }, content: JSON.stringify(jsonLd) },
+        { tag: "script", attrs: { type: "module" }, content: mermaidClientScript },
+      ],
       sidebar: [
         {
           label: "Tutorials",

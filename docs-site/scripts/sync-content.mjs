@@ -53,15 +53,24 @@ function frontmatter(title) {
 }
 
 // Rewrite links that would 404 on the site:
-//  - ../FOO or FOO at repo root -> GitHub blob URL
-//  - doc/FOO.md (used by README) -> FOO.md (docs are at the content root)
+//  - ../FOO or FOO at repo root (LICENSE, CONTRIBUTING, ...) -> GitHub blob URL
+//  - doc/FOO.md (used by README) -> ./FOO.md
+//  - bare relative FOO.md -> ./FOO.md so Astro resolves it to the page URL
+//    (Astro only auto-resolves Markdown links that start with ./ or ../).
 function rewriteLinks(markdown) {
   let out = markdown;
   for (const f of ROOT_FILES) {
     out = out.replaceAll(`](../${f})`, `](${GH_BLOB}/${f})`);
     out = out.replaceAll(`](${f})`, `](${GH_BLOB}/${f})`);
   }
-  out = out.replaceAll("](doc/", "](");
+  // README points into doc/; on the site those pages are siblings.
+  out = out.replaceAll("](doc/", "](./");
+  // Prefix bare relative .md links (no scheme, not already ./ ../ / #) so
+  // Astro rewrites them to the built page URL and they stop 404-ing.
+  out = out.replace(
+    /\]\((?!https?:|\/|\.\/|\.\.\/|#|mailto:)([^)\s]+\.md)(#[^)]*)?\)/g,
+    "](./$1$2)",
+  );
   return out;
 }
 
