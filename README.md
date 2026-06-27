@@ -103,6 +103,7 @@ Guides and explanation live under [`doc/`](doc/):
 - [doc/ARCHITECTURE_WAVE_10.md](doc/ARCHITECTURE_WAVE_10.md) — insertion points, follow-up generators, eject CLI
 - [doc/ARCHITECTURE_WAVE_11.md](doc/ARCHITECTURE_WAVE_11.md) — the admin engine (Administrate, Pundit policy split, admin audit)
 - [doc/WAVE_11_PII_GDPR.md](doc/WAVE_11_PII_GDPR.md) — PII encryption & GDPR handling
+- [doc/adr/](doc/adr/) — Architecture Decision Records (MADR): the *why* behind hard-to-reverse calls
 
 ### Building & extending
 
