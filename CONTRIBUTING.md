@@ -30,8 +30,27 @@ green:
 - `RSpec (Ruby 4.0.3)`
 - `Integration (rails new + boot)`
 
+The `Docs` workflow also runs (link check + API-doc coverage ratchet);
+the `Prose lint (advisory)` job is non-blocking until the existing docs
+are clean (see `.vale.ini`).
+
 Admins can override (`enforce_admins: false`), but this is the
 unhappy path — prefer fixing the failing check.
+
+### Required: code-owner review on docs and generators
+
+`.github/CODEOWNERS` marks the documentation, generator templates, and
+public API as owned. To make ownership *enforced* (not just suggested),
+a repo admin must enable a branch ruleset on `main` (Settings → Rules →
+Rulesets):
+
+- **Require a pull request before merging**, with **Require review from
+  Code Owners** enabled, and
+- **Dismiss stale pull request approvals when new commits are pushed**.
+
+This guarantees that a change to `README.md`, `doc/`, `CHANGELOG.md`,
+`lib/generators/`, or `lib/seams/` is reviewed by a maintainer — the
+durable cure for the doc drift that motivated the documentation guards.
 
 ## Pull-request workflow
 
