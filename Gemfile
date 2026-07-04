@@ -11,7 +11,7 @@ group :development, :test do
   gem "pry-byebug", "~> 3.10"
   gem "rspec", "~> 3.13"
   gem "rspec-rails", "~> 8.0"
-  gem "rubocop", "~> 1.66", require: false
+  gem "rubocop", "~> 1.88", require: false
   gem "rubocop-performance", "~> 1.22", require: false
   gem "rubocop-rails", "~> 2.27", require: false
   gem "rubocop-rspec", "~> 3.2", require: false
