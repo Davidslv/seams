@@ -15,7 +15,7 @@ group :development, :test do
   gem "rubocop-performance", "~> 1.22", require: false
   gem "rubocop-rails", "~> 2.27", require: false
   gem "rubocop-rspec", "~> 3.2", require: false
-  gem "rubycritic", "~> 4.9", require: false
+  gem "rubycritic", "~> 5.0", require: false
   gem "simplecov", "~> 0.22", require: false
   gem "yard", "~> 0.9", require: false
 end
