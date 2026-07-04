@@ -12,6 +12,7 @@ AllCops:
     - "tmp/**/*"
     - "vendor/**/*"
     - "spec/fixtures/**/*"
+    - "spec/tmp/**/*"
     - "lib/generators/**/templates/**/*"
 
 Style/Documentation:
