@@ -176,6 +176,12 @@ gates, and the pull-request workflow. Security issues:
 [SECURITY.md](SECURITY.md). Community expectations:
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
+Need help using Seams? Start with [SUPPORT.md](SUPPORT.md). How the
+project is run: [GOVERNANCE.md](GOVERNANCE.md) and
+[MAINTAINERS.md](MAINTAINERS.md). AI coding agents working in this
+repo: [AGENTS.md](AGENTS.md) (and [llms.txt](llms.txt) for an
+LLM-friendly index). Citing Seams: [CITATION.cff](CITATION.cff).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

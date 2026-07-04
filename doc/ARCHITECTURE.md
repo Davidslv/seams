@@ -118,3 +118,32 @@ end
   calls are synchronous events.
 - Not opinionated about authorization, multi-tenancy, or front-end
   framework. The engines emit events and ship data; you wire the rest.
+
+## Where this design would strain
+
+Honesty about the limits, for the person about to bet on it:
+
+- **Synchronous in-process events.** The event bus is
+  `ActiveSupport::Notifications` under the hood: a slow subscriber
+  slows the publishing request, and a raising subscriber can break it.
+  When a host needs real async fan-out (queues, retries, outbox), the
+  event layer is the seam to swap — the adapter boundary exists for
+  this — but Seams does not ship that today.
+- **One database, one schema.** Engines isolate namespaces and code,
+  not storage. Table-level coupling (a rogue join, a shared index
+  bottleneck) is invisible to the boundary cops. True data isolation
+  means per-engine schemas or databases, which the generators do not
+  yet model.
+- **Generated code drifts from the generator.** Every file belongs to
+  the host — which means a host that heavily edits generated engines
+  cannot cleanly re-run a newer generator over them. Upgrades are
+  guided by CHANGELOG/upgrade notes, not automated codemods.
+- **Boundary enforcement is advisory by construction.** The cops run
+  where the host's RuboCop runs. A host that disables a cop, or
+  reaches across engines in a way the cops don't model (raw SQL,
+  `connection.execute`), gets no protection.
+- **Scale of team, not scale of traffic.** The model buys clear
+  ownership and independent testing. It does not buy independent
+  deployment or independent scaling — if one engine's workload must
+  scale separately, that engine is a candidate to extract, and Seams
+  stops at the extraction boundary.
