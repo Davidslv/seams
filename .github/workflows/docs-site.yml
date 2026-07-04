@@ -50,7 +50,7 @@ jobs:
       - name: Build the YARD API reference into the site
         run: bundle exec yard doc --output-dir docs-site/dist/api
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: docs-site/dist
 
