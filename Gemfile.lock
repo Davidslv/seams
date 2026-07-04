@@ -330,7 +330,7 @@ GEM
       lint_roller (~> 1.1)
       rubocop (>= 1.75.0, < 2.0)
       rubocop-ast (>= 1.47.1, < 2.0)
-    rubocop-rails (2.34.3)
+    rubocop-rails (2.35.5)
       activesupport (>= 4.2.0)
       lint_roller (~> 1.1)
       rack (>= 1.1)
@@ -415,7 +415,7 @@ DEPENDENCIES
   rspec-rails (~> 8.0)
   rubocop (~> 1.88)
   rubocop-performance (~> 1.22)
-  rubocop-rails (~> 2.27)
+  rubocop-rails (~> 2.35)
   rubocop-rspec (~> 3.2)
   rubycritic (~> 5.0)
   seams!
