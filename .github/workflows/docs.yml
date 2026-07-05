@@ -48,7 +48,7 @@ jobs:
 
       - name: File an issue when nightly link check fails
         if: ${{ github.event_name == 'schedule' && steps.lychee.outputs.exit_code != 0 }}
-        uses: peter-evans/create-issue-from-file@v5
+        uses: peter-evans/create-issue-from-file@v6
         with:
           title: "Broken links detected by the nightly docs check"
           content-filepath: ./lychee/out.md

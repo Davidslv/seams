@@ -145,7 +145,7 @@ RSpec.describe Seams::Generators::HostInjector do
 
       generator.host_uninject_mount(engine_class: "Auth::Engine")
       content = File.read(File.join(destination_root, "config/routes.rb"))
-      expect(content).not_to match(/mount Auth::Engine,/)
+      expect(content).not_to include("mount Auth::Engine,")
       expect(content).to     include("mount Auth::EngineExtras,")
     end
 

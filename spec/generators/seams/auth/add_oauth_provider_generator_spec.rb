@@ -185,9 +185,9 @@ RSpec.describe Seams::Generators::Auth::AddOauthProviderGenerator do
 
     it "implements authorize_url, exchange_code, and fetch_user_info" do
       contents = File.read(adapter_path("linkedin"))
-      expect(contents).to match(/def authorize_url\(state:, redirect_uri:\)/)
-      expect(contents).to match(/def exchange_code\(code:, redirect_uri:\)/)
-      expect(contents).to match(/def fetch_user_info\(access_token:\)/)
+      expect(contents).to include("def authorize_url(state:, redirect_uri:)")
+      expect(contents).to include("def exchange_code(code:, redirect_uri:)")
+      expect(contents).to include("def fetch_user_info(access_token:)")
     end
 
     it "splices a configuration entry under the oauth_providers marker" do
