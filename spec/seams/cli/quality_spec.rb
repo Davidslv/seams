@@ -79,5 +79,77 @@ RSpec.describe Seams::CLI::Quality do
       end
     end
   end
+
+  # Regression: the host's generated .rubocop.yml excludes engines/**/*
+  # (engines lint themselves), and RuboCop merges the project root's
+  # `AllCops: Exclude` into every run unless --ignore-parent-exclusion
+  # is passed. The old single host-wide `rubocop --parallel` therefore
+  # inspected ZERO engine files — the Seams boundary cops never ran and
+  # real violations sailed through `seams:quality:all`. This spec runs
+  # the real rubocop binary against a fabricated host to prove the
+  # per-engine runs both happen and fail the gate.
+  describe "per-engine boundary enforcement (real rubocop run)" do
+    subject(:cli) { described_class.new(output: io) }
+
+    let(:host_root) { File.expand_path("../../tmp/quality_cli_host", __dir__) }
+
+    before do
+      FileUtils.rm_rf(host_root)
+      engine_dir = File.join(host_root, "engines", "billing")
+      FileUtils.mkdir_p(File.join(engine_dir, "app", "models", "billing"))
+
+      # Host config mirrors the generated one: engines are excluded.
+      File.write(File.join(host_root, ".rubocop.yml"), <<~YAML)
+        AllCops:
+          DisabledByDefault: true
+          SuggestExtensions: false
+          Exclude:
+            - "engines/**/*"
+      YAML
+      File.write(File.join(host_root, "host_file.rb"), "# frozen_string_literal: true\n")
+
+      File.write(File.join(engine_dir, ".rubocop.yml"), <<~YAML)
+        require:
+          - seams/cops
+
+        AllCops:
+          DisabledByDefault: true
+          SuggestExtensions: false
+
+        Seams/NoCrossEngineModelAccess:
+          Enabled: true
+          OwnEngine: Billing
+          OtherEngines:
+            - Auth
+          ExposedConcerns: []
+      YAML
+
+      # Planted violation: billing reaches into auth's data layer.
+      File.write(File.join(engine_dir, "app", "models", "billing", "peek.rb"), <<~RUBY)
+        # frozen_string_literal: true
+
+        module Billing
+          class Peek
+            def call
+              Auth::Identity.find(1)
+            end
+          end
+        end
+      RUBY
+
+      allow(cli).to receive(:gem_installed?) { |name| name == "rubocop" }
+    end
+
+    after { FileUtils.rm_rf(host_root) }
+
+    it "runs rubocop inside each engine and fails the gate on a planted violation" do
+      result = Dir.chdir(host_root) { cli.call }
+
+      expect(result).to be(false)
+      expect(io.string).to include("rubocop --ignore-parent-exclusion (engines/billing)")
+      expect(io.string).to include("Seams/NoCrossEngineModelAccess")
+      expect(io.string).not_to include("0 files inspected")
+    end
+  end
 end
 # rubocop:enable RSpec/SubjectStub
