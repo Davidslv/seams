@@ -39,4 +39,47 @@ RSpec.describe RuboCop::Cop::Seams::NoCrossEngineDependency, :config do
       require "active_support/core_ext"
     RUBY
   end
+
+  it "does not flag require_relative paths that stay inside the engine's own tree" do
+    expect_no_offenses(<<~RUBY)
+      require_relative "billing_adapter/config"
+      require_relative "./helpers/formatting"
+    RUBY
+  end
+
+  context "when a sibling engine is named `core`" do
+    # Regression: `other_engine_for` used to match ANY path segment, so
+    # `require "rspec/core/rake_task"` — present in every generated
+    # engine Rakefile — false-fired in every host with a `core` engine.
+    # Only the FIRST segment of a plain `require` identifies the
+    # library.
+    let(:cop_config) do
+      {
+        "Enabled" => true,
+        "OwnEngine" => "auth",
+        "OtherEngines" => %w[billing core notifications]
+      }
+    end
+
+    it "does not flag third-party requires with `core` in a deeper segment" do
+      expect_no_offenses(<<~RUBY)
+        require "rspec/core/rake_task"
+        require "active_support/core_ext/string"
+      RUBY
+    end
+
+    it "still flags a require whose first segment is the core engine" do
+      expect_offense(<<~RUBY)
+        require "core/something"
+        ^^^^^^^^^^^^^^^^^^^^^^^^ Engine `auth` must not require `core/something` from another engine. Communicate via events or via `Core`'s exposed concerns.
+      RUBY
+    end
+
+    it "still flags require_relative climbs into the core engine" do
+      expect_offense(<<~RUBY)
+        require_relative "../../core/lib/core/registry"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Engine `auth` must not require `../../core/lib/core/registry` from another engine. Communicate via events or via `Core`'s exposed concerns.
+      RUBY
+    end
+  end
 end

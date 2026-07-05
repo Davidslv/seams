@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require "seams"
 
 module Seams
@@ -37,14 +38,49 @@ module Seams
 
       private
 
+      # Runs RuboCop twice over: once host-wide, then once per engine.
+      #
+      # The per-engine runs are NOT redundant: the generated host
+      # .rubocop.yml excludes `engines/**/*` (engines lint themselves),
+      # and RuboCop merges the project root's `AllCops: Exclude` into
+      # any run started from a subdirectory unless
+      # `--ignore-parent-exclusion` is passed. A single host-wide run
+      # therefore inspects ZERO engine files, silently skipping the
+      # Seams boundary cops. Each engine with its own .rubocop.yml is
+      # linted from inside its directory with parent exclusion ignored.
       def run_rubocop
-        if gem_installed?("rubocop")
-          @output.puts("=== rubocop --parallel ===")
-          @results[:rubocop] = system("bundle", "exec", "rubocop", "--parallel") ? :pass : :fail
-        else
+        unless gem_installed?("rubocop")
           @output.puts("rubocop not installed — skipping.")
           @results[:rubocop] = :skipped
+          return
         end
+
+        @output.puts("=== rubocop --parallel ===")
+        host_ok = system("bundle", "exec", "rubocop", "--parallel")
+
+        # Run every engine even after a failure so the summary shows
+        # all offending engines, not just the first.
+        engines_ok = engine_rubocop_dirs.map { |dir| engine_rubocop_passed?(dir) }.all?
+
+        @results[:rubocop] = host_ok && engines_ok ? :pass : :fail
+      end
+
+      def engine_rubocop_passed?(dir)
+        @output.puts("=== rubocop --ignore-parent-exclusion (#{dir}) ===")
+        out, status = Open3.capture2e(
+          "bundle", "exec", "rubocop", "--ignore-parent-exclusion", chdir: dir
+        )
+        @output.puts(out)
+        status.success?
+      end
+
+      # Engines that ship their own .rubocop.yml (the generated
+      # default). Engines without one fall back to whatever the host
+      # run covers, so they are skipped here.
+      def engine_rubocop_dirs
+        Dir.glob(File.join(@engines_root, "*"))
+           .select { |dir| File.directory?(dir) && File.exist?(File.join(dir, ".rubocop.yml")) }
+           .sort
       end
 
       def run_brakeman
