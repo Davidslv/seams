@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Community and AI-era repository standards: `SUPPORT.md`, `GOVERNANCE.md`,
+  `MAINTAINERS.md`, `CITATION.cff`, `.editorconfig`, `.github/FUNDING.yml`,
+  an `llms.txt` machine-readable index, and `AGENTS.md` instructions for AI
+  coding agents. `doc/ARCHITECTURE.md` gains a "Where this design would
+  strain" section. Blank issues are now routed through the issue chooser.
+
 - Install generator: ships an opinionated quality toolchain — a host is hardened
   from the first CLI run. `seams:install` installs **strong_migrations**
   (+ initializer, audits all migrations via `start_after = 0`) and **lefthook**

@@ -1,8 +1,11 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
     url: https://github.com/Davidslv/seams/security/advisories/new
     about: Please report security issues privately — see SECURITY.md. Do not open a public issue.
+  - name: Getting help
+    url: https://github.com/Davidslv/seams/blob/main/SUPPORT.md
+    about: Where to go for usage questions — docs, guides, and how to ask.
   - name: Question / discussion
     url: https://github.com/Davidslv/seams/issues/5
     about: The live work tracker — check here before filing, and for general direction.

@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: Seams
+message: >-
+  If you use this software, please cite it using the metadata from this file.
+type: software
+authors:
+  - given-names: David
+    family-names: Silva
+    email: davidslv.london@gmail.com
+repository-code: "https://github.com/Davidslv/seams"
+url: "https://davidslv.github.io/seams/"
+abstract: >-
+  A CLI framework that generates modular Rails engines. Seams gives a
+  Rails application the architectural benefits of microservices — clear
+  boundaries, independent testing, team autonomy — without the
+  operational cost: it generates isolated Rails engines with namespace
+  isolation, contract tests, dummy apps, and boundary enforcement,
+  shipped as a single Rails app.
+keywords:
+  - ruby
+  - rails
+  - rails-engines
+  - modular-monolith
+  - architecture
+  - code-generation
+license: MIT
+version: 0.1.0
+date-released: "2026-05-10"
