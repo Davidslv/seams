@@ -149,6 +149,75 @@ RSpec.describe RuboCop::Cop::Seams::NoCrossEngineModelAccess, :config do
     end
   end
 
+  context "with association `class_name:` options" do
+    # `class_name:` names the target class as a STRING, which
+    # `on_const` cannot see — pre-fix, `belongs_to :subscription,
+    # class_name: "Billing::Subscription"` was invisible to the cop
+    # and let a real cross-engine association ship.
+    it "flags a cross-engine class_name string on belongs_to" do
+      expect_offense(<<~RUBY)
+        module Auth
+          class Profile < ApplicationRecord
+            belongs_to :subscription, class_name: "Billing::Subscription"
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Engine `Auth` must not access `Billing::Subscription` directly. Use an event or a Billing-exposed concern instead.
+          end
+        end
+      RUBY
+    end
+
+    it "flags a cross-engine class_name string on has_many" do
+      expect_offense(<<~RUBY)
+        module Auth
+          class Profile < ApplicationRecord
+            has_many :alerts, class_name: "Notifications::Notification"
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Engine `Auth` must not access `Notifications::Notification` directly. Use an event or a Notifications-exposed concern instead.
+          end
+        end
+      RUBY
+    end
+
+    it "does not flag a class_name within the engine's own namespace" do
+      expect_no_offenses(<<~RUBY)
+        module Auth
+          class Profile < ApplicationRecord
+            belongs_to :identity, class_name: "Auth::Identity"
+          end
+        end
+      RUBY
+    end
+
+    it "does not flag a class_name naming an exposed concern" do
+      expect_no_offenses(<<~RUBY)
+        module Auth
+          class Profile < ApplicationRecord
+            belongs_to :billable, class_name: "Billing::Billable"
+          end
+        end
+      RUBY
+    end
+
+    it "does not flag polymorphic associations" do
+      expect_no_offenses(<<~RUBY)
+        module Auth
+          class Profile < ApplicationRecord
+            belongs_to :subject, polymorphic: true
+          end
+        end
+      RUBY
+    end
+
+    it "flags class_name given as a constant exactly once (via on_const, not doubled)" do
+      expect_offense(<<~RUBY)
+        module Auth
+          class Profile < ApplicationRecord
+            belongs_to :subscription, class_name: Billing::Subscription
+                                                  ^^^^^^^^^^^^^^^^^^^^^ Engine `Auth` must not access `Billing::Subscription` directly. Use an event or a Billing-exposed concern instead.
+          end
+        end
+      RUBY
+    end
+  end
+
   context "when OwnEngine is missing from config" do
     let(:cop_config) do
       {
