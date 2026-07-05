@@ -529,7 +529,7 @@ RSpec.describe Seams::Generators::AdminGenerator do
 
   # Wave 10 Phase 2A: every catalogued insertion-point marker the
   # admin engine ships must appear in its target file. Phase 1 ships
-  # five markers; the catalogue (doc/INSERTION_POINTS_CATALOGUE.md)
+  # five markers; the catalogue (doc/reference/INSERTION_POINTS_CATALOGUE.md)
   # is updated alongside this generator.
   describe "insertion-point markers (Wave 10 convention)" do
     {

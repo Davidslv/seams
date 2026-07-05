@@ -410,7 +410,7 @@ RSpec.describe Seams::Generators::AccountsGenerator do
   # Wave 10 Phase 2A: every catalogued insertion-point marker the
   # accounts engine ships must appear in its target file. These
   # assertions gate against accidental marker removal in future
-  # template edits. See doc/INSERTION_POINTS_CATALOGUE.md for the
+  # template edits. See doc/reference/INSERTION_POINTS_CATALOGUE.md for the
   # canonical list.
   describe "insertion-point markers (Wave 10)" do
     {

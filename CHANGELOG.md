@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Community and AI-era repository standards: `SUPPORT.md`, `GOVERNANCE.md`,
   `MAINTAINERS.md`, `CITATION.cff`, `.editorconfig`, `.github/FUNDING.yml`,
   an `llms.txt` machine-readable index, and `AGENTS.md` instructions for AI
-  coding agents. `doc/ARCHITECTURE.md` gains a "Where this design would
+  coding agents. `doc/explanation/ARCHITECTURE.md` gains a "Where this design would
   strain" section. Blank issues are now routed through the issue chooser.
 
 - Install generator: ships an opinionated quality toolchain — a host is hardened
@@ -30,18 +30,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Permissions engine (`bin/seams permissions`): generates a host-editable
   role → ability grant map at `config/initializers/seams_permissions.rb`, backed
   by `Seams::PermissionRegistry` / `Seams::Permissions` and the
-  `authorize_permission!` controller helper. See [doc/PERMISSIONS.md].
+  `authorize_permission!` controller helper. See [doc/reference/PERMISSIONS.md].
 - Admin engine (`bin/seams admin`): opt-in Administrate dashboards with a Pundit
   `Platform`/`Tenant` policy split and an admin audit trail writing
-  `Core::AuditLog` rows. See [doc/ARCHITECTURE_WAVE_11.md].
+  `Core::AuditLog` rows. See [doc/explanation/ARCHITECTURE_WAVE_11.md].
 - Design engine (`bin/seams design`, `--shell`): a themeable design system —
   33 `ui_*` components, Tailwind v4 `@theme` tokens + component CSS,
   `Design::FormBuilder`, a `/design/guide` gallery, and a `design:component`
   generator; `--shell` also generates an application layout and a starter
-  signed-in dashboard. See [doc/DESIGN_SYSTEM.md].
+  signed-in dashboard. See [doc/design-system/DESIGN_SYSTEM.md].
 
 ### Changed
 
+- Documentation: `doc/` is now organised into Diátaxis folders —
+  `tutorials/`, `how-to/`, `reference/`, `design-system/`,
+  `explanation/`, plus `internal/` for maintainer-facing working
+  documents. Published URLs on the docs site are unchanged (the site
+  flattens the folders), and the site's in-page cross-links — which
+  previously shipped as raw `.md` hrefs and 404'd — now resolve to the
+  real page URLs.
 - Engine generator: ApplicationController now requires authentication by default. Opt out via `skip_before_action :authenticate_identity!` in controllers serving public flows. [BREAKING for hosts that explicitly relied on engines being unauthenticated by default.]
 - Notifications generator: preferences controller now uses an explicit
   permit list from the channel/type registry rather than `permit!`.
@@ -94,7 +101,7 @@ notifications, billing, teams) can mount an Administrate-backed admin
 surface at `/admin` covering all twelve canonical seams models with a
 single command. Dashboards, two-mode authorization, audit-log
 auto-write, and the four config knobs all ship out of the box. See
-[`doc/ARCHITECTURE_WAVE_11.md`](doc/ARCHITECTURE_WAVE_11.md) for the
+[`doc/explanation/ARCHITECTURE_WAVE_11.md`](doc/explanation/ARCHITECTURE_WAVE_11.md) for the
 new architecture material; the framework selection rationale lives in
 `proposals/admin_engine_administrate.md`.
 
@@ -170,8 +177,8 @@ follow-up generators target those points to add features without
 re-templating the whole engine; and `bin/seams resolve --eject`
 marks any single host file as host-owned so subsequent
 `bin/seams <engine>` runs leave it alone. See
-[`doc/ARCHITECTURE_WAVE_10.md`](doc/ARCHITECTURE_WAVE_10.md) for the
-addendum and [`doc/WRITING_FOLLOW_UP_GENERATORS.md`](doc/WRITING_FOLLOW_UP_GENERATORS.md)
+[`doc/explanation/ARCHITECTURE_WAVE_10.md`](doc/explanation/ARCHITECTURE_WAVE_10.md) for the
+addendum and [`doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md`](doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md)
 for the author's guide.
 
 #### Added
@@ -189,8 +196,8 @@ for the author's guide.
   core Configuration class). Marker shape:
   `# seams:insertion-point <engine>.<area>.<scope>` — ASCII only,
   greppable, parses through every Ruby linter. Format spec in
-  [`doc/INSERTION_POINTS.md`](doc/INSERTION_POINTS.md); canonical list
-  in [`doc/INSERTION_POINTS_CATALOGUE.md`](doc/INSERTION_POINTS_CATALOGUE.md).
+  [`doc/reference/INSERTION_POINTS.md`](doc/reference/INSERTION_POINTS.md); canonical list
+  in [`doc/reference/INSERTION_POINTS_CATALOGUE.md`](doc/reference/INSERTION_POINTS_CATALOGUE.md).
 - **`bin/seams resolve` CLI.** Three modes:
   - `--eject <engine>/<file>` — prepends a
     `# seams:ejected from <engine>.<path>` header to the host file;
@@ -217,12 +224,12 @@ for the author's guide.
   `auth.configuration.oauth_providers` marker, and writes a matching
   spec. Idempotent on rerun.
 - **Documentation.**
-  [`doc/INSERTION_POINTS.md`](doc/INSERTION_POINTS.md) (format spec),
-  [`doc/INSERTION_POINTS_CATALOGUE.md`](doc/INSERTION_POINTS_CATALOGUE.md)
+  [`doc/reference/INSERTION_POINTS.md`](doc/reference/INSERTION_POINTS.md) (format spec),
+  [`doc/reference/INSERTION_POINTS_CATALOGUE.md`](doc/reference/INSERTION_POINTS_CATALOGUE.md)
   (canonical 33-marker list),
-  [`doc/WRITING_FOLLOW_UP_GENERATORS.md`](doc/WRITING_FOLLOW_UP_GENERATORS.md)
+  [`doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md`](doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md)
   (author's guide), and
-  [`doc/ARCHITECTURE_WAVE_10.md`](doc/ARCHITECTURE_WAVE_10.md)
+  [`doc/explanation/ARCHITECTURE_WAVE_10.md`](doc/explanation/ARCHITECTURE_WAVE_10.md)
   (architecture addendum with splice + eject sequence diagrams).
 - **Host-facing surfaces updated.**
   `bin/seams help` and `bin/seams resolve --help` document the new
@@ -234,7 +241,7 @@ for the author's guide.
 
 Replaces the conflated `Auth::User` (which owned credentials AND
 tenant-membership concepts) with three peer engines, each with one
-clear responsibility. See `doc/UPGRADING_FROM_WAVE_8.md` for the
+clear responsibility. See `doc/how-to/UPGRADING_FROM_WAVE_8.md` for the
 migration story.
 
 #### Added
@@ -318,7 +325,7 @@ migration story.
   state holders are intentionally readable from any engine. The
   cop now treats `Current` as a framework-level constant and
   exempts it from the boundary rule. Documented in
-  `doc/CURRENT_ATTRIBUTES.md` and inline in the cop's docstring.
+  `doc/reference/CURRENT_ATTRIBUTES.md` and inline in the cop's docstring.
 - `Teams::AccountScoped` now references `Teams::Current.team`
   (previously a bare `Current.team` that resolved to nothing
   inside `module Teams` — silently making the default_scope a

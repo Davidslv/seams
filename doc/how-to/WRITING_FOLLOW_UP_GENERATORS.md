@@ -3,12 +3,12 @@
 A **follow-up generator** is a Rails generator that extends an
 already-installed seams engine without re-templating the whole
 engine. The first-party showcase is
-[`seams:auth:add_oauth_provider`](../lib/generators/seams/auth/add_oauth_provider/add_oauth_provider_generator.rb);
+[`seams:auth:add_oauth_provider`](../../lib/generators/seams/auth/add_oauth_provider/add_oauth_provider_generator.rb);
 this document is for hosts (and contributors to seams itself) writing
 the second.
 
 If you've never seen the marker mechanism before, skim
-[`INSERTION_POINTS.md`](INSERTION_POINTS.md) first — that document
+[`INSERTION_POINTS.md`](../reference/INSERTION_POINTS.md) first — that document
 specifies the format, this one covers the workflow.
 
 ---
@@ -101,7 +101,7 @@ do the heavy lifting:
 ## Walking through `add_oauth_provider`
 
 The shipped showcase
-([`add_oauth_provider_generator.rb`](../lib/generators/seams/auth/add_oauth_provider/add_oauth_provider_generator.rb))
+([`add_oauth_provider_generator.rb`](../../lib/generators/seams/auth/add_oauth_provider/add_oauth_provider_generator.rb))
 does six things. They're a useful checklist for any new follow-up
 generator.
 
@@ -184,17 +184,17 @@ contract. You don't need to re-test those.
 Three places mention a follow-up generator to a host:
 
 1. **The post-install message** in
-   [`install_generator.rb`](../lib/generators/seams/install/install_generator.rb)
+   [`install_generator.rb`](../../lib/generators/seams/install/install_generator.rb)
    — listed under "Other useful commands" so a host running
    `seams:install` sees the canonical generators alongside the
    follow-up ones.
 2. **The host's `bin/seams help`** — the help block in
-   [`bin_seams.tt`](../lib/generators/seams/install/templates/bin_seams.tt)
+   [`bin_seams.tt`](../../lib/generators/seams/install/templates/bin_seams.tt)
    lists the follow-up generators alongside `resolve`.
 3. **This document plus the catalogue.** Whenever you add a follow-up
    generator that targets a marker not yet exercised, mention it in
    the "Purpose" line of that marker's entry in
-   [`INSERTION_POINTS_CATALOGUE.md`](INSERTION_POINTS_CATALOGUE.md).
+   [`INSERTION_POINTS_CATALOGUE.md`](../reference/INSERTION_POINTS_CATALOGUE.md).
 
 If your follow-up generator lives in a host (not in the seams gem
 itself), the pattern is the same — Rails picks up generators from
@@ -204,9 +204,9 @@ itself), the pattern is the same — Rails picks up generators from
 
 ## See also
 
-- [`INSERTION_POINTS.md`](INSERTION_POINTS.md) — marker format spec.
-- [`INSERTION_POINTS_CATALOGUE.md`](INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers.
-- [`ARCHITECTURE_WAVE_10.md`](ARCHITECTURE_WAVE_10.md) — how the
+- [`INSERTION_POINTS.md`](../reference/INSERTION_POINTS.md) — marker format spec.
+- [`INSERTION_POINTS_CATALOGUE.md`](../reference/INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers.
+- [`ARCHITECTURE_WAVE_10.md`](../explanation/ARCHITECTURE_WAVE_10.md) — how the
   splice flow fits into the broader framework.
-- [`../lib/seams/generators/follow_up_generator.rb`](../lib/seams/generators/follow_up_generator.rb) — base class source, ~150 lines.
-- [`../lib/seams/generators/splicer.rb`](../lib/seams/generators/splicer.rb) — splice primitives, ~200 lines.
+- [`../lib/seams/generators/follow_up_generator.rb`](../../lib/seams/generators/follow_up_generator.rb) — base class source, ~150 lines.
+- [`../lib/seams/generators/splicer.rb`](../../lib/seams/generators/splicer.rb) — splice primitives, ~200 lines.

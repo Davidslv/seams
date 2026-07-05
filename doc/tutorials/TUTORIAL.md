@@ -6,7 +6,7 @@ order; each builds on the last.
 
 > This is a **tutorial** (learning by doing). For the per-generator
 > reference, see [GETTING_STARTED.md](GETTING_STARTED.md) and
-> [ENGINE_CATALOGUE.md](ENGINE_CATALOGUE.md).
+> [ENGINE_CATALOGUE.md](../reference/ENGINE_CATALOGUE.md).
 
 **Prerequisites:** Ruby 3.2+, Rails 7.1+ (8.x recommended), and a
 database (the default SQLite is fine for this).
@@ -97,7 +97,7 @@ Lists each engine and the events it emits and subscribes to.
 ## Where to go next
 
 - Add more product surface: `bin/seams accounts`, `bin/seams billing`,
-  `bin/seams teams` — see the [Engine Catalogue](ENGINE_CATALOGUE.md).
+  `bin/seams teams` — see the [Engine Catalogue](../reference/ENGINE_CATALOGUE.md).
 - Make a file your own (stop the generator overwriting it):
   `bin/seams resolve --eject auth/<file>`.
-- Understand the boundaries: [ARCHITECTURE.md](ARCHITECTURE.md).
+- Understand the boundaries: [ARCHITECTURE.md](../explanation/ARCHITECTURE.md).

@@ -119,7 +119,7 @@ Spectral), at `app/assets/tailwind/themes/_quire.css`. Apply it with one line in
 ```
 
 Delete the line to return to the neutral default. See
-`doc/DESIGN_SYSTEM_THEMING.md` for the full token surface and how to author your
+`doc/design-system/DESIGN_SYSTEM_THEMING.md` for the full token surface and how to author your
 own theme.
 
 ## Run the engine specs

@@ -26,12 +26,12 @@ Key facts for machine readers:
 
 - [Documentation site](https://davidslv.github.io/seams/): all guides, searchable, grouped by Diátaxis.
 - [README](https://github.com/Davidslv/seams/blob/main/README.md): overview, quick start, the engine list.
-- [Getting Started](https://github.com/Davidslv/seams/blob/main/doc/GETTING_STARTED.md): from `bundle install` to a booting host.
-- [Tutorial](https://github.com/Davidslv/seams/blob/main/doc/TUTORIAL.md): a longer guided build.
-- [Architecture](https://github.com/Davidslv/seams/blob/main/doc/ARCHITECTURE.md): the model, and why events, boundary cops, and adapters.
-- [Engine catalogue](https://github.com/Davidslv/seams/blob/main/doc/ENGINE_CATALOGUE.md): every canonical engine and what it owns.
-- [Adding an engine](https://github.com/Davidslv/seams/blob/main/doc/ADDING_AN_ENGINE.md) / [Removing an engine](https://github.com/Davidslv/seams/blob/main/doc/REMOVING_AN_ENGINE.md): task recipes.
-- [Testing](https://github.com/Davidslv/seams/blob/main/doc/TESTING.md): the test model for generated engines.
+- [Getting Started](https://github.com/Davidslv/seams/blob/main/doc/tutorials/GETTING_STARTED.md): from `bundle install` to a booting host.
+- [Tutorial](https://github.com/Davidslv/seams/blob/main/doc/tutorials/TUTORIAL.md): a longer guided build.
+- [Architecture](https://github.com/Davidslv/seams/blob/main/doc/explanation/ARCHITECTURE.md): the model, and why events, boundary cops, and adapters.
+- [Engine catalogue](https://github.com/Davidslv/seams/blob/main/doc/reference/ENGINE_CATALOGUE.md): every canonical engine and what it owns.
+- [Adding an engine](https://github.com/Davidslv/seams/blob/main/doc/how-to/ADDING_AN_ENGINE.md) / [Removing an engine](https://github.com/Davidslv/seams/blob/main/doc/how-to/REMOVING_AN_ENGINE.md): task recipes.
+- [Testing](https://github.com/Davidslv/seams/blob/main/doc/reference/TESTING.md): the test model for generated engines.
 - [API reference](https://rubydoc.info/gems/seams): YARD docs for the gem's public API.
 
 ## Contributing and policy

@@ -267,8 +267,8 @@ module Seams
         say ""
         say "  Recommended order: core -> auth -> accounts -> notifications -> billing -> teams.", :yellow
         say "  Optional: append `admin` last for an Administrate-backed admin surface.", :yellow
-        say "  See doc/CURRENT_ATTRIBUTES.md (after install) for the per-request namespace cascade.", :yellow
-        say "  See doc/WRITING_FOLLOW_UP_GENERATORS.md to write your own follow-up generator.", :yellow
+        say "  See doc/reference/CURRENT_ATTRIBUTES.md (after install) for the per-request namespace cascade.", :yellow
+        say "  See doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md to write your own follow-up generator.", :yellow
         say ""
       end
       # rubocop:enable Metrics/AbcSize, Metrics/MethodLength

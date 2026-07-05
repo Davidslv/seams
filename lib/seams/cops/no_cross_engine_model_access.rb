@@ -29,7 +29,7 @@ module RuboCop
       # would force every cross-engine read of per-request identity /
       # account / team to go through a host-defined shim, which defeats
       # the purpose of `CurrentAttributes` as a shared per-request bus.
-      # The exception is documented in `doc/CURRENT_ATTRIBUTES.md`.
+      # The exception is documented in `doc/reference/CURRENT_ATTRIBUTES.md`.
       class NoCrossEngineModelAccess < Base
         MSG = "Engine `%<own>s` must not access `%<const>s` directly. " \
               "Use an event or a %<other>s-exposed concern instead."

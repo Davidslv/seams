@@ -374,7 +374,7 @@ module Seams
       # the default, per the proposal) — it sits alongside application.css as the
       # worked proof that retheming is a token override: add one
       # `@import "themes/quire";` line and the whole app reskins. The theming
-      # guide (doc/DESIGN_SYSTEM_THEMING.md) documents it. Eject-aware.
+      # guide (doc/design-system/DESIGN_SYSTEM_THEMING.md) documents it. Eject-aware.
       def create_example_theme
         template_unless_ejected "app/assets/tailwind/themes/_quire.css",
                                 host_path("app/assets/tailwind/themes/_quire.css")
@@ -635,7 +635,7 @@ module Seams
           Retheme by overriding the @theme tokens in
           app/assets/tailwind/application.css. The example "quire" theme ships at
           app/assets/tailwind/themes/_quire.css — apply it with one line:
-          `@import "themes/quire";` (see doc/DESIGN_SYSTEM_THEMING.md).
+          `@import "themes/quire";` (see doc/design-system/DESIGN_SYSTEM_THEMING.md).
 
           Run the engine specs:
             bin/rails seams:test[design]

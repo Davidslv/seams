@@ -10,10 +10,10 @@ path. If you're the gem's author returning after a break, this is
 your map back in.
 
 For the breaking-change inventory and the upgrade procedure see
-[`UPGRADING_FROM_WAVE_8.md`](UPGRADING_FROM_WAVE_8.md). For the
-list of Wave 9 changes in chronological order, the [`CHANGELOG`](../CHANGELOG.md#wave-9--identity--account--team-rework-breaking).
-For per-engine surface-area reference, [`ENGINE_CATALOGUE.md`](ENGINE_CATALOGUE.md).
-For the cross-engine `Current` story, [`CURRENT_ATTRIBUTES.md`](CURRENT_ATTRIBUTES.md).
+[`UPGRADING_FROM_WAVE_8.md`](../how-to/UPGRADING_FROM_WAVE_8.md). For the
+list of Wave 9 changes in chronological order, the [`CHANGELOG`](../../CHANGELOG.md#wave-9--identity--account--team-rework-breaking).
+For per-engine surface-area reference, [`ENGINE_CATALOGUE.md`](../reference/ENGINE_CATALOGUE.md).
+For the cross-engine `Current` story, [`CURRENT_ATTRIBUTES.md`](../reference/CURRENT_ATTRIBUTES.md).
 
 This document is structured top-down: what seams is, the engines
 it ships, the data model that holds them together, and then the
@@ -62,7 +62,7 @@ flowchart LR
 
 `bin/seams` is a thin Ruby wrapper around `bin/rails generate
 seams:<name>` — see
-[`lib/generators/seams/install/templates/bin_seams.tt`](../lib/generators/seams/install/templates/bin_seams.tt).
+[`lib/generators/seams/install/templates/bin_seams.tt`](../../lib/generators/seams/install/templates/bin_seams.tt).
 It exists so day-to-day commands stay short (`bin/seams auth` vs
 `bin/rails generate seams:auth`) and so host docs can promise the
 six-letter form across every generator. Three flavours of subcommand:
@@ -86,7 +86,7 @@ host — it's the integration test for the gem.
 
 Wave 9 split the old monolithic `Auth::User` into three peer
 engines plus the existing supporting cast. The full engine list is
-in [`ENGINE_CATALOGUE.md`](ENGINE_CATALOGUE.md); this section
+in [`ENGINE_CATALOGUE.md`](../reference/ENGINE_CATALOGUE.md); this section
 focuses on how they relate.
 
 ```mermaid
@@ -117,8 +117,8 @@ Two kinds of edge in this graph:
   `[seams ...] missing required cross-engine dependency` error at
   boot if its peer isn't installed. Both `Accounts::Engine` and
   `Teams::Engine` enforce this against `Auth::Identity` — see
-  [`lib/generators/seams/accounts/templates/lib/engine.rb.tt`](../lib/generators/seams/accounts/templates/lib/engine.rb.tt#L33)
-  and [`lib/generators/seams/teams/templates/lib/engine.rb.tt`](../lib/generators/seams/teams/templates/lib/engine.rb.tt#L27).
+  [`lib/generators/seams/accounts/templates/lib/engine.rb.tt`](../../lib/generators/seams/accounts/templates/lib/engine.rb.tt#L33)
+  and [`lib/generators/seams/teams/templates/lib/engine.rb.tt`](../../lib/generators/seams/teams/templates/lib/engine.rb.tt#L27).
   Wave 9 added these because the old failure mode — a NULL
   `identity_id` surprise on the first query — was painful to
   debug.
@@ -126,9 +126,9 @@ Two kinds of edge in this graph:
   peer but adds extra behaviour when the peer is around. Billing's
   `Billing::Engine` only includes `Billing::Billable` into the
   configured `billable_class` if that class is loadable
-  ([`lib/engine.rb.tt`](../lib/generators/seams/billing/templates/lib/engine.rb.tt#L47)).
+  ([`lib/engine.rb.tt`](../../lib/generators/seams/billing/templates/lib/engine.rb.tt#L47)).
   Notifications attaches `BillingSubscriber` only when
-  `Billing::Engine` is defined ([`notifications/templates/lib/engine.rb.tt`](../lib/generators/seams/notifications/templates/lib/engine.rb.tt#L28)).
+  `Billing::Engine` is defined ([`notifications/templates/lib/engine.rb.tt`](../../lib/generators/seams/notifications/templates/lib/engine.rb.tt#L28)).
 
 Each engine occupies a deliberately narrow slice of responsibility.
 The headlines:
@@ -187,7 +187,7 @@ flowchart TD
 Two structural choices worth flagging. First, controllers and
 models live under the engine namespace (`app/models/auth/identity.rb`
 defines `Auth::Identity`) — `isolate_namespace Auth` in
-[`engine.rb.tt`](../lib/generators/seams/auth/templates/lib/engine.rb.tt#L4)
+[`engine.rb.tt`](../../lib/generators/seams/auth/templates/lib/engine.rb.tt#L4)
 keeps the engine routable at `/auth` without polluting the host's
 namespace. Second, `lib/auth/concerns/` is the engine's public
 surface: the cop allowlist tags `Auth::Authentication` and
@@ -278,7 +278,7 @@ Account B simultaneously. The compound unique index
 "at most one membership per (account, identity) pair", and the role
 travels on the membership row, not on the Identity. See the
 migration in
-[`db/migrate/create_accounts_memberships.rb.tt`](../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L36).
+[`db/migrate/create_accounts_memberships.rb.tt`](../../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L36).
 This is what enables the multi-tenant SaaS shapes Wave 9 was built
 for (B2C, B2B-flat, B2B-with-teams).
 
@@ -289,8 +289,8 @@ to Account" wire it themselves with a host-side migration. The
 rationale: most B2B-flat SaaS apps use Accounts but not Teams; most
 team-as-tenant apps use Teams but not Accounts; and the few that
 need both want the wiring on their terms. See
-[`teams/templates/app/models/membership.rb.tt`](../lib/generators/seams/teams/templates/app/models/membership.rb.tt)
-and the Wave-9 design note in [`UPGRADING_FROM_WAVE_8.md`](UPGRADING_FROM_WAVE_8.md#removed-teamsteamable).
+[`teams/templates/app/models/membership.rb.tt`](../../lib/generators/seams/teams/templates/app/models/membership.rb.tt)
+and the Wave-9 design note in [`UPGRADING_FROM_WAVE_8.md`](../how-to/UPGRADING_FROM_WAVE_8.md#removed-teamsteamable).
 
 **System actor is a Membership with `identity_id IS NULL`.** Audit
 logs and event payloads need a valid actor reference even when no
@@ -303,7 +303,7 @@ actor per Account" at the DB level — Wave 9 caught that the
 existing `(account_id, identity_id)` compound index couldn't
 prevent two `(account_id, NULL)` rows because Postgres treats
 NULLs as distinct in unique indexes. The fix is in
-[`db/migrate/create_accounts_memberships.rb.tt`](../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L45).
+[`db/migrate/create_accounts_memberships.rb.tt`](../../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L45).
 
 The transactional creation path that wires this together is
 `Accounts::Account.create_with_owner` — every demo row, every
@@ -340,7 +340,7 @@ system actor but no owner, or vice versa. Events fire
 `after_create_commit`, *outside* the transaction, so a slow
 subscriber doesn't hold the AccountsMemberships table lock and a
 raising subscriber doesn't roll back the persisted rows.
-[`accounts/templates/app/models/account.rb.tt`](../lib/generators/seams/accounts/templates/app/models/account.rb.tt#L69)
+[`accounts/templates/app/models/account.rb.tt`](../../lib/generators/seams/accounts/templates/app/models/account.rb.tt#L69)
 is the canonical implementation; the seams-example
 [`db/seeds.rb`](https://github.com/Davidslv/seams-example) walks the same
 path.
@@ -392,16 +392,16 @@ Three details worth grounding in the code.
 
 **Order matters.** `Accounts::Current.account=` reads
 `Auth::Current.identity` to derive the matching Membership — see
-[`accounts/templates/app/models/current.rb.tt`](../lib/generators/seams/accounts/templates/app/models/current.rb.tt#L22).
+[`accounts/templates/app/models/current.rb.tt`](../../lib/generators/seams/accounts/templates/app/models/current.rb.tt#L22).
 If you set Account before Identity, `Accounts::Current.membership`
 silently stays `nil` and every authorisation check fails closed.
 The canonical wiring order documented in
-[`CURRENT_ATTRIBUTES.md`](CURRENT_ATTRIBUTES.md#cascade-order) is
+[`CURRENT_ATTRIBUTES.md`](../reference/CURRENT_ATTRIBUTES.md#cascade-order) is
 `Auth::Authentication` → `Core::HasCurrentAttributes` →
 `Accounts::Authorization`, and the order is enforced socially by
 the host's `ApplicationController` — Wave 9 documented it because
 mis-ordering was the cause of three of the eight Phase 6a fixes in
-the [CHANGELOG](../CHANGELOG.md#fixed).
+the [CHANGELOG](../../CHANGELOG.md#fixed).
 
 **Cross-engine reads are intentional, writes are not.** The
 `Seams/NoCrossEngineModelAccess` cop normally flags any reference
@@ -411,7 +411,7 @@ shared per-request bus, and forbidding cross-engine reads of it
 would force every cross-engine identity / account / team lookup to
 go through a host-defined shim. The cop's `DEFAULT_IGNORED_LEAF_NAMES`
 list in
-[`lib/seams/cops/no_cross_engine_model_access.rb`](../lib/seams/cops/no_cross_engine_model_access.rb#L37)
+[`lib/seams/cops/no_cross_engine_model_access.rb`](../../lib/seams/cops/no_cross_engine_model_access.rb#L37)
 includes `Current` for exactly that reason.
 
 **Each engine owns its own namespace.** A host that doesn't install
@@ -513,7 +513,7 @@ The publisher API has two attach modes worth knowing:
   object on every reload and the block keeps calling the *old*
   one — edits to the subscriber's methods are invisible until a
   full server restart. See
-  [`lib/seams/events/publisher.rb#L72`](../lib/seams/events/publisher.rb#L72).
+  [`lib/seams/events/publisher.rb#L72`](../../lib/seams/events/publisher.rb#L72).
 - **`attach_class(key, event_name, class_name:, method_name:)`** —
   the reload-safe form. Stores the subscriber class as a STRING
   name and re-resolves `Object.const_get(class_name)` on every
@@ -523,14 +523,14 @@ The publisher API has two attach modes worth knowing:
   (`Notifications::AuthSubscriber.attach!`,
   `Notifications::BillingSubscriber.attach!`,
   `Teams::InvitationSubscriber.attach!`). See
-  [`lib/seams/events/publisher.rb#L101`](../lib/seams/events/publisher.rb#L101).
+  [`lib/seams/events/publisher.rb#L101`](../../lib/seams/events/publisher.rb#L101).
 
 The `EventRegistry` is the source of truth for "what events does
 this app emit". Each engine's `register_events` initializer adds
 its names; `Publisher.publish` consults the registry and raises
 `UnregisteredEventError` if the caller publishes an event no engine
 declared. The orphan-subscription check
-([`bin/audit`](../bin/audit) runs it pre-push) walks every
+([`bin/audit`](../../bin/audit) runs it pre-push) walks every
 subscription and lists names that no engine has registered as
 emitted — catches typos before they ship.
 
@@ -583,7 +583,7 @@ The phases at a glance:
    own `.rubocop.yml` to allowlist concerns the engine intentionally
    exposes (e.g. Auth allows `Auth::Authenticatable` and
    `Auth::Authentication`) — see
-   [`auth_generator.rb#L180`](../lib/generators/seams/auth/auth_generator.rb#L180).
+   [`auth_generator.rb#L180`](../../lib/generators/seams/auth/auth_generator.rb#L180).
 4. **Dummy app.** `Seams::Generators::DummyAppWriter.write!` lays
    down a slim `spec/dummy/` Rails app inside the engine so the
    engine's specs can boot Rails and run against a real Postgres
@@ -591,7 +591,7 @@ The phases at a glance:
    environment.rb, database.yml, secret_key.rb, ApplicationRecord,
    ApplicationController, ApplicationMailer, schema.rb) comes from
    the writer; the engine supplies the schema body. See
-   [`lib/seams/generators/dummy_app_writer.rb`](../lib/seams/generators/dummy_app_writer.rb).
+   [`lib/seams/generators/dummy_app_writer.rb`](../../lib/seams/generators/dummy_app_writer.rb).
 5. **Host wiring.** `HostInjector` mixes idempotent edits into the
    host: `host_inject_gem`, `host_inject_mount`,
    `host_inject_include_in_user`,
@@ -600,7 +600,7 @@ The phases at a glance:
    yellow `skip` line if the target file is missing. The user-model
    helper is a best-effort no-op post-Wave-9 because the canonical
    demo doesn't ship `app/models/user.rb`. See
-   [`lib/seams/generators/host_injector.rb`](../lib/seams/generators/host_injector.rb).
+   [`lib/seams/generators/host_injector.rb`](../../lib/seams/generators/host_injector.rb).
 6. **Post-install message.** `report_summary` prints "next steps" —
    `bundle install`, `bin/rails db:migrate`, run the engine specs.
    These are the only intentionally human-readable bits of generator
@@ -611,7 +611,7 @@ re-run** — `force: true` reapplies templates without prompting.
 And generators are **independently maintainable** — each engine's
 generator is a single file under `lib/generators/seams/<name>/<name>_generator.rb`,
 and adding an engine means adding one directory plus an entry in
-[`bin/seams`](../lib/generators/seams/install/templates/bin_seams.tt#L16).
+[`bin/seams`](../../lib/generators/seams/install/templates/bin_seams.tt#L16).
 
 ---
 
@@ -656,7 +656,7 @@ sequenceDiagram
 The transactional shape matters. The `Auth::Identity` row, the
 encrypted email, the bcrypt password digest, and the initial
 `Auth::Session` row are all created inside one DB transaction in
-[`register_identity.rb.tt`](../lib/generators/seams/auth/templates/app/services/register_identity.rb.tt#L31).
+[`register_identity.rb.tt`](../../lib/generators/seams/auth/templates/app/services/register_identity.rb.tt#L31).
 The event fires *after* the transaction commits, so a subscriber
 that queues a job can rely on the rows being readable from the job
 worker. The job pattern is the firewall — `AuthSubscriber` never
@@ -712,16 +712,16 @@ clash; the column went away with it, and the reset flow now leans
 on `has_secure_password`'s built-in signed-id helpers
 (`#password_reset_token` and `Identity.find_by_password_reset_token`).
 See
-[`reset_password.rb.tt`](../lib/generators/seams/auth/templates/app/services/reset_password.rb.tt)
+[`reset_password.rb.tt`](../../lib/generators/seams/auth/templates/app/services/reset_password.rb.tt)
 and the ROADMAP item describing the rationale (Wave 9 scope, line
 33).
 
 The "don't leak which emails are registered" pattern is in
-[`password_resets_controller.rb.tt`](../lib/generators/seams/auth/templates/app/controllers/password_resets_controller.rb.tt#L19) —
+[`password_resets_controller.rb.tt`](../../lib/generators/seams/auth/templates/app/controllers/password_resets_controller.rb.tt#L19) —
 the controller returns the same flash message whether the email was
 known or not, and `Auth::Identity.authenticate` does a dummy bcrypt
 hash on email-misses so the timing is constant
-([`identity.rb.tt#L49`](../lib/generators/seams/auth/templates/app/models/identity.rb.tt#L49)).
+([`identity.rb.tt#L49`](../../lib/generators/seams/auth/templates/app/models/identity.rb.tt#L49)).
 
 ---
 
@@ -784,7 +784,7 @@ transaction, the controller catches it, and returns 200 without
 re-publishing. Without the unique index a transient handler bug
 would publish the same canonical event twice and the notifications
 subscriber would create two welcome rows. See
-[`webhooks_controller.rb.tt#L56`](../lib/generators/seams/billing/templates/app/controllers/webhooks_controller.rb.tt#L56).
+[`webhooks_controller.rb.tt#L56`](../../lib/generators/seams/billing/templates/app/controllers/webhooks_controller.rb.tt#L56).
 
 **The notification owner is the Account, not the human.** Wave 9
 flipped the `Billing.configuration.billable_class` default from
@@ -794,14 +794,14 @@ billing relationship. The `BillingSubscriber.enqueue` method reads
 `Billing.configuration.billable_class` to find the right
 `owner_class_name` and looks up the row by the `account_id` that
 every Wave-9 billing payload carries. See
-[`billing_subscriber.rb.tt#L99`](../lib/generators/seams/notifications/templates/app/subscribers/billing_subscriber.rb.tt#L99).
+[`billing_subscriber.rb.tt#L99`](../../lib/generators/seams/notifications/templates/app/subscribers/billing_subscriber.rb.tt#L99).
 
 **The polymorphic `owner_id` column is a string.** Wave 9 caught
 that `notifications.owner_id` was bigint, which silently coerced
 UUIDs to 0 — every billing notification was being attached to "the
 Account whose UUID happened to coerce to 0", which is no
 account. The migration in
-[`create_notifications.rb.tt#L22`](../lib/generators/seams/notifications/templates/db/migrate/create_notifications.rb.tt#L22)
+[`create_notifications.rb.tt#L22`](../../lib/generators/seams/notifications/templates/db/migrate/create_notifications.rb.tt#L22)
 declares `owner_id` as `string`, so the column accommodates both
 bigint Identity IDs and UUID Account IDs. Active Record's
 polymorphic association casts the parameter to text in the prepared
@@ -856,13 +856,13 @@ polymorphic Notification owner. The rationale: a single human
 should be able to opt out of all email notifications across every
 Account they belong to, regardless of which Account a given
 Notification is addressed to. The `Notifications::NotificationPreference#enabled?`
-class method ([`notification_preference.rb.tt#L23`](../lib/generators/seams/notifications/templates/app/models/notification_preference.rb.tt#L23))
+class method ([`notification_preference.rb.tt#L23`](../../lib/generators/seams/notifications/templates/app/models/notification_preference.rb.tt#L23))
 takes `identity_id`, `channel`, and an optional `notification_type`,
 falls back to a row with `notification_type: nil` if the type-specific
 row is absent, and returns `true` (enabled) when no row exists at all
 — "absent means use defaults".
 
-The polymorphic `owner` on `Notification` ([`notification.rb.tt#L18`](../lib/generators/seams/notifications/templates/app/models/notification.rb.tt#L18))
+The polymorphic `owner` on `Notification` ([`notification.rb.tt#L18`](../../lib/generators/seams/notifications/templates/app/models/notification.rb.tt#L18))
 means any model can own a notification: an Identity (welcome
 email), an Account (paid-invoice receipt), a host model (a custom
 "project archived" template). The `Notifications::Notifiable`
@@ -871,7 +871,7 @@ concern is optional sugar for the receiving side — it adds a
 helper. Hosts that include the concern on their own User model
 override `notification_preference_identity_id` to point preference
 lookups at the right Identity ID
-([`notifiable.rb.tt#L99`](../lib/generators/seams/notifications/templates/lib/concerns/notifiable.rb.tt#L99)).
+([`notifiable.rb.tt#L99`](../../lib/generators/seams/notifications/templates/lib/concerns/notifiable.rb.tt#L99)).
 
 ---
 
@@ -908,7 +908,7 @@ flowchart TD
 ```
 
 The cop's source is
-[`lib/seams/cops/no_cross_engine_model_access.rb`](../lib/seams/cops/no_cross_engine_model_access.rb).
+[`lib/seams/cops/no_cross_engine_model_access.rb`](../../lib/seams/cops/no_cross_engine_model_access.rb).
 The exemption list (`DEFAULT_IGNORED_LEAF_NAMES`) is on line 37; the
 suffix list (`DEFAULT_IGNORED_LEAF_SUFFIXES` — `Controller`, `Job`,
 `Mailer`, `Helper`, `Component`, `Channel`, `Engine`) on line 50.
@@ -920,7 +920,7 @@ The application-layer-integrity model. There are no DB-level FKs
 across engines. `accounts_memberships.identity_id` references
 `auth_identities.id` semantically but has no FK constraint — see
 the migration comment at
-[`create_accounts_memberships.rb.tt#L20`](../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L20).
+[`create_accounts_memberships.rb.tt#L20`](../../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L20).
 The rationale is that engines might end up in different Postgres
 schemas or even different databases in production (a future "split
 the auth engine onto its own DB" refactor shouldn't require
@@ -975,7 +975,7 @@ flowchart TD
 app, connect to a per-engine Postgres database
 (`<engine>_dummy_test`), load the engine's schema, and run model /
 controller / mailer specs. The dummy app is itself written by
-`Seams::Generators::DummyAppWriter` ([`lib/seams/generators/dummy_app_writer.rb`](../lib/seams/generators/dummy_app_writer.rb))
+`Seams::Generators::DummyAppWriter` ([`lib/seams/generators/dummy_app_writer.rb`](../../lib/seams/generators/dummy_app_writer.rb))
 during `seams:<engine>` generation, so an engine's `spec/dummy/`
 mirrors what its host would look like at minimum. Each engine's
 schema is the canonical migration set translated into a single
@@ -997,9 +997,9 @@ excluded from the default `bundle exec rspec` run; `bin/audit` runs
 it last unless `--fast` is passed. This is the only spec in the
 repo that proves the generated engines actually boot in a real
 Rails application — see
-[`spec/integration_full/README.md`](../spec/integration_full/README.md).
+[`spec/integration_full/README.md`](../../spec/integration_full/README.md).
 
-`bin/audit` ([`bin/audit`](../bin/audit)) is the single pre-push
+`bin/audit` ([`bin/audit`](../../bin/audit)) is the single pre-push
 verification command. It chains: rubocop → rspec (default suite) →
 bundle-audit → brakeman → publisher orphan-subscriptions →
 integration_full. Pre-push git hook calls it; CI runs the same
@@ -1013,7 +1013,7 @@ checks via parallel jobs.
 the canonical post-Wave-9 host. It's a regular Rails app with
 `engines/{auth, accounts, billing, core, notifications, teams}/`
 and the host wired into all six. Wave 9 regenerated the demo from
-scratch (Phase 3b — see the [`CHANGELOG`](../CHANGELOG.md#wave-9--identity--account--team-rework-breaking))
+scratch (Phase 3b — see the [`CHANGELOG`](../../CHANGELOG.md#wave-9--identity--account--team-rework-breaking))
 so it reflects the Identity / Account / Team shape end-to-end.
 
 The shortest tour is `db/seeds.rb`. Running `bin/rails db:seed`
@@ -1101,34 +1101,34 @@ Where to find each piece of Wave 9 functionality, by claim:
 
 | Claim                                    | File path |
 | ---                                      | ---       |
-| Identity / Session / API token shape     | [`lib/generators/seams/auth/templates/app/models/`](../lib/generators/seams/auth/templates/app/models/) |
-| Account.create_with_owner transaction    | [`lib/generators/seams/accounts/templates/app/models/account.rb.tt#L69`](../lib/generators/seams/accounts/templates/app/models/account.rb.tt#L69) |
-| One system actor per Account (DB)        | [`lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L45`](../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L45) |
-| `Accounts::Current.account=` cascade     | [`lib/generators/seams/accounts/templates/app/models/current.rb.tt#L22`](../lib/generators/seams/accounts/templates/app/models/current.rb.tt#L22) |
-| `Auth::Current` perimeter                | [`lib/generators/seams/auth/templates/lib/concerns/authentication.rb.tt#L52`](../lib/generators/seams/auth/templates/lib/concerns/authentication.rb.tt#L52) |
-| Reload-safe subscriber attach             | [`lib/seams/events/publisher.rb#L101`](../lib/seams/events/publisher.rb#L101) |
-| Boundary cop's `Current` exemption        | [`lib/seams/cops/no_cross_engine_model_access.rb#L37`](../lib/seams/cops/no_cross_engine_model_access.rb#L37) |
-| AccountScoped fail-closed default        | [`lib/generators/seams/accounts/templates/lib/concerns/account_scoped.rb.tt#L67`](../lib/generators/seams/accounts/templates/lib/concerns/account_scoped.rb.tt#L67) |
-| Notifications.owner_id is string         | [`lib/generators/seams/notifications/templates/db/migrate/create_notifications.rb.tt#L22`](../lib/generators/seams/notifications/templates/db/migrate/create_notifications.rb.tt#L22) |
-| Billing webhook idempotency               | [`lib/generators/seams/billing/templates/app/controllers/webhooks_controller.rb.tt#L56`](../lib/generators/seams/billing/templates/app/controllers/webhooks_controller.rb.tt#L56) |
-| BillingSubscriber resolves account_id    | [`lib/generators/seams/notifications/templates/app/subscribers/billing_subscriber.rb.tt#L99`](../lib/generators/seams/notifications/templates/app/subscribers/billing_subscriber.rb.tt#L99) |
-| Engine boot dependency assertion          | [`lib/generators/seams/accounts/templates/lib/engine.rb.tt#L33`](../lib/generators/seams/accounts/templates/lib/engine.rb.tt#L33), [`teams/templates/lib/engine.rb.tt#L27`](../lib/generators/seams/teams/templates/lib/engine.rb.tt#L27) |
-| Dummy app writer                          | [`lib/seams/generators/dummy_app_writer.rb`](../lib/seams/generators/dummy_app_writer.rb) |
-| Host injector helpers                     | [`lib/seams/generators/host_injector.rb`](../lib/seams/generators/host_injector.rb) |
+| Identity / Session / API token shape     | [`lib/generators/seams/auth/templates/app/models/`](../../lib/generators/seams/auth/templates/app/models/) |
+| Account.create_with_owner transaction    | [`lib/generators/seams/accounts/templates/app/models/account.rb.tt#L69`](../../lib/generators/seams/accounts/templates/app/models/account.rb.tt#L69) |
+| One system actor per Account (DB)        | [`lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L45`](../../lib/generators/seams/accounts/templates/db/migrate/create_accounts_memberships.rb.tt#L45) |
+| `Accounts::Current.account=` cascade     | [`lib/generators/seams/accounts/templates/app/models/current.rb.tt#L22`](../../lib/generators/seams/accounts/templates/app/models/current.rb.tt#L22) |
+| `Auth::Current` perimeter                | [`lib/generators/seams/auth/templates/lib/concerns/authentication.rb.tt#L52`](../../lib/generators/seams/auth/templates/lib/concerns/authentication.rb.tt#L52) |
+| Reload-safe subscriber attach             | [`lib/seams/events/publisher.rb#L101`](../../lib/seams/events/publisher.rb#L101) |
+| Boundary cop's `Current` exemption        | [`lib/seams/cops/no_cross_engine_model_access.rb#L37`](../../lib/seams/cops/no_cross_engine_model_access.rb#L37) |
+| AccountScoped fail-closed default        | [`lib/generators/seams/accounts/templates/lib/concerns/account_scoped.rb.tt#L67`](../../lib/generators/seams/accounts/templates/lib/concerns/account_scoped.rb.tt#L67) |
+| Notifications.owner_id is string         | [`lib/generators/seams/notifications/templates/db/migrate/create_notifications.rb.tt#L22`](../../lib/generators/seams/notifications/templates/db/migrate/create_notifications.rb.tt#L22) |
+| Billing webhook idempotency               | [`lib/generators/seams/billing/templates/app/controllers/webhooks_controller.rb.tt#L56`](../../lib/generators/seams/billing/templates/app/controllers/webhooks_controller.rb.tt#L56) |
+| BillingSubscriber resolves account_id    | [`lib/generators/seams/notifications/templates/app/subscribers/billing_subscriber.rb.tt#L99`](../../lib/generators/seams/notifications/templates/app/subscribers/billing_subscriber.rb.tt#L99) |
+| Engine boot dependency assertion          | [`lib/generators/seams/accounts/templates/lib/engine.rb.tt#L33`](../../lib/generators/seams/accounts/templates/lib/engine.rb.tt#L33), [`teams/templates/lib/engine.rb.tt#L27`](../../lib/generators/seams/teams/templates/lib/engine.rb.tt#L27) |
+| Dummy app writer                          | [`lib/seams/generators/dummy_app_writer.rb`](../../lib/seams/generators/dummy_app_writer.rb) |
+| Host injector helpers                     | [`lib/seams/generators/host_injector.rb`](../../lib/seams/generators/host_injector.rb) |
 
 ### "Start here" reading order for a fresh engineer
 
-1. [`README.md`](../README.md) — the one-paragraph pitch + the Quick Start.
+1. [`README.md`](../../README.md) — the one-paragraph pitch + the Quick Start.
 2. **This document** — ARCHITECTURE_WAVE_9.md, the full system
    walk-through.
 3. [`ARCHITECTURE_WAVE_10.md`](ARCHITECTURE_WAVE_10.md) — the
    Wave 10 addendum: insertion points, follow-up generators, and
    the `bin/seams resolve` escape hatch.
-4. [`ENGINE_CATALOGUE.md`](ENGINE_CATALOGUE.md) — per-engine
+4. [`ENGINE_CATALOGUE.md`](../reference/ENGINE_CATALOGUE.md) — per-engine
    surface area as a reference.
-5. [`CURRENT_ATTRIBUTES.md`](CURRENT_ATTRIBUTES.md) — the
+5. [`CURRENT_ATTRIBUTES.md`](../reference/CURRENT_ATTRIBUTES.md) — the
    per-request cascade, in detail.
-6. [`UPGRADING_FROM_WAVE_8.md`](UPGRADING_FROM_WAVE_8.md) — only
+6. [`UPGRADING_FROM_WAVE_8.md`](../how-to/UPGRADING_FROM_WAVE_8.md) — only
    if you're maintaining a host that adopted seams pre-Wave-9.
 7. [`seams-example/README.md`](https://github.com/Davidslv/seams-example) —
    the canonical demo's overview.

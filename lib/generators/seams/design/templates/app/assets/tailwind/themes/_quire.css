@@ -13,7 +13,7 @@
        @import "themes/quire";
 
    To go back to the neutral default, delete that line. That is the entire
-   retheme surface. See doc/DESIGN_SYSTEM_THEMING.md.
+   retheme surface. See doc/design-system/DESIGN_SYSTEM_THEMING.md.
 
    Lineage: this is quire-saas's original Compositor palette + type pairing, the
    design system this engine was extracted from. --------------------------- */

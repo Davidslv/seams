@@ -2,7 +2,13 @@
 // collection at build time. The docs are NOT moved or duplicated in
 // git — this script copies them into src/content/docs/ (gitignored)
 // just before `astro build`, injecting the frontmatter Starlight needs
-// and rewriting the few links that point outside doc/.
+// and rewriting links so they keep resolving.
+//
+// The repo organises doc/ into Diátaxis folders (tutorials/, how-to/,
+// reference/, design-system/, explanation/); the site FLATTENS them so
+// every published URL predates the folders and never changes. Links are
+// resolved per source file, so cross-folder references land on the
+// right flattened page.
 //
 // Run automatically by `npm run dev` / `npm run build` (see the
 // pre* scripts in package.json).
@@ -16,22 +22,19 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const docDir = path.join(repoRoot, "doc");
 const outDir = path.join(__dirname, "..", "src", "content", "docs");
 
-// Internal/working docs that don't belong on the public site.
-const EXCLUDE = new Set([
-  "SEAMS-NEW-HANDOFF.md",
-  "REVIEW_2026_05_08.md",
-]);
+// doc/ subdirectories that hold public pages (flattened on the site).
+const CONTENT_DIRS = ["tutorials", "how-to", "reference", "design-system", "explanation"];
 
-// Root-level files that live outside doc/ — link to them on GitHub.
+// Internal/working docs that don't belong on the public site.
+// doc/internal/ is skipped wholesale; this covers strays at other levels.
+const EXCLUDE = new Set(["REVIEW_2026_05_08.md"]);
+
+// Anything living outside doc/ is linked on GitHub.
 const GH_BLOB = "https://github.com/Davidslv/seams/blob/main";
-const ROOT_FILES = [
-  "CONTRIBUTING.md",
-  "SECURITY.md",
-  "CODE_OF_CONDUCT.md",
-  "CHANGELOG.md",
-  "RELEASING.md",
-  "LICENSE",
-];
+
+// Must match `base` in astro.config.mjs. Starlight's page slug is the
+// content filename lowercased (INSERTION_POINTS.md -> insertion_points).
+const BASE = "/seams";
 
 function titleFrom(markdown, fallback) {
   const m = markdown.match(/^#\s+(.+?)\s*$/m);
@@ -52,35 +55,53 @@ function frontmatter(title) {
   return `---\ntitle: "${yamlEscape(title)}"\n---\n\n`;
 }
 
-// Rewrite links that would 404 on the site:
-//  - ../FOO or FOO at repo root (LICENSE, CONTRIBUTING, ...) -> GitHub blob URL
-//  - doc/FOO.md (used by README) -> ./FOO.md
-//  - bare relative FOO.md -> ./FOO.md so Astro resolves it to the page URL
-//    (Astro only auto-resolves Markdown links that start with ./ or ../).
-function rewriteLinks(markdown) {
-  let out = markdown;
-  for (const f of ROOT_FILES) {
-    out = out.replaceAll(`](../${f})`, `](${GH_BLOB}/${f})`);
-    out = out.replaceAll(`](${f})`, `](${GH_BLOB}/${f})`);
-  }
-  // README points into doc/; on the site those pages are siblings.
-  out = out.replaceAll("](doc/", "](./");
-  // Prefix bare relative .md links (no scheme, not already ./ ../ / #) so
-  // Astro rewrites them to the built page URL and they stop 404-ing.
-  out = out.replace(
-    /\]\((?!https?:|\/|\.\/|\.\.\/|#|mailto:)([^)\s]+\.md)(#[^)]*)?\)/g,
-    "](./$1$2)",
-  );
-  return out;
+// Rewrite every relative link so it resolves on the flattened site:
+//  - a link to another doc page (any doc/ subfolder) -> the final page
+//    URL (/seams/<slug>/). Astro does NOT resolve `./FOO.md` links in
+//    content — they used to ship raw and 404 — so emit real URLs.
+//  - a link to an ADR -> /seams/adr/<slug>/ (adr keeps its subdirectory)
+//  - a link that leaves doc/ (../../CHANGELOG.md, ../../lib/...) -> GitHub
+// srcDirRel is the source file's directory relative to the repo root
+// (e.g. "doc/reference").
+function rewriteLinks(markdown, srcDirRel) {
+  const LINK = /\]\((?!https?:|mailto:|#|\/)([^)\s]+?)(#[^)]*)?\)/g;
+  return markdown.replace(LINK, (whole, target, frag = "") => {
+    // A handful of docs use repo-root-style targets (doc/..., lib/...).
+    const repoRel = target.startsWith("doc/") || target.startsWith("lib/") || target.startsWith("spec/")
+      ? path.posix.normalize(target)
+      : path.posix.normalize(path.posix.join(srcDirRel, target));
+    if (repoRel.startsWith("..")) return whole; // escapes the repo; leave it
+    if (!repoRel.startsWith("doc/") || !repoRel.endsWith(".md")) {
+      return `](${GH_BLOB}/${repoRel}${frag})`;
+    }
+    const slug = path.posix.basename(repoRel, ".md").toLowerCase();
+    const dir = repoRel.startsWith("doc/adr/") ? "adr/" : "";
+    return `](${BASE}/${dir}${slug}/${frag})`;
+  });
 }
 
 async function emit(srcPath, destName, fallbackTitle) {
   const raw = await fs.readFile(srcPath, "utf8");
   const title = titleFrom(raw, fallbackTitle);
-  const body = rewriteLinks(stripFirstH1(raw));
+  const srcDirRel = path
+    .relative(repoRoot, path.dirname(srcPath))
+    .split(path.sep)
+    .join("/");
+  const body = rewriteLinks(stripFirstH1(raw), srcDirRel);
   const dest = path.join(outDir, destName);
   await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.writeFile(dest, frontmatter(title) + body);
+}
+
+async function syncDir(dir) {
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    if (EXCLUDE.has(entry.name)) continue;
+    // Flatten: the page keeps its filename (and therefore its URL),
+    // whatever folder it lives in.
+    await emit(path.join(dir, entry.name), entry.name, entry.name.replace(/\.md$/, ""));
+  }
 }
 
 async function run() {
@@ -95,12 +116,11 @@ async function run() {
     path.join(outDir, "index.mdx"),
   );
 
-  // Every top-level doc, preserving filename case so relative .md links
-  // between docs keep resolving.
-  for (const entry of await fs.readdir(docDir, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-    if (EXCLUDE.has(entry.name)) continue;
-    await emit(path.join(docDir, entry.name), entry.name, entry.name.replace(/\.md$/, ""));
+  // Top-level strays (doc/README.md, anything not yet folderised) plus
+  // the Diátaxis content folders, all flattened to top-level pages.
+  await syncDir(docDir);
+  for (const sub of CONTENT_DIRS) {
+    await syncDir(path.join(docDir, sub));
   }
 
   // The ADR log (doc/adr/*.md) under an adr/ subdir, if present.

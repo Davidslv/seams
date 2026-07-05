@@ -209,7 +209,7 @@ authorization pattern (the platform/tenant policy split) rather than
 new domain models. The framework selection (Administrate over
 ActiveAdmin, Avo, Trestle, Motor, RailsAdmin) is recorded in
 `proposals/archive/admin_engine_administrate-accomplished.md`.
-Full walk-through: [ARCHITECTURE_WAVE_11.md](ARCHITECTURE_WAVE_11.md).
+Full walk-through: [ARCHITECTURE_WAVE_11.md](../explanation/ARCHITECTURE_WAVE_11.md).
 
 ## Design
 
@@ -231,12 +231,12 @@ Design is the only **non-isolated** canonical engine: its partials and
 helpers are host-wide by design (D4 in the proposal). Tailwind v4 is a
 hard dependency (D2) — retheming is a token override, demonstrated by
 the example `_quire.css` theme. See
-[DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) and its companions
-([foundations](DESIGN_SYSTEM_FOUNDATIONS.md),
-[components](DESIGN_SYSTEM_COMPONENTS.md),
-[forms](DESIGN_SYSTEM_FORMS.md),
-[theming](DESIGN_SYSTEM_THEMING.md),
-[accessibility](DESIGN_SYSTEM_ACCESSIBILITY.md)).
+[DESIGN_SYSTEM.md](../design-system/DESIGN_SYSTEM.md) and its companions
+([foundations](../design-system/DESIGN_SYSTEM_FOUNDATIONS.md),
+[components](../design-system/DESIGN_SYSTEM_COMPONENTS.md),
+[forms](../design-system/DESIGN_SYSTEM_FORMS.md),
+[theming](../design-system/DESIGN_SYSTEM_THEMING.md),
+[accessibility](../design-system/DESIGN_SYSTEM_ACCESSIBILITY.md)).
 
 ## Pulling them together
 
@@ -265,7 +265,7 @@ end
 Order matters: `Auth::Authentication` must be included BEFORE
 `Core::HasCurrentAttributes` and `Accounts::Authorization` so
 `Auth::Current.identity` is bound before the other engines read it.
-See [doc/CURRENT_ATTRIBUTES.md](CURRENT_ATTRIBUTES.md) for the full
+See [doc/reference/CURRENT_ATTRIBUTES.md](CURRENT_ATTRIBUTES.md) for the full
 cascade order.
 
 Hosts that want a domain-specific User can keep one and mix the

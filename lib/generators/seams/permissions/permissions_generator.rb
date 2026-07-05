@@ -70,7 +70,7 @@ module Seams
           To fully own this file (skip it on future generator runs):
             bin/seams resolve --eject (or add the `# seams:ejected from` header).
 
-          See doc/PERMISSIONS.md for the model, the role hierarchy, the bypass
+          See doc/reference/PERMISSIONS.md for the model, the role hierarchy, the bypass
           tiers, and what is deliberately deferred (YAML DSL, DB custom roles,
           per-ability grants).
 

@@ -153,8 +153,8 @@ role that should hold it.
 **Ejecting.** The initializer is eject-aware. A re-run of the generator
 leaves it alone once it carries the `# seams:ejected from` header, so
 your edits survive regeneration. Stamp the header to fully own the file
-(see [doc/INSERTION_POINTS.md](INSERTION_POINTS.md) and the eject CLI in
-[doc/ARCHITECTURE_WAVE_10.md](ARCHITECTURE_WAVE_10.md)).
+(see [doc/reference/INSERTION_POINTS.md](INSERTION_POINTS.md) and the eject CLI in
+[doc/explanation/ARCHITECTURE_WAVE_10.md](../explanation/ARCHITECTURE_WAVE_10.md)).
 
 ## Using `authorize_permission!`
 
@@ -191,7 +191,7 @@ membership role, then adds a per-record tenant guard
 account's record by id-tampering. The **platform** policies
 (`Admin::Platform::*Policy`) gate on `staff?` instead, because platform
 admin is the cross-tenant power. See
-[doc/ARCHITECTURE_WAVE_11.md](ARCHITECTURE_WAVE_11.md).
+[doc/explanation/ARCHITECTURE_WAVE_11.md](../explanation/ARCHITECTURE_WAVE_11.md).
 
 ## Deliberately deferred
 
@@ -215,8 +215,8 @@ whole layer.
 
 ## See also
 
-- [doc/CURRENT_ATTRIBUTES.md](CURRENT_ATTRIBUTES.md) — where the
+- [doc/reference/CURRENT_ATTRIBUTES.md](CURRENT_ATTRIBUTES.md) — where the
   per-request membership (and its role) comes from.
-- [doc/ARCHITECTURE_WAVE_11.md](ARCHITECTURE_WAVE_11.md) — the admin
+- [doc/explanation/ARCHITECTURE_WAVE_11.md](../explanation/ARCHITECTURE_WAVE_11.md) — the admin
   engine + how its policies consume permissions.
 - `spec/seams/authorization_spec.rb` — the access-rule regression matrix.

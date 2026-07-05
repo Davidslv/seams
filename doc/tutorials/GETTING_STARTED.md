@@ -138,12 +138,12 @@ of them in parallel (one job per engine).
 
 ## Next steps
 
-- [ADDING_AN_ENGINE.md](ADDING_AN_ENGINE.md) — Build your own engine on top of the generic generator.
-- [WRITING_AN_ADAPTER.md](WRITING_AN_ADAPTER.md) — Swap in Mailgun, Twilio, Paddle, etc.
-- [ENGINE_CATALOGUE.md](ENGINE_CATALOGUE.md) — The canonical engines in detail.
-- [PERMISSIONS.md](PERMISSIONS.md) — Role → ability grant map and `authorize_permission!`.
-- [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) — The design engine: components, tokens, theming.
-- [ARCHITECTURE_WAVE_11.md](ARCHITECTURE_WAVE_11.md) — The admin engine.
-- [CURRENT_ATTRIBUTES.md](CURRENT_ATTRIBUTES.md) — Per-request namespaces (Auth::Current, Accounts::Current, Teams::Current).
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Why Seams is built this way.
-- [UPGRADING_FROM_WAVE_8.md](UPGRADING_FROM_WAVE_8.md) — If you adopted seams pre-Wave-9.
+- [ADDING_AN_ENGINE.md](../how-to/ADDING_AN_ENGINE.md) — Build your own engine on top of the generic generator.
+- [WRITING_AN_ADAPTER.md](../how-to/WRITING_AN_ADAPTER.md) — Swap in Mailgun, Twilio, Paddle, etc.
+- [ENGINE_CATALOGUE.md](../reference/ENGINE_CATALOGUE.md) — The canonical engines in detail.
+- [PERMISSIONS.md](../reference/PERMISSIONS.md) — Role → ability grant map and `authorize_permission!`.
+- [DESIGN_SYSTEM.md](../design-system/DESIGN_SYSTEM.md) — The design engine: components, tokens, theming.
+- [ARCHITECTURE_WAVE_11.md](../explanation/ARCHITECTURE_WAVE_11.md) — The admin engine.
+- [CURRENT_ATTRIBUTES.md](../reference/CURRENT_ATTRIBUTES.md) — Per-request namespaces (Auth::Current, Accounts::Current, Teams::Current).
+- [ARCHITECTURE.md](../explanation/ARCHITECTURE.md) — Why Seams is built this way.
+- [UPGRADING_FROM_WAVE_8.md](../how-to/UPGRADING_FROM_WAVE_8.md) — If you adopted seams pre-Wave-9.
