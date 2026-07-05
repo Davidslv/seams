@@ -21,7 +21,12 @@ namespace :seams do
   task :quality, [:engine] => :environment do |_t, args|
     name = args[:engine] or abort("Usage: rake seams:quality[billing]")
     abort("Invalid engine name: #{name.inspect}") unless ENGINE_NAME_PATTERN.match?(name)
-    sh "bundle", "exec", "rubocop", "engines/#{name}"
+    # Run from inside the engine directory with --ignore-parent-exclusion:
+    # the host .rubocop.yml excludes engines/**/* (engines lint
+    # themselves), and RuboCop merges that parent exclusion into any run
+    # unless told not to — `rubocop engines/#{name}` from the host root
+    # inspects zero files and reports a false pass.
+    sh "bundle", "exec", "rubocop", "--ignore-parent-exclusion", chdir: "engines/#{name}"
   end
 
   namespace :test do
@@ -45,6 +50,13 @@ namespace :seams do
   task audit: :environment do
     Rake::Task["environment"].invoke
     sh "bundle", "exec", "rubocop", "--parallel"
+    # Per-engine RuboCop: the host run above excludes engines/**/*, so
+    # each engine with its own .rubocop.yml is linted from inside its
+    # directory (--ignore-parent-exclusion stops the host's exclusion
+    # from turning these runs into 0-file no-ops).
+    Dir["engines/*"].select { |d| File.directory?(d) && File.exist?("#{d}/.rubocop.yml") }.sort.each do |dir|
+      sh "bundle", "exec", "rubocop", "--ignore-parent-exclusion", chdir: dir
+    end
     sh "bundle", "exec", "rspec", "spec"
     Dir["engines/*"].select { |d| File.directory?(d) }.sort.each do |dir|
       next if Dir.glob("#{dir}/spec/**/*_spec.rb").empty?
