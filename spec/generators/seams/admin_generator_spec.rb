@@ -585,7 +585,7 @@ RSpec.describe Seams::Generators::AdminGenerator do
           # membership role; the role == "admin" literal must be gone.
           expect(content).to include("permission_ability")
           expect(content).to include("Seams::Permissions.can?")
-          expect(content).not_to match(/%w\[owner admin\]\.include\?/)
+          expect(content).not_to include("%w[owner admin].include?")
           # Phase 4: per-record tenant guard — show?/update?/destroy?
           # also assert the record's own account_id matches the
           # caller's account_id, so a tenant-admin can't load

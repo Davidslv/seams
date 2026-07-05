@@ -114,7 +114,7 @@ RSpec.describe Seams::CLI::List do
 
       list.call
       expect(io.string.scan("depends on: auth").size).to eq(1)
-      expect(io.string).not_to match(/depends on: notifications/)
+      expect(io.string).not_to include("depends on: notifications")
     end
 
     # Regression: real generated engines wire subscribers via
