@@ -25,13 +25,13 @@ The three pieces of new machinery:
 1. **Insertion-point markers** — `# seams:insertion-point <name>`
    comments inside generated files, placed at exactly the points
    where adding-one-more is the natural extension. The full list
-   lives in [`INSERTION_POINTS_CATALOGUE.md`](INSERTION_POINTS_CATALOGUE.md);
-   the format spec is in [`INSERTION_POINTS.md`](INSERTION_POINTS.md).
+   lives in [`INSERTION_POINTS_CATALOGUE.md`](../reference/INSERTION_POINTS_CATALOGUE.md);
+   the format spec is in [`INSERTION_POINTS.md`](../reference/INSERTION_POINTS.md).
 2. **Follow-up generators** — net-new generators of the form
    `bin/rails generate seams:<engine>:<verb>_<noun>` that locate a
    marker by name and splice content under it, idempotently. The
    first showcase is `seams:auth:add_oauth_provider`. The authoring
-   guide is [`WRITING_FOLLOW_UP_GENERATORS.md`](WRITING_FOLLOW_UP_GENERATORS.md).
+   guide is [`WRITING_FOLLOW_UP_GENERATORS.md`](../how-to/WRITING_FOLLOW_UP_GENERATORS.md).
 3. **`bin/seams resolve`** — the documented escape hatch. Three
    sub-commands: `--eject <engine>/<file>` marks a host file as
    host-owned (subsequent regenerations skip it via the
@@ -137,7 +137,7 @@ bytes for the eject header and short-circuits when present.
 
 Eject-eligibility (the rule both `bin/seams resolve --eject` and the
 generators agree on) is documented inline in
-[`Seams::Generators::EjectAware`](../lib/seams/generators/eject_aware.rb).
+[`Seams::Generators::EjectAware`](../../lib/seams/generators/eject_aware.rb).
 The short version: anything under `app/`, `lib/`, `config/`, `spec/`
 is eligible; migrations, `engine.rb`, `version.rb`, the Gemfile, and
 the `.gemspec` are not.
@@ -204,10 +204,10 @@ only the marker count grows.
 
 ## See also
 
-- [`INSERTION_POINTS.md`](INSERTION_POINTS.md) — marker format spec.
-- [`INSERTION_POINTS_CATALOGUE.md`](INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers (32 active + 1 deferred to Wave 12).
-- [`WRITING_FOLLOW_UP_GENERATORS.md`](WRITING_FOLLOW_UP_GENERATORS.md) — author's guide for writing the next follow-up generator.
-- [`../lib/seams/generators/splicer.rb`](../lib/seams/generators/splicer.rb) — the splice primitive, ~200 lines, no Rails/Thor dependency.
-- [`../lib/seams/generators/follow_up_generator.rb`](../lib/seams/generators/follow_up_generator.rb) — base class for follow-up generators.
-- [`../lib/seams/generators/eject_aware.rb`](../lib/seams/generators/eject_aware.rb) — the mixin all six canonical generators include.
-- [`../lib/seams/cli/resolve.rb`](../lib/seams/cli/resolve.rb) — `bin/seams resolve` implementation.
+- [`INSERTION_POINTS.md`](../reference/INSERTION_POINTS.md) — marker format spec.
+- [`INSERTION_POINTS_CATALOGUE.md`](../reference/INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers (32 active + 1 deferred to Wave 12).
+- [`WRITING_FOLLOW_UP_GENERATORS.md`](../how-to/WRITING_FOLLOW_UP_GENERATORS.md) — author's guide for writing the next follow-up generator.
+- [`../lib/seams/generators/splicer.rb`](../../lib/seams/generators/splicer.rb) — the splice primitive, ~200 lines, no Rails/Thor dependency.
+- [`../lib/seams/generators/follow_up_generator.rb`](../../lib/seams/generators/follow_up_generator.rb) — base class for follow-up generators.
+- [`../lib/seams/generators/eject_aware.rb`](../../lib/seams/generators/eject_aware.rb) — the mixin all six canonical generators include.
+- [`../lib/seams/cli/resolve.rb`](../../lib/seams/cli/resolve.rb) — `bin/seams resolve` implementation.

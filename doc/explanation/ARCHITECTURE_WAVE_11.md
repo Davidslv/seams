@@ -238,7 +238,7 @@ own domain models. Result:
 The reinterpretation is documented in three places:
 
 - The engine README (the
-  [`Why staff? on Identity, not a separate AdminUser table?`](../lib/generators/seams/admin/templates/README.md.tt)
+  [`Why staff? on Identity, not a separate AdminUser table?`](../../lib/generators/seams/admin/templates/README.md.tt)
   section).
 - The Wave 11A proposal
   (`proposals/wave_11a_admin_engine.md`).
@@ -265,9 +265,9 @@ seven engines:
 | `admin.configuration.attributes` | `engines/admin/lib/admin/configuration.rb` | New configuration knobs (`attr_accessor`). |
 | `admin.configuration.defaults` | `engines/admin/lib/admin/configuration.rb` | Defaults for the new knobs (`@new_knob = sensible_default` inside `initialize`). |
 
-Format spec lives in [`INSERTION_POINTS.md`](INSERTION_POINTS.md);
+Format spec lives in [`INSERTION_POINTS.md`](../reference/INSERTION_POINTS.md);
 canonical list in
-[`INSERTION_POINTS_CATALOGUE.md`](INSERTION_POINTS_CATALOGUE.md).
+[`INSERTION_POINTS_CATALOGUE.md`](../reference/INSERTION_POINTS_CATALOGUE.md).
 
 The first follow-up generator on the admin engine (likely
 `seams:admin:add_dashboard <model>`) targets
@@ -305,8 +305,8 @@ follow-up generators that target its markers grow.
 
 - `../proposals/wave_11a_admin_engine.md` — five-phase orchestration and risks.
 - `../proposals/admin_engine_administrate.md` — framework selection rationale (the May 2026 research report).
-- [`../lib/generators/seams/admin/admin_generator.rb`](../lib/generators/seams/admin/admin_generator.rb) — the `bin/rails generate seams:admin` implementation.
-- [`../lib/generators/seams/admin/templates/README.md.tt`](../lib/generators/seams/admin/templates/README.md.tt) — the engine README a fresh host operator reads first.
-- [`INSERTION_POINTS_CATALOGUE.md#admin-engine-wave-11a`](INSERTION_POINTS_CATALOGUE.md) — the five admin markers in the canonical catalogue.
+- [`../lib/generators/seams/admin/admin_generator.rb`](../../lib/generators/seams/admin/admin_generator.rb) — the `bin/rails generate seams:admin` implementation.
+- [`../lib/generators/seams/admin/templates/README.md.tt`](../../lib/generators/seams/admin/templates/README.md.tt) — the engine README a fresh host operator reads first.
+- [`INSERTION_POINTS_CATALOGUE.md#admin-engine-wave-11a`](../reference/INSERTION_POINTS_CATALOGUE.md) — the five admin markers in the canonical catalogue.
 - [`ARCHITECTURE_WAVE_10.md`](ARCHITECTURE_WAVE_10.md) — the splice + eject machinery the admin engine inherits.
 - [`ARCHITECTURE_WAVE_9.md`](ARCHITECTURE_WAVE_9.md) — the Identity / Account / Team shapes the admin engine reads.

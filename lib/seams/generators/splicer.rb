@@ -11,8 +11,8 @@ module Seams
     # the whole file. The Splicer is the shared primitive: every
     # follow-up generator funnels through these methods.
     #
-    # See doc/INSERTION_POINTS.md for the marker format spec and
-    # doc/INSERTION_POINTS_CATALOGUE.md for the canonical list of
+    # See doc/reference/INSERTION_POINTS.md for the marker format spec and
+    # doc/reference/INSERTION_POINTS_CATALOGUE.md for the canonical list of
     # markers each engine ships.
     #
     # Example:

@@ -95,7 +95,7 @@ concerns to it automatically. The cop also exempts every engine's
 `<Engine>::Current` namespace from the boundary rule (each engine
 ships its own `ActiveSupport::CurrentAttributes` peer; cross-engine
 reads of per-request state are intentional). See
-`doc/CURRENT_ATTRIBUTES.md`.
+`doc/reference/CURRENT_ATTRIBUTES.md`.
 
 ## Adapter pattern
 

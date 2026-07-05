@@ -48,7 +48,7 @@ email/SMS, Stripe subscriptions, multi-tenant teams, and a themeable
 design system generated as real Rails engines under `engines/`. Every
 file is yours to edit. Nothing is hidden behind the gem.
 
-New to Seams? Start with **[doc/GETTING_STARTED.md](doc/GETTING_STARTED.md)**
+New to Seams? Start with **[doc/tutorials/GETTING_STARTED.md](doc/tutorials/GETTING_STARTED.md)**
 — a step-by-step walkthrough from `bundle install` to a booting host.
 
 ## What you get
@@ -67,9 +67,9 @@ New to Seams? Start with **[doc/GETTING_STARTED.md](doc/GETTING_STARTED.md)**
 - `bin/seams notifications` — Notifications engine (STI strategies, ActionCable bell, TypeRegistry). `--channels in_app,email,sms` (default: all)
 - `bin/seams billing` — Billing engine (official Stripe gem, 13-handler webhook router, Lifetime Deals). `--gateway stripe` (default)
 - `bin/seams teams` — Teams engine (Team, Membership, Invitation, AccountScoped). `--with invitations,roles` (default: all)
-- `bin/seams admin` — Admin engine (Administrate dashboards, Pundit `Platform`/`Tenant` policy split, admin audit trail) — opt-in, see [Wave 11A](doc/ARCHITECTURE_WAVE_11.md)
+- `bin/seams admin` — Admin engine (Administrate dashboards, Pundit `Platform`/`Tenant` policy split, admin audit trail) — opt-in, see [Wave 11A](doc/explanation/ARCHITECTURE_WAVE_11.md)
 - `bin/seams design` — Design-system engine (33 `ui_*` components, Tailwind v4 `@theme` tokens, `Design::FormBuilder`, `/design/guide` gallery). `--shell` also generates an app layout + starter dashboard
-- `bin/seams permissions` — host-editable role → ability grant map (`config/initializers/seams_permissions.rb`), see [doc/PERMISSIONS.md](doc/PERMISSIONS.md)
+- `bin/seams permissions` — host-editable role → ability grant map (`config/initializers/seams_permissions.rb`), see [doc/reference/PERMISSIONS.md](doc/reference/PERMISSIONS.md)
 
 ### Diagnostics & escape hatch
 
@@ -80,7 +80,7 @@ New to Seams? Start with **[doc/GETTING_STARTED.md](doc/GETTING_STARTED.md)**
 
 ### Follow-up generators
 
-- `bin/rails generate seams:auth:add_oauth_provider <name>` — add an OAuth provider adapter to an installed Auth engine. Write your own: [doc/WRITING_FOLLOW_UP_GENERATORS.md](doc/WRITING_FOLLOW_UP_GENERATORS.md)
+- `bin/rails generate seams:auth:add_oauth_provider <name>` — add an OAuth provider adapter to an installed Auth engine. Write your own: [doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md](doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md)
 
 ### Plus
 
@@ -98,47 +98,47 @@ Guides and explanation live under [`doc/`](doc/):
 
 ### Start here
 
-- [doc/GETTING_STARTED.md](doc/GETTING_STARTED.md) — install → first engine → booting host
-- [doc/ENGINE_CATALOGUE.md](doc/ENGINE_CATALOGUE.md) — every canonical engine in detail
-- [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md) — short overview of why Seams is built this way
+- [doc/tutorials/GETTING_STARTED.md](doc/tutorials/GETTING_STARTED.md) — install → first engine → booting host
+- [doc/reference/ENGINE_CATALOGUE.md](doc/reference/ENGINE_CATALOGUE.md) — every canonical engine in detail
+- [doc/explanation/ARCHITECTURE.md](doc/explanation/ARCHITECTURE.md) — short overview of why Seams is built this way
 
 ### Architecture (by wave)
 
-- [doc/ARCHITECTURE_WAVE_9.md](doc/ARCHITECTURE_WAVE_9.md) — full system walk-through (post-Wave-9)
-- [doc/ARCHITECTURE_WAVE_10.md](doc/ARCHITECTURE_WAVE_10.md) — insertion points, follow-up generators, eject CLI
-- [doc/ARCHITECTURE_WAVE_11.md](doc/ARCHITECTURE_WAVE_11.md) — the admin engine (Administrate, Pundit policy split, admin audit)
-- [doc/WAVE_11_PII_GDPR.md](doc/WAVE_11_PII_GDPR.md) — PII encryption & GDPR handling
+- [doc/explanation/ARCHITECTURE_WAVE_9.md](doc/explanation/ARCHITECTURE_WAVE_9.md) — full system walk-through (post-Wave-9)
+- [doc/explanation/ARCHITECTURE_WAVE_10.md](doc/explanation/ARCHITECTURE_WAVE_10.md) — insertion points, follow-up generators, eject CLI
+- [doc/explanation/ARCHITECTURE_WAVE_11.md](doc/explanation/ARCHITECTURE_WAVE_11.md) — the admin engine (Administrate, Pundit policy split, admin audit)
+- [doc/explanation/WAVE_11_PII_GDPR.md](doc/explanation/WAVE_11_PII_GDPR.md) — PII encryption & GDPR handling
 - [doc/adr/](doc/adr/) — Architecture Decision Records (MADR): the *why* behind hard-to-reverse calls
 
 ### Building & extending
 
-- [doc/ADDING_AN_ENGINE.md](doc/ADDING_AN_ENGINE.md)
-- [doc/REMOVING_AN_ENGINE.md](doc/REMOVING_AN_ENGINE.md)
-- [doc/WRITING_AN_ADAPTER.md](doc/WRITING_AN_ADAPTER.md) — swap in Mailgun, Twilio, Paddle, etc.
-- [doc/WRITING_FOLLOW_UP_GENERATORS.md](doc/WRITING_FOLLOW_UP_GENERATORS.md)
-- [doc/INSERTION_POINTS.md](doc/INSERTION_POINTS.md) — marker format spec
-- [doc/INSERTION_POINTS_CATALOGUE.md](doc/INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers
+- [doc/how-to/ADDING_AN_ENGINE.md](doc/how-to/ADDING_AN_ENGINE.md)
+- [doc/how-to/REMOVING_AN_ENGINE.md](doc/how-to/REMOVING_AN_ENGINE.md)
+- [doc/how-to/WRITING_AN_ADAPTER.md](doc/how-to/WRITING_AN_ADAPTER.md) — swap in Mailgun, Twilio, Paddle, etc.
+- [doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md](doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md)
+- [doc/reference/INSERTION_POINTS.md](doc/reference/INSERTION_POINTS.md) — marker format spec
+- [doc/reference/INSERTION_POINTS_CATALOGUE.md](doc/reference/INSERTION_POINTS_CATALOGUE.md) — the canonical 33 markers
 
 ### Reference
 
-- [doc/CURRENT_ATTRIBUTES.md](doc/CURRENT_ATTRIBUTES.md) — per-request namespaces (Auth::Current, Accounts::Current, Teams::Current, Core::Current)
-- [doc/PERMISSIONS.md](doc/PERMISSIONS.md) — ability codes, role hierarchy, the grant map, `authorize_permission!`
-- [doc/OBSERVABILITY.md](doc/OBSERVABILITY.md) — logging, tracing, metrics integration
-- [doc/TESTING.md](doc/TESTING.md)
-- [doc/DEPLOYING.md](doc/DEPLOYING.md)
+- [doc/reference/CURRENT_ATTRIBUTES.md](doc/reference/CURRENT_ATTRIBUTES.md) — per-request namespaces (Auth::Current, Accounts::Current, Teams::Current, Core::Current)
+- [doc/reference/PERMISSIONS.md](doc/reference/PERMISSIONS.md) — ability codes, role hierarchy, the grant map, `authorize_permission!`
+- [doc/reference/OBSERVABILITY.md](doc/reference/OBSERVABILITY.md) — logging, tracing, metrics integration
+- [doc/reference/TESTING.md](doc/reference/TESTING.md)
+- [doc/how-to/DEPLOYING.md](doc/how-to/DEPLOYING.md)
 
 ### Design system
 
-- [doc/DESIGN_SYSTEM.md](doc/DESIGN_SYSTEM.md) — components, tokens, theming, FormBuilder (start here)
-- [doc/DESIGN_SYSTEM_FOUNDATIONS.md](doc/DESIGN_SYSTEM_FOUNDATIONS.md) — tokens & scales
-- [doc/DESIGN_SYSTEM_COMPONENTS.md](doc/DESIGN_SYSTEM_COMPONENTS.md) — the 33 `ui_*` components
-- [doc/DESIGN_SYSTEM_FORMS.md](doc/DESIGN_SYSTEM_FORMS.md) — `Design::FormBuilder`
-- [doc/DESIGN_SYSTEM_THEMING.md](doc/DESIGN_SYSTEM_THEMING.md) — retheme via token override
-- [doc/DESIGN_SYSTEM_ACCESSIBILITY.md](doc/DESIGN_SYSTEM_ACCESSIBILITY.md)
+- [doc/design-system/DESIGN_SYSTEM.md](doc/design-system/DESIGN_SYSTEM.md) — components, tokens, theming, FormBuilder (start here)
+- [doc/design-system/DESIGN_SYSTEM_FOUNDATIONS.md](doc/design-system/DESIGN_SYSTEM_FOUNDATIONS.md) — tokens & scales
+- [doc/design-system/DESIGN_SYSTEM_COMPONENTS.md](doc/design-system/DESIGN_SYSTEM_COMPONENTS.md) — the 33 `ui_*` components
+- [doc/design-system/DESIGN_SYSTEM_FORMS.md](doc/design-system/DESIGN_SYSTEM_FORMS.md) — `Design::FormBuilder`
+- [doc/design-system/DESIGN_SYSTEM_THEMING.md](doc/design-system/DESIGN_SYSTEM_THEMING.md) — retheme via token override
+- [doc/design-system/DESIGN_SYSTEM_ACCESSIBILITY.md](doc/design-system/DESIGN_SYSTEM_ACCESSIBILITY.md)
 
 ### Migrating & releasing
 
-- [doc/UPGRADING_FROM_WAVE_8.md](doc/UPGRADING_FROM_WAVE_8.md) — if you adopted seams pre-Wave-9
+- [doc/how-to/UPGRADING_FROM_WAVE_8.md](doc/how-to/UPGRADING_FROM_WAVE_8.md) — if you adopted seams pre-Wave-9
 - [RELEASING.md](RELEASING.md) — for maintainers: how to cut a new gem release
 
 ## Why Seams instead of...
@@ -156,7 +156,7 @@ Active development, pre-1.0. The canonical engine set is built out
 through **Wave 11**:
 
 - **Waves 1–8** — foundation, auth (OAuth, API tokens, GDPR-encrypted PII), notifications (TypeRegistry, ActionCable bell, multipart mailers), billing (official Stripe gem, 13-handler webhook router, Lifetime Deals), teams (team scoping, role-based authz).
-- **Wave 9** — added the `accounts` engine and reworked the identity/account/team boundary: `Auth::Identity` (the human), `Accounts::Account` (the tenant), `Teams::Team` (the optional grouping) are now three peer engines with one responsibility each. ([CHANGELOG](CHANGELOG.md#wave-9--identity--account--team-rework-breaking) · [upgrade guide](doc/UPGRADING_FROM_WAVE_8.md))
+- **Wave 9** — added the `accounts` engine and reworked the identity/account/team boundary: `Auth::Identity` (the human), `Accounts::Account` (the tenant), `Teams::Team` (the optional grouping) are now three peer engines with one responsibility each. ([CHANGELOG](CHANGELOG.md#wave-9--identity--account--team-rework-breaking) · [upgrade guide](doc/how-to/UPGRADING_FROM_WAVE_8.md))
 - **Wave 10** — insertion points, follow-up generators, and the eject CLI (`bin/seams resolve`).
 - **Wave 11A** — the opt-in `admin` engine.
 - **Wave 11B** — the `permissions` grant map.

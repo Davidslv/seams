@@ -143,7 +143,7 @@ module Seams
         fail_with(
           "refusing to eject #{engine}/#{relative}: this file is framework-managed " \
           "(migrations, engine.rb, version.rb, Gemfile, .gemspec) and is not eject-eligible. " \
-          "See doc/INSERTION_POINTS.md and Seams::Generators::EjectAware for the rule."
+          "See doc/reference/INSERTION_POINTS.md and Seams::Generators::EjectAware for the rule."
         )
         false
       end

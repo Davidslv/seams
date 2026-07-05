@@ -6,7 +6,7 @@ follows the `AGENTS.md` convention. Keep it short and current.
 ## What this project is
 
 A CLI framework that generates modular Rails engines. See
-[README.md](README.md) and [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md). The
+[README.md](README.md) and [doc/explanation/ARCHITECTURE.md](doc/explanation/ARCHITECTURE.md). The
 generated code is the product: most changes are changes to generator templates
 (`lib/generators/seams/**/templates/*.tt`), not to the gem's runtime code.
 
@@ -26,7 +26,7 @@ generated code is the product: most changes are changes to generator templates
 4. **Test-first.** Generator behaviour is specified in `spec/generators/`;
    every template change needs a spec asserting the generated output.
 5. **Update the docs with the change.** A new engine, flag, or option touches
-   `doc/` (and often `doc/ENGINE_CATALOGUE.md`) plus `CHANGELOG.md` in the
+   `doc/` (and often `doc/reference/ENGINE_CATALOGUE.md`) plus `CHANGELOG.md` in the
    same PR — CI has documentation guards that catch drift.
 
 ## Repository map

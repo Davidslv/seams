@@ -80,7 +80,7 @@ when nil, "help", "-h", "--help"
       bin/rails generate seams:auth:add_oauth_provider <name>
                                     Add a new OAuth provider adapter
                                     (e.g. linkedin, apple, microsoft)
-      See doc/WRITING_FOLLOW_UP_GENERATORS.md for how to write your own.
+      See doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md for how to write your own.
 
     Diagnostics + escape hatch:
       list                          List engines + their events

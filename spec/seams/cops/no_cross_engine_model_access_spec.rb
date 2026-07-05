@@ -95,7 +95,7 @@ RSpec.describe RuboCop::Cop::Seams::NoCrossEngineModelAccess, :config do
   context "with per-request CurrentAttributes namespaces" do
     # Every engine ships its own `<Engine>::Current` namespace; they
     # are intentionally a shared per-request bus and exempt from the
-    # boundary cop. See doc/CURRENT_ATTRIBUTES.md.
+    # boundary cop. See doc/reference/CURRENT_ATTRIBUTES.md.
     it "does not flag Billing::Current" do
       expect_no_offenses(<<~RUBY)
         module Auth

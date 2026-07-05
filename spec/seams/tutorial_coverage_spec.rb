@@ -2,7 +2,7 @@
 
 # rubocop:disable RSpec/DescribeClass
 
-# Keeps doc/TUTORIAL.md honest: every `bin/seams <command>` it tells a
+# Keeps doc/tutorials/TUTORIAL.md honest: every `bin/seams <command>` it tells a
 # newcomer to run must be a real command, and every relative link must
 # resolve. A tutorial that drifts from the CLI is worse than no tutorial —
 # the reader copy-pastes a command in their first ten minutes and it
@@ -10,7 +10,7 @@
 # tutorial describes is exercised end-to-end by spec/integration_full/.
 
 TUTORIAL_ROOT = File.expand_path("../..", __dir__)
-TUTORIAL_PATH = File.join(TUTORIAL_ROOT, "doc/TUTORIAL.md")
+TUTORIAL_PATH = File.join(TUTORIAL_ROOT, "doc/tutorials/TUTORIAL.md")
 
 # Generators discovered from the code, plus the non-generator diagnostic
 # commands the bin/seams wrapper routes (see bin_seams.tt).
@@ -43,7 +43,7 @@ RSpec.describe "Tutorial coverage" do
 
     expect(unknown).to(
       be_empty,
-      "doc/TUTORIAL.md references bin/seams commands that don't exist: " \
+      "doc/tutorials/TUTORIAL.md references bin/seams commands that don't exist: " \
       "#{unknown.join(", ")}. Fix the tutorial or the command."
     )
   end
@@ -55,7 +55,7 @@ RSpec.describe "Tutorial coverage" do
 
     expect(missing).to(
       be_empty,
-      "doc/TUTORIAL.md links to files that don't exist: #{missing.join(", ")}."
+      "doc/tutorials/TUTORIAL.md links to files that don't exist: #{missing.join(", ")}."
     )
   end
 end

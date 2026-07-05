@@ -5,8 +5,8 @@ Thanks for using Seams. Here is where to go, depending on what you need.
 ## I have a question about how to use the gem
 
 1. Read the [README](README.md) — the quick start and the engine list cover the common cases.
-2. Read the [Getting Started guide](doc/GETTING_STARTED.md) and the
-   [Tutorial](doc/TUTORIAL.md), or browse the
+2. Read the [Getting Started guide](doc/tutorials/GETTING_STARTED.md) and the
+   [Tutorial](doc/tutorials/TUTORIAL.md), or browse the
    [documentation site](https://davidslv.github.io/seams/).
 3. Search [existing issues](https://github.com/Davidslv/seams/issues?q=).
 4. If you still need help, open an issue using the question route in the
@@ -23,7 +23,7 @@ code did vs. what you expected. See
 
 Open a **feature request** using the template. Explain the boundary the
 engine would own and how it fits the modular-monolith model — see
-[doc/ARCHITECTURE.md](doc/ARCHITECTURE.md).
+[doc/explanation/ARCHITECTURE.md](doc/explanation/ARCHITECTURE.md).
 
 ## I found a security issue
 
