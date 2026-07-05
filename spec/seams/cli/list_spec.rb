@@ -140,5 +140,30 @@ RSpec.describe Seams::CLI::List do
       expect(io.string).to include("subscribes: identity.signed_up.auth")
       expect(io.string).to include("depends on: auth")
     end
+
+    # Regression: the subscription scan is textual and multiline — it
+    # captures the first string literal after the Publisher call. When
+    # the event name is passed as a VARIABLE, that capture used to be
+    # whatever unrelated string appeared next in the file (in a real
+    # host it grabbed "Accounts::Account" from a subscriber's
+    # owner-class fallback), producing phantom "subscribes:" and
+    # "depends on:" lines. Captures that don't look like event names
+    # (three-plus dot-separated segments) are now dropped.
+    it "ignores attach_class calls whose event name is a variable, not a string" do
+      subscriber_dir = File.join(engines_root, "billing", "app", "subscribers", "billing")
+      FileUtils.mkdir_p(subscriber_dir)
+      File.write(File.join(subscriber_dir, "account_subscriber.rb"), <<~RUBY)
+        class Billing::AccountSubscriber
+          def self.attach!
+            Seams::Events::Publisher.attach_class(:billing_accounts, event_name) do |payload|
+              payload.fetch(:owner_class, "Accounts::Account")
+            end
+          end
+        end
+      RUBY
+
+      list.call
+      expect(io.string).not_to include("Accounts::Account")
+    end
   end
 end
