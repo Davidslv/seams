@@ -15,14 +15,14 @@ module RuboCop
 
         # @!method require_call?(node)
         def_node_matcher :require_call?, <<~PATTERN
-          (send nil? {:require :require_relative} (str $_))
+          (send nil? ${:require :require_relative} (str $_))
         PATTERN
 
         def on_send(node)
-          path = require_call?(node)
+          method, path = require_call?(node)
           return unless path
 
-          offending_engine = other_engine_for(path)
+          offending_engine = other_engine_for(method, path)
           return unless offending_engine
 
           add_offense(
@@ -42,11 +42,40 @@ module RuboCop
           Array(cop_config["OtherEngines"]).map(&:to_s)
         end
 
-        def other_engine_for(path)
-          # Match either "billing/foo" or "../../billing/foo" — the engine
-          # name is whichever directory segment matches another engine.
+        # For a plain `require`, only the FIRST path segment identifies
+        # the library — `require "billing/foo"` loads the sibling engine,
+        # but `require "rspec/core/rake_task"` loads rspec-core no matter
+        # what its deeper segments are called. Matching ANY segment (the
+        # old behaviour) false-fired on every generated host with an
+        # engine named `core`, because engine Rakefiles require
+        # "rspec/core/rake_task".
+        #
+        # For `require_relative`, the path is anchored inside the
+        # engine's own tree: it only reaches a sibling engine when it
+        # first climbs OUT via `../`. Resolve the climb and check the
+        # first segment after it — `../../billing/foo` is a genuine
+        # cross-engine reach, while `core/something` (no climb) is just
+        # a subdirectory of the requiring file.
+        def other_engine_for(method, path)
+          candidate =
+            if method == :require_relative
+              first_segment_after_climb(path)
+            else
+              path.split("/").first
+            end
+
+          other_engines.find { |engine| engine == candidate }
+        end
+
+        # Returns the first path segment after the leading `../` (or
+        # `./`) climb, or nil when the path never leaves the requiring
+        # file's own directory.
+        def first_segment_after_climb(path)
           segments = path.split("/")
-          other_engines.find { |engine| segments.include?(engine) }
+          climbed  = segments.take_while { |segment| [".", ".."].include?(segment) }
+          return nil unless climbed.include?("..")
+
+          segments.drop(climbed.size).first
         end
 
         def capitalize(name)
