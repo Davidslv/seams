@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "yaml"
 require "rails/generators"
 require "rails/generators/test_case"
 require "generators/seams/engine/engine_generator"
@@ -77,6 +78,20 @@ RSpec.describe Seams::Generators::EngineGenerator do
         expect(content).to include("Seams/NoCrossEngineModelAccess")
         expect(content).to include("OwnEngine: Billing")
         expect(content).to include("Seams/NoCrossEngineDependency")
+      end
+    end
+
+    it "scopes the boundary cops to production code via a per-cop spec exclude" do
+      assert_file "engines/billing/.rubocop.yml" do |content|
+        parsed = YAML.safe_load(content)
+
+        # Boundaries are a production-code contract; integration specs
+        # legitimately create real sibling records in test setup, so
+        # each boundary cop excludes spec/**/* — per-cop, NOT globally
+        # (all other cops still lint the specs).
+        expect(parsed.dig("Seams/NoCrossEngineModelAccess", "Exclude")).to eq(["spec/**/*"])
+        expect(parsed.dig("Seams/NoCrossEngineDependency", "Exclude")).to eq(["spec/**/*"])
+        expect(parsed.dig("AllCops", "Exclude")).not_to include("spec/**/*")
       end
     end
 
