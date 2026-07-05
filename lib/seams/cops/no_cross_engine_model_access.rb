@@ -57,6 +57,13 @@ module RuboCop
           Engine
         ].freeze
 
+        ASSOCIATION_MACROS = %i[
+          belongs_to
+          has_one
+          has_many
+          has_and_belongs_to_many
+        ].freeze
+
         def on_const(node)
           return unless flaggable?(node)
 
@@ -71,7 +78,78 @@ module RuboCop
           )
         end
 
+        # Association macros name the target class via a `class_name:`
+        # STRING (`belongs_to :account, class_name: "Accounts::Account"`),
+        # which `on_const` cannot see — string literals are not constant
+        # nodes, so this exact pattern used to sail through the cop.
+        # Flag the option when the named class lives in another engine.
+        #
+        # `class_name:` given as a constant is already caught by
+        # `on_const`, so only string values are flagged here (no double
+        # offense). `polymorphic: true` associations are exempt: the
+        # target class is decided at runtime by the owning record.
+        def on_send(node)
+          pair = string_class_name_pair(node)
+          return unless pair
+
+          full_name = pair.value.value.to_s.delete_prefix("::")
+          return unless cross_engine_class_name?(full_name)
+
+          assert_own_engine_configured!
+
+          add_offense(
+            pair,
+            message: format(MSG, own: own_engine, const: full_name,
+                                 other: full_name.split("::").first)
+          )
+        end
+
         private
+
+        # Returns the `class_name: "..."` pair of an association macro
+        # when its value is a string literal worth checking; nil
+        # otherwise (not an association, no options, polymorphic, or a
+        # constant value already covered by `on_const`).
+        def string_class_name_pair(node)
+          options = association_options(node)
+          return nil unless options
+          return nil if polymorphic_option?(options)
+
+          pair = class_name_pair(options)
+          return nil unless pair
+
+          pair.value.str_type? ? pair : nil
+        end
+
+        def association_options(node)
+          return nil unless association_macro?(node)
+
+          options = node.last_argument
+          options if options&.hash_type?
+        end
+
+        def association_macro?(node)
+          node.receiver.nil? && ASSOCIATION_MACROS.include?(node.method_name)
+        end
+
+        def polymorphic_option?(options)
+          options.pairs.any? do |pair|
+            pair.key.sym_type? && pair.key.value == :polymorphic && pair.value.true_type?
+          end
+        end
+
+        def class_name_pair(options)
+          options.pairs.find { |pair| pair.key.sym_type? && pair.key.value == :class_name }
+        end
+
+        def cross_engine_class_name?(full_name)
+          parts = full_name.split("::")
+          return false if parts.size < 2
+          return false unless other_engines.include?(parts.first)
+          return false if exposed_concern?(full_name)
+
+          true
+        end
 
         def flaggable?(node)
           parts = const_parts_under_other_engine(node)

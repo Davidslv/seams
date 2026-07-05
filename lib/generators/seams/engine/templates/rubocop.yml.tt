@@ -32,16 +32,25 @@ Metrics/MethodLength:
 # host application here so this engine cannot reach into them
 # accidentally. Add concerns the other engines expose (e.g.
 # `Billing::Billable`) to ExposedConcerns to allow `include` calls.
+#
+# Both boundary cops exclude spec/**/*: boundaries are a
+# production-code contract, and integration specs legitimately need to
+# create real sibling records (e.g. `Auth::Identity.create!` in test
+# setup) to exercise cross-engine behaviour.
 Seams/NoCrossEngineModelAccess:
   Enabled: true
   OwnEngine: <%= module_name %>
   OtherEngines: []
   ExposedConcerns: []
+  Exclude:
+    - "spec/**/*"
 
 Seams/NoCrossEngineDependency:
   Enabled: true
   OwnEngine: <%= name %>
   OtherEngines: []
+  Exclude:
+    - "spec/**/*"
 
 Seams/KnownQueueNames:
   Enabled: true
