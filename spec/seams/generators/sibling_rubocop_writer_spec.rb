@@ -31,11 +31,15 @@ RSpec.describe Seams::Generators::SiblingRubocopWriter do
         OwnEngine: #{name.split("_").map(&:capitalize).join}
         OtherEngines: #{yaml_list(module_others)}
         ExposedConcerns: #{yaml_list(exposed_concerns)}
+        Exclude:
+          - "spec/**/*"
 
       Seams/NoCrossEngineDependency:
         Enabled: true
         OwnEngine: #{name}
         OtherEngines: #{yaml_list(other_engines)}
+        Exclude:
+          - "spec/**/*"
 
       Seams/KnownQueueNames:
         Enabled: true
@@ -60,6 +64,17 @@ RSpec.describe Seams::Generators::SiblingRubocopWriter do
       auth = yaml_for("auth")
       expect(auth.dig("Seams/NoCrossEngineModelAccess", "OtherEngines")).to eq(["Billing"])
       expect(auth.dig("Seams/NoCrossEngineModelAccess", "ExposedConcerns")).to eq(["Some::PreciousConcern"])
+    end
+
+    it "preserves the per-cop spec Exclude blocks when rewriting OtherEngines" do
+      write_engine(name: "auth", other_engines: %w[billing], exposed_concerns: [])
+
+      described_class.rewrite!(engines_root: engines_root, dirs: %w[auth billing teams])
+
+      auth = yaml_for("auth")
+      expect(auth.dig("Seams/NoCrossEngineModelAccess", "Exclude")).to eq(["spec/**/*"])
+      expect(auth.dig("Seams/NoCrossEngineDependency",  "Exclude")).to eq(["spec/**/*"])
+      expect(auth.dig("Seams/NoCrossEngineDependency",  "OtherEngines")).to eq(%w[billing teams])
     end
 
     it "preserves the KnownQueueNames block that follows the dependency cop" do
