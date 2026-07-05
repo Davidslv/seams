@@ -87,7 +87,7 @@ RSpec.describe Seams::Generators::DummyAppWriter do
       # unauthenticated path stub or override this method.
       content = File.read(File.join(engine_path, "spec/dummy/app/controllers/application_controller.rb"))
       expect(content).to include("class ApplicationController < ActionController::Base")
-      expect(content).to match(/def authenticate_identity!/)
+      expect(content).to include("def authenticate_identity!")
     end
 
     it "rails_helper.rb loads the dummy environment + schema" do

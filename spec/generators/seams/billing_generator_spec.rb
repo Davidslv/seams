@@ -203,7 +203,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
       gen_path = File.expand_path("../../../lib/generators/seams/billing/billing_generator.rb", __dir__)
       content  = File.read(gen_path)
       expect(content).to include('host_inject_gem("stripe"')
-      expect(content).not_to match(/host_inject_gem\("faraday"/)
+      expect(content).not_to include('host_inject_gem("faraday"')
     end
   end
 
@@ -231,7 +231,7 @@ RSpec.describe Seams::Generators::BillingGenerator do
 
     it "Billable#start_subscription! takes plan_ref + email (no host User assumed)" do
       assert_file "engines/billing/lib/billing/concerns/billable.rb" do |content|
-        expect(content).to match(/def start_subscription!\(plan_ref:, email:\)/)
+        expect(content).to include("def start_subscription!(plan_ref:, email:)")
       end
     end
 

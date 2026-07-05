@@ -167,8 +167,8 @@ RSpec.describe Seams::Generators::AuthGenerator do
         # signed_id has built-in expiry. The column-based assignments
         # are gone (only a doc-comment may mention the old column).
         expect(content).not_to include("TOKEN_TTL")
-        expect(content).not_to match(/password_reset_token: SecureRandom/)
-        expect(content).not_to match(/password_reset_token_sent_at:/)
+        expect(content).not_to include("password_reset_token: SecureRandom")
+        expect(content).not_to include("password_reset_token_sent_at:")
       end
     end
   end
