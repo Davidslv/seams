@@ -14,6 +14,16 @@ module Seams
       # Matches the top-level `module Foo` declaration in an engine file.
       MODULE_DECLARATION = /\bmodule\s+([A-Z][A-Za-z0-9_]*)\b/
 
+      # The canonical event-name convention: at least three
+      # dot-separated word segments ("subscription.created.billing").
+      # Used to reject regex captures that are NOT event names — the
+      # subscription scan is textual and multiline, so when an event
+      # name is passed as a variable it would otherwise grab the next
+      # unrelated string literal downstream (e.g. a subscriber's
+      # owner-class fallback like "Accounts::Account") and report a
+      # phantom subscription/dependency.
+      EVENT_NAME = /\A\w+(\.\w+){2,}\z/
+
       def initialize(engines_root: DEFAULT_ENGINES_ROOT, output: $stdout)
         @engines_root = engines_root
         @output       = output
@@ -73,6 +83,7 @@ module Seams
             content.scan(/Publisher\.(?:subscribe|attach_once|attach_class)\([^"']*["']([^"']+)["']/m)
                    .flatten
           end
+          .grep(EVENT_NAME)
           .uniq
       end
 
