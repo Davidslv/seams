@@ -13,7 +13,7 @@ group :development, :test do
   gem "rspec-rails", "~> 8.0"
   gem "rubocop", "~> 1.88", require: false
   gem "rubocop-performance", "~> 1.22", require: false
-  gem "rubocop-rails", "~> 2.35", require: false
+  gem "rubocop-rails", "~> 2.38", require: false
   gem "rubocop-rspec", "~> 3.10", require: false
   gem "rubycritic", "~> 5.0", require: false
   gem "simplecov", "~> 0.22", require: false
