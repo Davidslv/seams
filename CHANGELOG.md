@@ -52,6 +52,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hosts get rspec-rails 8.x. The generated CI uses `actions/checkout@v7`
   and a `postgres:18` service; the Kamal Postgres accessory comment moves
   to `postgres:18` and its volume to `/var/lib/postgresql` (18's layout).
+- Billing generator: the generated engine now targets stripe-ruby 19
+  (`gem "stripe", "~> 19.0"`, was `~> 13.0`), which pins Stripe API version
+  `2026-08-26.dahlia`. Existing hosts run `bundle update stripe` and should
+  move their webhook endpoint to the same API version (the handlers accept
+  both shapes meanwhile). Changes in the generated code:
+  - New `Billing::Stripe::Payload` reads Stripe objects and webhook hashes
+    alike. Handlers and `Invoices::SyncService` read the invoice's
+    subscription from `invoice.parent.subscription_details.subscription` and
+    the period end from `items.data[0].current_period_end` (both moved in
+    2025-03-31.basil). The old top-level `invoice.subscription` and
+    `subscription.current_period_end` are still read as fallbacks.
+  - `invoice.paid` now stores Stripe's `status_transitions.paid_at` as
+    `paid_at` instead of the time the webhook arrived.
+  - Fixed `#dig` calls on SDK responses (`Gateways::Stripe#normalise_subscription`,
+    `Invoices::SyncService#paid_at_for`). `Stripe::StripeObject` has no `#dig`,
+    so these raised `NoMethodError` on real API responses.
+  - `Billing::Stripe::Client` re-raises every `Stripe::StripeError` as
+    `Billing::GatewayError` (original on `#cause`). Every generated caller
+    already rescued `Billing::GatewayError`, but the gem-backed client never
+    raised it, so Stripe errors escaped `StripeService`, the checkout and
+    portal services, and `CreateLifetimeSessionService`. Hosts that rescued
+    `Stripe::*` errors from these services should rescue
+    `Billing::GatewayError` instead.
+  - The webhook endpoint answers `400` (not `500`) to a signed v2 thin event;
+    stripe-ruby 19's `Stripe::Webhook.construct_event` raises `ArgumentError`
+    for those.
+  - Stripe event fixtures under `spec/fixtures/stripe/` use the dahlia shapes
+    and carry `api_version`.
 - Dependencies: Ruby 4.0.7 (repo, CI, and the generated host's
   `.ruby-version` / Dockerfile default), Rails 8.1.4, RuboCop 1.91 (+
   rubocop-rails 2.38, rubocop-performance 1.27), SimpleCov 1.3, brakeman

@@ -3,9 +3,10 @@
 module Billing
   # Base class for service objects that talk to Stripe via
   # Billing::Stripe::Client. Subclasses define #call_stripe and the
-  # base wraps it in uniform error handling that converts Faraday
-  # errors + Billing::Stripe::Client errors into ServiceResult
-  # failures with stable codes.
+  # base wraps it in uniform error handling that converts the
+  # Billing::GatewayError raised by Billing::Stripe::Client (which
+  # translates every ::Stripe::StripeError from the `stripe` gem)
+  # into ServiceResult failures with stable codes.
   #
   #   class MyService < Billing::StripeService
   #     def initialize(plan_ref:)
@@ -43,10 +44,11 @@ module Billing
     def call
       on_success(call_stripe(client))
     rescue Billing::GatewayError => e
-      # The Faraday-based Billing::Stripe::Client raises
-      # Billing::GatewayError on 4xx/5xx, network failures, and
-      # auth errors. Sub-classify by message prefix so callers can
-      # branch on `result.code`.
+      # Billing::Stripe::Client re-raises every ::Stripe::StripeError
+      # (4xx/5xx, network failures, auth errors) as
+      # Billing::GatewayError with a stable message prefix.
+      # Sub-classify by that prefix so callers can branch on
+      # `result.code`.
       ServiceResult.failure(error: e.message, code: classify_gateway_error(e))
     end
 

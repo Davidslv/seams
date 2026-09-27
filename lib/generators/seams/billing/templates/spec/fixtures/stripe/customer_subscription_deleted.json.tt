@@ -4,6 +4,7 @@
   "type": "customer.subscription.deleted",
   "livemode": false,
   "created": 1730200000,
+  "api_version": "2026-08-26.dahlia",
   "data": {
     "object": {
       "id": "sub_test_123",
@@ -11,7 +12,12 @@
       "customer": "cus_test_123",
       "status": "canceled",
       "canceled_at": 1730200000,
-      "items": { "data": [] }
+      "items": {
+        "object": "list",
+        "data": [],
+        "has_more": false,
+        "url": "/v1/subscription_items?subscription=sub_test_123"
+      }
     }
   }
 }

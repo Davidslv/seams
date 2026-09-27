@@ -4,6 +4,7 @@
   "type": "checkout.session.completed",
   "livemode": false,
   "created": 1731200000,
+  "api_version": "2026-08-26.dahlia",
   "data": {
     "object": {
       "id": "cs_test_123",

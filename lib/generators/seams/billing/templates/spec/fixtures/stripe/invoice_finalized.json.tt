@@ -4,15 +4,29 @@
   "type": "invoice.finalized",
   "livemode": false,
   "created": 1730700000,
+  "api_version": "2026-08-26.dahlia",
   "data": {
     "object": {
       "id": "in_test_123",
       "object": "invoice",
       "customer": "cus_test_123",
-      "subscription": "sub_test_123",
+      "parent": {
+        "type": "subscription_details",
+        "quote_details": null,
+        "subscription_details": {
+          "metadata": {},
+          "subscription": "sub_test_123"
+        }
+      },
       "status": "open",
       "amount_due": 1299,
-      "currency": "gbp"
+      "currency": "gbp",
+      "status_transitions": {
+        "finalized_at": 1730700000,
+        "marked_uncollectible_at": null,
+        "paid_at": null,
+        "voided_at": null
+      }
     }
   }
 }

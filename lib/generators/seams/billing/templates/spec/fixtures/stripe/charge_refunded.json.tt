@@ -4,6 +4,7 @@
   "type": "charge.refunded",
   "livemode": false,
   "created": 1731100000,
+  "api_version": "2026-08-26.dahlia",
   "data": {
     "object": {
       "id": "ch_test_123",

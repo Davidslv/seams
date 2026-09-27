@@ -17,10 +17,23 @@ module Billing
     # and the gateway adapter call this Client without knowing
     # whether the implementation is Faraday or the gem.
     #
-    # Stripe gem version pinned to ~> 13 in the host Gemfile by the
-    # Billing generator. The StripeClient API
-    # (`client.v1.<resource>.<action>`) is what Stripe documents at
-    # https://docs.stripe.com/api?lang=ruby for every endpoint we use.
+    # Stripe gem version pinned to ~> 19 in the host Gemfile by the
+    # Billing generator. stripe-ruby 19 pins API version
+    # 2026-08-26.dahlia (see ::Stripe.api_version). The StripeClient
+    # API (`client.v1.<resource>.<action>`) is what Stripe documents
+    # at https://docs.stripe.com/api?lang=ruby for every endpoint we
+    # use. Responses are ::Stripe::StripeObject instances: read them
+    # with `obj[:key]` or Billing::Stripe::Payload.dig — they have no
+    # Hash#dig.
+    #
+    # Errors: every ::Stripe::StripeError raised by the gem is
+    # re-raised as Billing::GatewayError (original kept as #cause),
+    # because every caller in the engine rescues Billing::GatewayError.
+    # The message prefix is what Billing::StripeService#classify_gateway_error
+    # matches on:
+    #   ::Stripe::APIConnectionError             -> "Stripe connection error: ..."
+    #   ::Stripe::AuthenticationError/Permission -> "Stripe authentication error: ..."
+    #   any other ::Stripe::StripeError          -> "Stripe <ErrorClass>: ..."
     #
     # Verified against:
     #   https://docs.stripe.com/api/customers/create
@@ -34,42 +47,45 @@ module Billing
     #   https://docs.stripe.com/api/customer_portal/sessions/create
     #   https://docs.stripe.com/api/idempotent_requests
     class Client
+      # StripeClient.new raises ::Stripe::AuthenticationError on a nil
+      # key; translated like any other call so callers see
+      # Billing::GatewayError (code :gateway_auth).
       def initialize(api_key:)
-        @sdk = ::Stripe::StripeClient.new(api_key)
+        @sdk = translate_errors { ::Stripe::StripeClient.new(api_key) }
       end
 
       # POST /v1/subscriptions
       def create_subscription(customer:, items:, **extra)
-        sdk.v1.subscriptions.create({ customer: customer, items: items }.merge(extra))
+        translate_errors { sdk.v1.subscriptions.create({ customer: customer, items: items }.merge(extra)) }
       end
 
       # DELETE /v1/subscriptions/{id}
       def cancel_subscription(subscription_id, **extra)
-        sdk.v1.subscriptions.cancel(subscription_id, extra)
+        translate_errors { sdk.v1.subscriptions.cancel(subscription_id, extra) }
       end
 
       # GET /v1/subscriptions/{id}
       def retrieve_subscription(subscription_id)
-        sdk.v1.subscriptions.retrieve(subscription_id)
+        translate_errors { sdk.v1.subscriptions.retrieve(subscription_id) }
       end
 
       # POST /v1/subscriptions/{id} — used by ChangePlanService (items[])
       # and ReactivateService (cancel_at_period_end: false).
       def update_subscription(subscription_id, **fields)
-        sdk.v1.subscriptions.update(subscription_id, fields)
+        translate_errors { sdk.v1.subscriptions.update(subscription_id, fields) }
       end
 
       # POST /v1/checkout/sessions — params is a Hash (subscription
       # mode for recurring; payment mode for LTDs).
       def create_checkout_session(params)
-        sdk.v1.checkout.sessions.create(params)
+        translate_errors { sdk.v1.checkout.sessions.create(params) }
       end
 
       # POST /v1/billing_portal/sessions
       def create_billing_portal_session(customer:, return_url: nil)
         body = { customer: customer }
         body[:return_url] = return_url if return_url
-        sdk.v1.billing_portal.sessions.create(body)
+        translate_errors { sdk.v1.billing_portal.sessions.create(body) }
       end
 
       # POST /v1/customers. The optional `idempotency_key:` is the gem's
@@ -80,22 +96,32 @@ module Billing
       def create_customer(email:, idempotency_key: nil, **extra)
         body = { email: email }.merge(extra)
         opts = idempotency_key ? { idempotency_key: idempotency_key } : {}
-        sdk.v1.customers.create(body, opts)
+        translate_errors { sdk.v1.customers.create(body, opts) }
       end
 
       # GET /v1/customers/search
       def search_customers(query:, limit: 1)
-        sdk.v1.customers.search(query: query, limit: limit)
+        translate_errors { sdk.v1.customers.search({ query: query, limit: limit }) }
       end
 
       # GET /v1/invoices/{id}
       def retrieve_invoice(invoice_id)
-        sdk.v1.invoices.retrieve(invoice_id)
+        translate_errors { sdk.v1.invoices.retrieve(invoice_id) }
       end
 
       private
 
       attr_reader :sdk
+
+      def translate_errors
+        yield
+      rescue ::Stripe::APIConnectionError => e
+        raise Billing::GatewayError, "Stripe connection error: #{e.message}"
+      rescue ::Stripe::AuthenticationError, ::Stripe::PermissionError => e
+        raise Billing::GatewayError, "Stripe authentication error: #{e.message}"
+      rescue ::Stripe::StripeError => e
+        raise Billing::GatewayError, "Stripe #{e.class.name.split('::').last}: #{e.message}"
+      end
     end
   end
 end

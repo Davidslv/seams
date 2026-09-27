@@ -3,6 +3,7 @@
 require "billing/gateways/abstract"
 require "billing/stripe/client"
 require "billing/stripe/webhook_signature"
+require "billing/stripe/payload"
 
 module Billing
   module Gateways
@@ -136,18 +137,17 @@ module Billing
 
       private
 
-      # Stripe's response shape changed: current_period_end now lives
-      # on items.data[].current_period_end. We try the subscription
-      # root first for backwards compatibility, then fall back to the
-      # first item.
+      # `sub` is a ::Stripe::Subscription from the gem (no #dig) or a
+      # Hash in specs; Billing::Stripe::Payload reads both.
+      # Since API 2025-03-31.basil current_period_end lives on
+      # items.data[] only; the subscription root is the fallback for
+      # older payloads.
       def normalise_subscription(sub)
-        items_data = sub.dig("items", "data") || []
-        first_item = items_data.first || {}
         {
-          id:                  sub["id"],
-          status:              sub["status"],
-          current_period_end:  sub["current_period_end"] || first_item["current_period_end"],
-          plan_ref:            first_item.dig("price", "id")
+          id:                 Billing::Stripe::Payload.dig(sub, :id),
+          status:             Billing::Stripe::Payload.dig(sub, :status),
+          current_period_end: Billing::Stripe::Payload.subscription_current_period_end(sub),
+          plan_ref:           Billing::Stripe::Payload.subscription_price_ref(sub)
         }
       end
     end

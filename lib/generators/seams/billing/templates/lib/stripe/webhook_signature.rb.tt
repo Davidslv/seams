@@ -28,7 +28,15 @@ module Billing
       # Returns the parsed Stripe::Event on success; raises
       # Billing::WebhookError on any failure mode (no header,
       # malformed header, no v1, no matching v1, timestamp outside
-      # tolerance, malformed JSON).
+      # tolerance, malformed JSON, or a v2 "thin" event).
+      #
+      # stripe-ruby 19 made construct_event raise ArgumentError when
+      # the signed body is a v2 event notification
+      # (object: "v2.core.event"). This endpoint handles v1 snapshot
+      # events only, so a v2 payload means the event destination is
+      # misconfigured: we answer 400 via Billing::WebhookError rather
+      # than a 500.
+      # https://github.com/stripe/stripe-ruby/wiki/Migration-guide-for-v19
       def verify!(payload:, signature_header:, secret:, tolerance: DEFAULT_TOLERANCE)
         raise Billing::WebhookError, "Stripe-Signature header missing" if signature_header.nil? || signature_header.empty?
 
@@ -37,6 +45,8 @@ module Billing
         raise Billing::WebhookError, "Stripe signature invalid: #{e.message}"
       rescue JSON::ParserError => e
         raise Billing::WebhookError, "Stripe payload not JSON: #{e.message}"
+      rescue ArgumentError => e
+        raise Billing::WebhookError, "Stripe payload is not a v1 event: #{e.message}"
       end
     end
   end
