@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-27
+
+> [!WARNING]
+> Breaking changes for hosts (pre-1.0, so this is a minor bump):
+>
+> - Generated billing code targets `stripe ~> 19.0` (was `~> 13.0`) and
+>   raises `Billing::GatewayError` where Stripe errors used to escape.
+>   Hosts that rescued `Stripe::*` from the generated services must rescue
+>   `Billing::GatewayError`. Match your Stripe webhook endpoint's API
+>   version to `2026-08-26.dahlia`.
+> - Generated code is not rewritten by a gem upgrade. See "Fixed" for the
+>   manual steps (engine `spec/dummy/config/cable.yml`, admin engine).
+
 ### Added
 
 - Integration suite: a default `seams:install` host must resolve its
