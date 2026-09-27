@@ -47,13 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Dependencies: Ruby 4.0.7 (repo, CI, and the generated host's
 - Generated host pins: rspec-rails is injected as `">= 7.1", "< 9"` (was
   `"~> 7.1"`) in the host Gemfile and each engine Gemfile, so Rails 7.2+
   hosts get rspec-rails 8.x. The generated CI uses `actions/checkout@v7`
   and a `postgres:18` service; the Kamal Postgres accessory comment moves
   to `postgres:18` and its volume to `/var/lib/postgresql` (18's layout).
-- Dependencies: Ruby 4.0.6 (repo, CI, and the generated host's
+- Dependencies: Ruby 4.0.7 (repo, CI, and the generated host's
   `.ruby-version` / Dockerfile default), Rails 8.1.4, RuboCop 1.91 (+
   rubocop-rails 2.38, rubocop-performance 1.27), SimpleCov 1.3, brakeman
   8.0.6, sqlite3 2.9.6, yard 0.9.45, and the docs-site on Astro 7.3 / Starlight 0.42. Patches the
