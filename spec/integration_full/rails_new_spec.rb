@@ -297,16 +297,28 @@ RSpec.describe "rails new integration", type: :integration_full do
           puts "ADMIN staff #{path} => #{staff.response.status}"
         end
       end
+      staff.get("/admin/identities")
+      body = staff.response.body
+      puts "ADMIN nav links => #{body.scan(/navigation__link--/).size}"
+      puts "ADMIN new link => #{body.include?('href="/admin/identities/new"')}"
+      audits_before = Rails.application.executor.wrap { Core::AuditLog.count }
       staff.post("/admin/plans", params: { plan: { name: "Integration", gateway_ref: "price_integration",
                                                    amount_cents: 500, currency: "usd", interval: "month" } })
-      puts "ADMIN staff create plan => #{staff.response.status}"
+      puts "ADMIN create plan => #{staff.response.status}"
+      puts "ADMIN create audited => #{Rails.application.executor.wrap { Core::AuditLog.count } - audits_before}"
     RUBY
 
     expect(admin_http).to include("ADMIN anon => 302 http://localhost/auth/session/new"), admin_http
     expect(admin_http).to include("ADMIN nonstaff => 403"), admin_http
     staff_lines = admin_http.lines.grep(/^ADMIN staff /)
-    expect(staff_lines.size).to eq(25), admin_http
-    expect(staff_lines.grep_v(/=> (200|302)$/)).to be_empty, admin_http
+    expect(staff_lines.size).to eq(24), admin_http
+    expect(staff_lines.grep_v(/=> 200$/)).to be_empty, admin_http
+    # Administrate's own sidebar and link checks read the host's routes,
+    # which miss a mounted engine; both came out empty before.
+    expect(admin_http).to include("ADMIN nav links => 12"), admin_http
+    expect(admin_http).to include("ADMIN new link => true"), admin_http
+    expect(admin_http).to include("ADMIN create plan => 302"), admin_http
+    expect(admin_http).to include("ADMIN create audited => 1"), admin_http
 
     # Phase 2C — verify Auth + Notifications wiring end-to-end.
     # Publish the canonical identity.signed_up.auth event from a

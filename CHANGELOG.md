@@ -110,6 +110,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Admin engine UI: the sidebar and every New / show / edit / destroy link
+  were missing, because Administrate reads the host's routes and a mounted
+  engine's routes are not in them. `existing_action?` and a navigation
+  partial now read the engine's routes; `authorized_action?` uses the
+  policy of the resource being linked. An `_index_header` override builds
+  the New link from the controller. Creates now write an admin audit row
+  (Administrate's `create` never set `requested_resource`). The admin
+  README documents the authenticator and membership resolver that tenant
+  mode needs.
 - `bin/audit` (the pre-push gate) failed from a linked git worktree:
   the hook's exported `GIT_DIR` made `bundle-audit --update` pull its
   advisory database against this repo. It now clears git's hook

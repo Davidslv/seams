@@ -89,6 +89,34 @@ Seams::Admin.configure { |c| c.tenancy_scope = :tenant }
 - **Requires:** the `accounts` engine. Without it the admin engine
   fails fast at boot with a clear error message.
 
+Tenant mode needs two more settings in the same initializer. With only
+`tenancy_scope = :tenant`, a tenant admin who is not platform staff gets
+a 403 from the gate, and no membership is resolved for admin requests:
+
+1. **Authenticator.** The default gate is `current_identity&.staff?`,
+   which only lets platform staff in. Let signed-in identities through
+   and leave per-record decisions to the tenant policies.
+2. **Membership resolver.** The admin controllers do not inherit your
+   `ApplicationController`, so whatever sets `Accounts::Current.membership`
+   there does not run for admin requests. Resolve it here.
+
+```ruby
+# config/initializers/seams_admin.rb
+Seams::Admin.configure do |c|
+  c.tenancy_scope = :tenant
+  c.authenticator = ->(ctrl) { ctrl.current_identity.present? }
+  # Example: the identity's first active membership. Pick the account the
+  # way your app does (subdomain, session, a switcher).
+  c.current_membership_resolver = lambda do |ctrl|
+    identity = ctrl.current_identity
+    identity && Accounts::Membership.find_by(identity_id: identity.id, active: true)
+  end
+end
+```
+
+With both set, a member-role identity still gets 403 from the policies,
+and an admin sees only its own account's rows.
+
 Switching modes is a config flip — no schema change, no regenerate.
 The `policy_namespace` lookup on `Seams::Admin::ApplicationController`
 reads `Seams::Admin.config.tenancy_scope` on every request.

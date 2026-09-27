@@ -552,6 +552,31 @@ RSpec.describe Seams::Generators::AdminGenerator do
       end
     end
 
+    it "reads this engine's routes for existing_action? and the navigation" do
+      assert_file controller_path do |content|
+        expect(content).to include("def existing_action?(resource, action_name)")
+        expect(content).to include("::Seams::Admin::Engine.routes.routes.filter_map")
+        expect(content).to include("helper_method :seams_admin_navigation")
+      end
+      assert_file "engines/admin/app/views/seams/admin/application/_navigation.html.erb" do |content|
+        expect(content).to include("<% seams_admin_navigation.each do |entry| %>")
+      end
+    end
+
+    it "builds the index New link from the controller, not the dashboard class" do
+      assert_file "engines/admin/app/views/seams/admin/application/_index_header.html.erb" do |content|
+        expect(content).to include("url_for(controller: \"/admin/\#{controller_name}\", action: :new)")
+        expect(content).not_to include("page.resource_path")
+      end
+    end
+
+    it "keeps the created record for the create audit row" do
+      assert_file controller_path do |content|
+        expect(content).to include("super { |resource| @created_resource = resource }")
+        expect(content).to include('return @created_resource if action_name == "create"')
+      end
+    end
+
     it "registers the stubbed engines' abilities in the dummy app" do
       assert_file "engines/admin/spec/dummy/config/initializers/seams_abilities.rb" do |content|
         expect(content).to include("Seams::Permissions::DEFAULT_GRANTS.values.flatten.uniq.each")

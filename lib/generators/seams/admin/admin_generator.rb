@@ -189,6 +189,18 @@ module Seams
         end
       end
 
+      # Administrate partial overrides: navigation built from this
+      # engine's routes, and an index header whose New link does not
+      # depend on the dashboard class name. See each partial's header.
+      def create_view_overrides
+        %w[_navigation _index_header].each do |partial|
+          template_unless_ejected(
+            "app/views/seams/admin/application/#{partial}.html.erb.tt",
+            engine_path("app/views/seams/admin/application/#{partial}.html.erb")
+          )
+        end
+      end
+
       # Association fields that name their dashboard explicitly; see
       # templates/app/fields/admin/fields/dashboard_option.rb.tt.
       def create_fields

@@ -1,0 +1,14 @@
+<%%#
+  Replaces Administrate's navigation partial. Administrate lists the
+  resources from Rails.application.routes, which does not include this
+  mounted engine, so its sidebar came out empty. Entries come from
+  Seams::Admin::ApplicationController#seams_admin_navigation: every
+  dashboard with an index route the current user may list.
+%>
+<nav class="navigation">
+  <%%= link_to(t("administrate.navigation.back_to_app"), main_app.root_path, class: "button button--alt button--nav") if main_app.respond_to?(:root_path) %>
+
+  <%% seams_admin_navigation.each do |entry| %>
+    <%%= link_to(entry[:label], entry[:path], class: "navigation__link navigation__link--#{entry[:active] ? "active" : "inactive"}") %>
+  <%% end %>
+</nav>

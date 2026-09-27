@@ -59,6 +59,25 @@ module Seams
         subclass.include(::Seams::Admin.railtie_routes_url_helpers)
       end
 
+      # [route_key, action] pairs for this engine's dashboard routes.
+      def self.admin_routes
+        ::Seams::Admin::Engine.routes.routes.filter_map do |route|
+          controller = route.defaults[:controller]
+          next unless controller&.start_with?("admin/")
+
+          [controller.delete_prefix("admin/"), route.defaults[:action]]
+        end.to_set
+      end
+
+      # "Auth::Identity" => "identities", derived from each dashboard's
+      # declared model so follow-up dashboards are picked up too.
+      def self.admin_route_keys_by_model
+        admin_routes.map(&:first).uniq.each_with_object({}) do |key, map|
+          dashboard = "Admin::#{key.classify}Dashboard".safe_constantize
+          map[dashboard.model.name] = key if dashboard.respond_to?(:model)
+        end
+      end
+
       # Accounts::Membership and Teams::Membership both have the route
       # key `memberships` (isolated-engine model naming), so
       # Administrate's polymorphic `[:admin, membership]` calls
@@ -132,6 +151,7 @@ module Seams
       # policy scopes; dashboards may also branch on it for
       # account_id columns.
       helper_method :seams_admin_tenancy_scope
+      helper_method :seams_admin_navigation
 
       def seams_admin_tenancy_scope
         ::Seams::Admin.config.tenancy_scope
@@ -168,6 +188,13 @@ module Seams
       # at runtime per-request (rare; typically configured once at boot)
       # override this method on a subclass and consult their own request
       # state.
+      # Administrate's `create` never sets `@requested_resource`, and
+      # calling `requested_resource` there looks up `params[:id]` (nil).
+      # Keep the saved record for record_admin_audit.
+      def create
+        super { |resource| @created_resource = resource }
+      end
+
       def policy_namespace
         case ::Seams::Admin.config.tenancy_scope
         when :tenant   then [::Admin::Tenant]
@@ -208,8 +235,49 @@ module Seams
         authorize(resource, policy_class: admin_policy_class)
       end
 
+      # Views ask about other resources too (navigation, association
+      # lists), so pick the policy for the resource being linked, not
+      # this controller's. Unknown resources are denied.
       def authorized_action?(resource, action)
-        admin_policy_class.new(pundit_user, resource).public_send(:"#{action}?")
+        key    = admin_route_key_for(resource) || controller_name
+        policy = "#{policy_namespace.first}::#{key.classify}Policy".safe_constantize
+        return false if policy.nil?
+
+        policy.new(pundit_user, resource).public_send(:"#{action}?")
+      end
+
+      # Administrate decides which links to render with existing_action?,
+      # built from Rails.application.routes. A mounted engine's routes are
+      # not in that set, so every show/edit/new/destroy link and the
+      # navigation vanished. Read this engine's routes instead.
+      def existing_action?(resource, action_name)
+        key = admin_route_key_for(resource)
+        key.present? && self.class.admin_routes.include?([key, action_name.to_s])
+      end
+
+      # Route key ("accounts_memberships") for a record, a model class,
+      # or a name Administrate passes ("admin/accounts_membership",
+      # :identities).
+      def admin_route_key_for(resource)
+        case resource
+        when ::ActiveRecord::Base then self.class.admin_route_keys_by_model[resource.class.name]
+        when Class                then self.class.admin_route_keys_by_model[resource.name]
+        else resource.to_s.delete_prefix("admin/").pluralize.presence
+        end
+      end
+
+      # Sidebar entries for the navigation partial: every dashboard with
+      # an index route that the current user may list.
+      def seams_admin_navigation
+        self.class.admin_routes.select { |_key, action| action == "index" }.map(&:first).uniq.filter_map do |key|
+          dashboard = "Admin::#{key.classify}Dashboard".safe_constantize
+          next unless dashboard.respond_to?(:model) && authorized_action?(dashboard.model, :index)
+
+          { key: key,
+            label: dashboard.model.model_name.human(count: 2),
+            path: url_for(controller: "/admin/#{key}", action: :index),
+            active: key == controller_name }
+        end
       end
 
       # Resolve the current Accounts::Membership for tenant-mode
@@ -248,10 +316,10 @@ module Seams
       #     row from this controller would double-log. We detect the
       #     `audit_logs` association the concern installs and skip.
       #
-      # `requested_resource` is Administrate's resolved record. On
-      # `create` it's the just-saved record; on `update` it's the
-      # just-updated record; on `destroy` it's the record that was just
-      # destroyed (frozen but still readable for `id` / `class.name`).
+      # The audited record: on `create` the record our `create` override
+      # captured (Administrate never sets requested_resource there); on
+      # `update` the just-updated record; on `destroy` the record that was
+      # just destroyed (frozen but still readable for `id` / `class.name`).
       def record_admin_audit
         return unless defined?(::Core::AuditLog)
         return unless response.successful? || response.redirect?
@@ -293,6 +361,8 @@ module Seams
       # subclass that overrode `requested_resource` to raise) we don't
       # want the audit hook to take down the whole response.
       def requested_resource_for_audit
+        return @created_resource if action_name == "create"
+
         respond_to?(:requested_resource, true) ? requested_resource : nil
       rescue StandardError
         nil
