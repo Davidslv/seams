@@ -116,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     check, and the tenant role specs use a concrete policy.
   The integration suite signs in as anonymous, non-staff, and staff and
   asserts every dashboard's index and new page plus a create.
+- Generated `bin/docker-entrypoint` now runs `db:prepare` for the
+  Dockerfile's own `bundle exec rails server -b 0.0.0.0` command. It only
+  checked the first three arguments, where `server` never appears, so a
+  seams-built container started against an empty database. Verified by
+  building and running a generated host (all engines) against Postgres 18.
 - Engine dummy apps now ship `spec/dummy/config/cable.yml` (test adapter).
   solid_cable 4.1 reads `config_for("cable")` at boot, so every generated
   engine spec suite failed to load in a host that bundles solid_cable.

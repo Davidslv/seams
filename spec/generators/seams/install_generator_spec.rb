@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "tmpdir"
 require "rails/generators"
 require "rails/generators/test_case"
 require "generators/seams/install/install_generator"
@@ -191,6 +192,42 @@ RSpec.describe Seams::Generators::InstallGenerator do
     it "marks bin/docker-entrypoint as executable" do
       full = File.join(destination_root, "bin/docker-entrypoint")
       expect(File.executable?(full)).to be(true)
+    end
+
+    # Run the generated script with a stub `bundle` that logs its args,
+    # so the test checks what the entrypoint does, not its text. The
+    # Dockerfile's CMD is `bundle exec rails server -b 0.0.0.0`, where
+    # `server` is the 4th argument.
+    describe "running bin/docker-entrypoint" do
+      let(:stub_dir) { Dir.mktmpdir("entrypoint-stub") }
+      let(:log)      { File.join(stub_dir, "bundle.log") }
+
+      before do
+        File.write(File.join(stub_dir, "bundle"), "#!/bin/sh\necho \"$*\" >> \"#{log}\"\n")
+        FileUtils.chmod(0o755, File.join(stub_dir, "bundle"))
+      end
+
+      after { FileUtils.rm_rf(stub_dir) }
+
+      def run_entrypoint(*command)
+        env = { "PATH" => "#{stub_dir}:#{ENV.fetch("PATH")}" }
+        system(env, File.join(destination_root, "bin/docker-entrypoint"), *command, exception: true)
+        File.exist?(log) ? File.readlines(log, chomp: true) : []
+      end
+
+      it "runs db:prepare before the Dockerfile's web command" do
+        expect(run_entrypoint("bundle", "exec", "rails", "server", "-b", "0.0.0.0"))
+          .to eq(["exec rails db:prepare", "exec rails server -b 0.0.0.0"])
+      end
+
+      it "runs db:prepare before ./bin/rails server" do
+        expect(run_entrypoint("bundle", "exec", "./bin/rails", "server").first).to eq("exec rails db:prepare")
+      end
+
+      it "skips db:prepare for a worker" do
+        expect(run_entrypoint("bundle", "exec", "rails", "solid_queue:start"))
+          .to eq(["exec rails solid_queue:start"])
+      end
     end
   end
 
