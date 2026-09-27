@@ -18,8 +18,10 @@ set -e
 # Web command is `bundle exec rails server` (or `./bin/rails server`).
 # Workers use `bundle exec rails solid_queue:start` — never run
 # db:prepare from a worker, two containers racing CREATE TABLE breaks.
-case "${1}${2}${3}" in
-  *server*|*"./bin/rails"*"server"*|*"bin/rails"*"server"*)
+# Match `server` as a whole word anywhere in the command: in
+# `bundle exec rails server` it is the 4th argument.
+case " $* " in
+  *" server "*|*" s "*)
     bundle exec rails db:prepare
     ;;
 esac
