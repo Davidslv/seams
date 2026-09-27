@@ -28,15 +28,15 @@ Every generated file is plain Rails code in your repo. You can read it, change i
 
 ## Installation
 
+Add Seams to your Gemfile:
+
+```ruby
+# Gemfile
+gem "seams", "~> 0.2"
+```
+
 > [!WARNING]
-> **Install from GitHub for now.** The only release on RubyGems is `0.1.0` (May 2026). It requires Ruby 4.0 or newer and predates many fixes, including the admin engine working at all and Ruby 3.3 support. Until a new version is released, point your Gemfile at the repository:
->
-> ```ruby
-> # Gemfile
-> gem "seams", github: "Davidslv/seams"
-> ```
->
-> Once a newer version is on RubyGems, use `gem "seams"` instead.
+> **Use 0.2.0 or newer.** Version `0.1.0` requires Ruby 4.0 and predates many fixes, including the admin engine working and Ruby 3.3 support.
 
 Then install the framework:
 
