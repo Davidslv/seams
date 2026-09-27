@@ -27,7 +27,7 @@ green:
 
 - `Lint`
 - `Security`
-- `RSpec (Ruby 4.0.3)`
+- `RSpec (Ruby 4.0.6)`
 - `Integration (rails new + boot)`
 
 The `Docs` workflow also runs (link check + API-doc coverage ratchet);
