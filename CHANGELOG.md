@@ -42,10 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Dependencies: Ruby 4.0.6 (repo, CI, and the generated host's
+- Dependencies: Ruby 4.0.7 (repo, CI, and the generated host's
   `.ruby-version` / Dockerfile default), Rails 8.1.4, RuboCop 1.91 (+
   rubocop-rails 2.38, rubocop-performance 1.27), SimpleCov 1.3, brakeman
-  8.0.6, and the docs-site on Astro 7.3 / Starlight 0.42. Patches the
+  8.0.6, sqlite3 2.9.6, yard 0.9.45, and the docs-site on Astro 7.3 / Starlight 0.42. Patches the
   websocket-driver 0.8.0 advisories (CVE-2026-54463/54464/54465/61666)
   and the docs-site devalue, nanoid, and postcss advisories. CI moves to
   `actions/setup-node@v7`.
@@ -75,6 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Engine dummy apps now ship `spec/dummy/config/cable.yml` (test adapter).
   solid_cable 4.1 reads `config_for("cable")` at boot, so every generated
   engine spec suite failed to load in a host that bundles solid_cable.
+  Engines generated before this release need the file added by hand:
+  `engines/*/spec/dummy/config/cable.yml` containing `test:` /
+  `  adapter: test`.
 - Teams generator: `InvitationsController#accept` now redirects unauthenticated requests to the sign-in path (stashing the token in the session under `pending_invitation_token`) instead of raising `ActiveRecord::RecordInvalid`. The host's sign-in flow is responsible for reading `return_to` and redirecting back after authentication.
 - Teams generator: `InvitationsController#accept` now verifies that the signed-in identity's email matches the invitation email (case-insensitively) before creating the membership. Previously any authenticated identity holding a valid token could accept the invitation under a different account.
 - Billing generator: `scoped_invoices` / `scoped_subscriptions` now return

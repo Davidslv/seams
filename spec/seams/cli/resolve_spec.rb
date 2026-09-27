@@ -10,8 +10,8 @@ require "seams/cli/resolve"
 # the CLI wrote, and (c) the human-readable output. Splitting those
 # into single-expectation examples buys nothing — the file write and
 # the stdout line are facets of the same observable behaviour. The
-# resolve_spec.rb file exempts these two cops at file scope rather
-# than per-example.
+# describe block below exempts these two cops as a whole rather than
+# per-example.
 # rubocop:disable-next RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe Seams::CLI::Resolve do
   let(:tmpdir)        { Dir.mktmpdir("seams-resolve-spec-") }
