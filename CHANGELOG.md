@@ -82,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Engines generated before this release need the file added by hand:
   `engines/*/spec/dummy/config/cable.yml` containing `test:` /
   `  adapter: test`.
+- Nightly link check: lychee retries each link 5 times (10s apart) before
+  reporting it, and a failing run updates the open `broken-link` issue
+  instead of filing a new one. Closes #93 and #109, both transient
+  connection resets on contributor-covenant.org.
 - Teams generator: `InvitationsController#accept` now redirects unauthenticated requests to the sign-in path (stashing the token in the session under `pending_invitation_token`) instead of raising `ActiveRecord::RecordInvalid`. The host's sign-in flow is responsible for reading `return_to` and redirecting back after authentication.
 - Teams generator: `InvitationsController#accept` now verifies that the signed-in identity's email matches the invitation email (case-insensitively) before creating the membership. Previously any authenticated identity holding a valid token could accept the invitation under a different account.
 - Billing generator: `scoped_invoices` / `scoped_subscriptions` now return
