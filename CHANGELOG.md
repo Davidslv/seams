@@ -72,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `bin/audit` (the pre-push gate) failed from a linked git worktree:
+  the hook's exported `GIT_DIR` made `bundle-audit --update` pull its
+  advisory database against this repo. It now clears git's hook
+  variables for that command.
 - Engine dummy apps now ship `spec/dummy/config/cable.yml` (test adapter).
   solid_cable 4.1 reads `config_for("cable")` at boot, so every generated
   engine spec suite failed to load in a host that bundles solid_cable.

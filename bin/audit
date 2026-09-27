@@ -36,7 +36,12 @@ bundle exec rspec
 pass "rspec default"
 
 heading "bundle-audit (vulnerable gems)"
-bundle exec bundle-audit check --update
+# A git hook run from a linked worktree exports GIT_DIR (and friends).
+# bundle-audit --update runs `git pull` inside its advisory-db checkout,
+# which would then target this repo instead ("couldn't find remote ref
+# master"). Clear them for this one command.
+env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX \
+  bundle exec bundle-audit check --update
 pass "bundle-audit"
 
 # Brakeman runs against the gem itself as a sanity check. The gem doesn't
