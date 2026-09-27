@@ -173,6 +173,15 @@ RSpec.describe Seams::Generators::EngineGenerator do
       run_generator(["reporting"])
       expect(File.exist?(initializer_path)).to be(false)
     end
+
+    it "neither mounts nor writes an initializer with --skip-host-wiring" do
+      FileUtils.mkdir_p(File.join(destination_root, "config/initializers"))
+      File.write(routes_path, "Rails.application.routes.draw do\nend\n")
+      run_generator(["reporting", "--skip-host-wiring"])
+
+      expect(File.read(routes_path)).not_to include("mount Reporting::Engine")
+      expect(File.exist?(initializer_path)).to be(false)
+    end
   end
 
   describe "engine name validation" do

@@ -26,6 +26,9 @@ module Seams
 
       def authenticate_admin!
         return if admin_authenticator_call
+        # Signed-out visitors go to the auth engine's sign-in page; a
+        # signed-in identity that fails the gate gets the 403 below.
+        return authenticate_identity! if respond_to?(:signed_in?, true) && !signed_in?
 
         respond_with_admin_forbidden(<<~MSG.strip)
           Access denied. The seams admin surface is gated on

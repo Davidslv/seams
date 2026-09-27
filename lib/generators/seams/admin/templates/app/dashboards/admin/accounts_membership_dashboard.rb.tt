@@ -17,10 +17,18 @@ require "administrate/base_dashboard"
 # the admin surface treats identity_id as a typed integer reference.
 module Admin
   class AccountsMembershipDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (AccountsMembershipDashboard -> Admin::AccountsMembership), which does not exist.
+    def self.model
+      ::Accounts::Membership
+    end
+
     ATTRIBUTE_TYPES = {
       # UUID PK — Field::String, not Field::Number.
       id:          Field::String,
-      account:     Field::BelongsTo.with_options(class_name: "Accounts::Account"),
+      account:     Admin::Fields::BelongsTo.with_options(
+        class_name: "Accounts::Account", dashboard: "Admin::AccountDashboard"
+      ),
       identity_id: Field::Number,
       name:        Field::String,
       role:        Field::Select.with_options(collection: %w[owner admin member system]),

@@ -474,14 +474,14 @@ RSpec.describe Seams::Generators::AdminGenerator do
       it "splices a `resources :#{plural}` declaration" do
         assert_file routes_path do |content|
           expect(content).to include("resources :#{plural}")
-          expect(content).to include(%(controller: "admin/#{plural}"))
+          expect(content).to include(%(controller: "/admin/#{plural}"))
         end
       end
     end
 
-    it "sets the engine root to admin/identities#index" do
+    it "sets the engine root to /admin/identities#index" do
       assert_file routes_path do |content|
-        expect(content).to include('root to: "admin/identities#index"')
+        expect(content).to include('root to: "/admin/identities#index"')
       end
     end
   end
@@ -490,6 +490,81 @@ RSpec.describe Seams::Generators::AdminGenerator do
     it "appends `gem \"administrate\"` so the engine's standalone specs can require it" do
       assert_file "engines/admin/Gemfile" do |content|
         expect(content).to include('gem "administrate", "~> 1.0"')
+      end
+    end
+  end
+
+  # Found by driving a generated host over HTTP: each of these broke
+  # every admin request for a signed-in staff identity.
+  describe "request wiring" do
+    let(:controller_path) { "engines/admin/app/controllers/seams/admin/application_controller.rb" }
+
+    it "includes the auth engine's session lookup so current_identity resolves" do
+      assert_file controller_path do |content|
+        expect(content).to include("include ::Auth::Authentication if defined?(::Auth::Authentication)")
+      end
+    end
+
+    it "gives the top-level Admin:: controllers the engine's route helpers" do
+      assert_file controller_path do |content|
+        expect(content).to include("subclass.include(::Seams::Admin.railtie_routes_url_helpers)")
+      end
+    end
+
+    it "resolves each dashboard's policy explicitly instead of Pundit's array lookup" do
+      assert_file controller_path do |content|
+        expect(content).to include("::\#{controller_name.classify}Policy\".constantize")
+        expect(content).to include("policy_class: admin_policy_class")
+        expect(content).to include("policy_scope_class: admin_policy_class::Scope")
+      end
+    end
+
+    it "does not name a non-action in verify_authorized's except list" do
+      assert_file controller_path do |content|
+        expect(content).to include("after_action :verify_authorized,    except: :index")
+      end
+    end
+
+    it "routes the colliding membership route keys by record class" do
+      assert_file controller_path do |content|
+        expect(content).to include('"Accounts::Membership" => "accounts_membership"')
+        expect(content).to include('"Teams::Membership"    => "teams_membership"')
+      end
+    end
+
+    it "redirects signed-out visitors to sign-in before answering 403" do
+      assert_file "engines/admin/lib/admin/concerns/authenticator.rb" do |content|
+        expect(content).to include("return authenticate_identity! if respond_to?(:signed_in?, true) && !signed_in?")
+      end
+    end
+
+    it "names the dashboard routes admin_* for Administrate's polymorphic links" do
+      assert_file "engines/admin/config/routes.rb" do |content|
+        expect(content).to include("scope as: :admin do")
+      end
+    end
+
+    ADMIN_PHASE_TWO_DASHBOARD_TABLE.each do |basename, _dashboard_class, model_class|
+      it "#{basename} dashboard declares its model (#{model_class})" do
+        assert_file "engines/admin/app/dashboards/admin/#{basename}_dashboard.rb" do |content|
+          expect(content).to include("def self.model\n      ::#{model_class}\n    end")
+        end
+      end
+    end
+
+    it "registers the stubbed engines' abilities in the dummy app" do
+      assert_file "engines/admin/spec/dummy/config/initializers/seams_abilities.rb" do |content|
+        expect(content).to include("Seams::Permissions::DEFAULT_GRANTS.values.flatten.uniq.each")
+        expect(content).to include("Seams::PermissionRegistry.register(ability")
+      end
+    end
+
+    it "ships association fields that take a dashboard: option" do
+      %w[dashboard_option belongs_to has_many].each do |field|
+        assert_file "engines/admin/app/fields/admin/fields/#{field}.rb"
+      end
+      assert_file "engines/admin/app/dashboards/admin/team_dashboard.rb" do |content|
+        expect(content).to include('dashboard: "Admin::TeamsMembershipDashboard"')
       end
     end
   end
@@ -820,14 +895,14 @@ RSpec.describe Seams::Generators::AdminGenerator do
       end
     end
 
-    it "does NOT redefine scoped_resource (Punditize already overrides it)" do
-      # Defining `scoped_resource` ourselves shadows Punditize's
-      # version, breaking the policy_scope wiring. The override Phase 3
-      # originally added is now redundant — Punditize's own
-      # `scoped_resource` calls `policy_scope!` with the array-form
-      # namespace.
+    it "redefines scoped_resource through Pundit's policy_scope (verify_policy_scoped stays satisfied)" do
+      # Punditize's own scoped_resource cannot find these policies (its
+      # array lookup yields Module::Auth::IdentityPolicy). The override
+      # passes the explicit Scope class to Pundit's `policy_scope`,
+      # which also marks the request as policy-scoped.
       assert_file controller_path do |content|
-        expect(content).not_to include("def scoped_resource")
+        expect(content).to include("def scoped_resource")
+        expect(content).to include("policy_scope(resource_class.default_scoped")
       end
     end
   end

@@ -8,9 +8,15 @@ require "administrate/base_dashboard"
 # read the full token (they re-issue if lost).
 module Admin
   class InvitationDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (InvitationDashboard -> Admin::Invitation), which does not exist.
+    def self.model
+      ::Teams::Invitation
+    end
+
     ATTRIBUTE_TYPES = {
       id:          Field::Number,
-      team:        Field::BelongsTo.with_options(class_name: "Teams::Team"),
+      team:        Admin::Fields::BelongsTo.with_options(class_name: "Teams::Team", dashboard: "Admin::TeamDashboard"),
       email:       Field::String.with_options(searchable: true),
       # Truncated to 16 chars so the table view doesn't get blown up
       # by the 43-char base64 token. Full value still available on the

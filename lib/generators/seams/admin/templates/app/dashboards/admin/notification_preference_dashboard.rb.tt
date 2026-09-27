@@ -8,6 +8,12 @@ require "administrate/base_dashboard"
 # false` is an explicit opt-out.
 module Admin
   class NotificationPreferenceDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (NotificationPreferenceDashboard -> Admin::NotificationPreference), which does not exist.
+    def self.model
+      ::Notifications::NotificationPreference
+    end
+
     ATTRIBUTE_TYPES = {
       id:                Field::Number,
       identity_id:       Field::Number,

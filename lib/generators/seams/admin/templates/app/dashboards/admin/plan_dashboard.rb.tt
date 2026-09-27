@@ -12,6 +12,12 @@ require "administrate/base_dashboard"
 # `currency` from the same row and formats accordingly.
 module Admin
   class PlanDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (PlanDashboard -> Admin::Plan), which does not exist.
+    def self.model
+      ::Billing::Plan
+    end
+
     ATTRIBUTE_TYPES = {
       id:                  Field::Number,
       gateway_ref:         Field::String,

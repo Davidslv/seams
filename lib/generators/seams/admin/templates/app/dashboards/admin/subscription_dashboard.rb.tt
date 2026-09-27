@@ -10,6 +10,12 @@ require "administrate/base_dashboard"
 # account_id as an opaque tenant reference rather than a belongs_to.
 module Admin
   class SubscriptionDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (SubscriptionDashboard -> Admin::Subscription), which does not exist.
+    def self.model
+      ::Billing::Subscription
+    end
+
     ATTRIBUTE_TYPES = {
       id:                 Field::Number,
       # UUID — Field::String, not Field::Number.

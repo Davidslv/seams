@@ -8,6 +8,12 @@ require "administrate/base_dashboard"
 # track the human (Auth::Identity bigint) who pressed the button.
 module Admin
   class LifetimePassDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (LifetimePassDashboard -> Admin::LifetimePass), which does not exist.
+    def self.model
+      ::Billing::LifetimePass
+    end
+
     ATTRIBUTE_TYPES = {
       id:                       Field::Number,
       # UUID — Field::String, not Field::Number.

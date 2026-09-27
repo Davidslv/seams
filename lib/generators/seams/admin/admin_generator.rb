@@ -69,7 +69,7 @@ module Seams
       #
       # The order here is the order routes + dashboards appear in
       # the generated files; Identity comes first so the engine root
-      # (`root to: "admin/identities#index"`) lands on something
+      # (`root to: "/admin/identities#index"`) lands on something
       # meaningful.
       DASHBOARD_MODELS = [
         # [dashboard_basename, model_class, owning_engine]
@@ -87,8 +87,11 @@ module Seams
         ["lifetime_pass",           "Billing::LifetimePass",                "billing"]
       ].freeze
 
+      # The base engine would mount `Admin::Engine` and write an
+      # `Admin.configure` initializer, but this engine's constants live
+      # under `Seams::Admin`. wire_into_host mounts the real class.
       def create_base_engine
-        EngineGenerator.start([ENGINE_NAME], destination_root: destination_root)
+        EngineGenerator.start([ENGINE_NAME, "--skip-host-wiring"], destination_root: destination_root)
       end
 
       def overwrite_engine_entry_point
@@ -186,6 +189,17 @@ module Seams
         end
       end
 
+      # Association fields that name their dashboard explicitly; see
+      # templates/app/fields/admin/fields/dashboard_option.rb.tt.
+      def create_fields
+        %w[dashboard_option belongs_to has_many].each do |field|
+          template_unless_ejected(
+            "app/fields/admin/fields/#{field}.rb.tt",
+            engine_path("app/fields/admin/fields/#{field}.rb")
+          )
+        end
+      end
+
       # Phase 2: emit one dashboard + one controller per entry in
       # DASHBOARD_MODELS. `template_unless_ejected` so a host that
       # ejects an individual dashboard (e.g. to restyle the Identity
@@ -221,6 +235,7 @@ module Seams
         write_auth_current_stub
         write_accounts_current_stub
         write_dummy_model_stubs
+        write_dummy_ability_registrations
         amend_dummy_application_rb
         rewrite_dummy_routes_for_namespaced_engine
       end
@@ -424,6 +439,27 @@ module Seams
       # `class Foo < ApplicationRecord; self.table_name = "..."; end`
       # — no associations, no validations, no callbacks. The dummy
       # schema (see #dummy_schema) ships the matching tables.
+      # The tenant policies resolve through Seams::Permissions.can?, which
+      # raises for an ability no engine registered. In a host the owning
+      # engines register them at boot; the dummy app only stubs those
+      # engines' models, so register their default abilities here.
+      def write_dummy_ability_registrations
+        path = File.join(destination_root, "engines", ENGINE_NAME,
+                         "spec/dummy/config/initializers/seams_abilities.rb")
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, <<~RUBY)
+          # frozen_string_literal: true
+
+          # Stand-in for the ability registrations the auth, accounts,
+          # teams, billing, and notifications engines make at boot.
+          Seams::Permissions::DEFAULT_GRANTS.values.flatten.uniq.each do |ability|
+            next if Seams::PermissionRegistry.registered?(ability)
+
+            Seams::PermissionRegistry.register(ability, owned_by: ability.split(".").last.capitalize)
+          end
+        RUBY
+      end
+
       def write_dummy_model_stubs
         DUMMY_MODEL_STUBS.each do |relative_path, body|
           full = File.join(destination_root, "engines", ENGINE_NAME,

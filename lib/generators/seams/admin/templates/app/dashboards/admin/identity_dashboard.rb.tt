@@ -13,6 +13,12 @@ require "administrate/base_dashboard"
 # auth engine's reset flow, not through the admin surface.
 module Admin
   class IdentityDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (IdentityDashboard -> Admin::Identity), which does not exist.
+    def self.model
+      ::Auth::Identity
+    end
+
     # ATTRIBUTE_TYPES describes how Administrate renders each column.
     # Administrate auto-discovers attributes from the model; declaring
     # them explicitly here makes the rendering deterministic and lets
