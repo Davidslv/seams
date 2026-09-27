@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Integration suite: a default `seams:install` host must resolve its
+  bundle on a multi-platform lockfile (x86_64-linux, aarch64-linux,
+  arm64-darwin, x86_64-darwin). Guards the #42 class, where a gem shipping
+  only some native platforms broke `bundle` on Rails 8 lockfiles. Completes
+  #48.
 - Community and AI-era repository standards: `SUPPORT.md`, `GOVERNANCE.md`,
   `MAINTAINERS.md`, `CITATION.cff`, `.editorconfig`, `.github/FUNDING.yml`,
   an `llms.txt` machine-readable index, and `AGENTS.md` instructions for AI
