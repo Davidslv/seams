@@ -17,6 +17,8 @@ module Seams
     class Quality
       # Default directory that holds the generated engines.
       DEFAULT_ENGINES_ROOT = "engines"
+      # Gate statuses that count as a pass for the overall result.
+      PASSING_STATUSES = %i[pass skipped].freeze
 
       def initialize(engines_root: DEFAULT_ENGINES_ROOT, output: $stdout)
         @engines_root = engines_root
@@ -33,7 +35,7 @@ module Seams
         run_simplecov_collation
 
         print_summary
-        @results.values.all? { |status| %i[pass skipped].include?(status) }
+        @results.values.all? { |status| PASSING_STATUSES.include?(status) }
       end
 
       private

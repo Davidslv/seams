@@ -8,7 +8,7 @@
 
 Key facts for machine readers:
 
-- Language: Ruby (>= 4.0). Runtime dependencies: rails (>= 7.1, < 9.0), thor.
+- Language: Ruby (>= 3.3). Runtime dependencies: rails (>= 7.1, < 9.0), thor.
 - Entry point: the `bin/seams` CLI in a host app (installed by
   `bin/rails generate seams:install`), e.g. `bin/seams core`, `bin/seams auth`,
   `bin/seams engine <name>`, `bin/seams list`, `bin/seams remove <name>`.

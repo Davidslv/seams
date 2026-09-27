@@ -5,7 +5,7 @@ generating your first canonical engine.
 
 ## Prerequisites
 
-- Ruby 3.2+
+- Ruby 3.3+
 - Rails 7.1+ (8.x recommended)
 - A new or existing Rails application
 

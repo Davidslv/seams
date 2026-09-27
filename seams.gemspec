@@ -16,7 +16,7 @@ Gem::Specification.new do |spec|
   spec.homepage    = "https://davidslv.uk/modular-rails/"
   spec.license     = "MIT"
 
-  spec.required_ruby_version = ">= 4.0.0"
+  spec.required_ruby_version = ">= 3.3.0"
 
   # homepage_uri (the book's canonical "what is this" page) and
   # source_code_uri (this repo) deliberately differ so the

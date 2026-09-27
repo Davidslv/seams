@@ -76,6 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the hook's exported `GIT_DIR` made `bundle-audit --update` pull its
   advisory database against this repo. It now clears git's hook
   variables for that command.
+- gemspec: `required_ruby_version` is now `>= 3.3.0` (was `>= 4.0.0`), so
+  `bundle add seams` resolves on Ruby 3.3 and 3.4 hosts. CI runs the spec
+  suite on 3.3, 3.4, and 4.0. RuboCop targets 3.3 so 4.0-only syntax is
+  caught. Ruby 3.2 is end-of-life and SimpleCov 1.x requires 3.3.
+  Fixes #79.
 - Engine dummy apps now ship `spec/dummy/config/cable.yml` (test adapter).
   solid_cable 4.1 reads `config_for("cable")` at boot, so every generated
   engine spec suite failed to load in a host that bundles solid_cable.

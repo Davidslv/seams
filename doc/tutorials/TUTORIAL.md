@@ -8,7 +8,7 @@ order; each builds on the last.
 > reference, see [GETTING_STARTED.md](GETTING_STARTED.md) and
 > [ENGINE_CATALOGUE.md](../reference/ENGINE_CATALOGUE.md).
 
-**Prerequisites:** Ruby 3.2+, Rails 7.1+ (8.x recommended), and a
+**Prerequisites:** Ruby 3.3+, Rails 7.1+ (8.x recommended), and a
 database (the default SQLite is fine for this).
 
 ## 1. A new Rails app (≈2 min)
