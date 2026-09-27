@@ -114,7 +114,9 @@ module Seams
       end
 
       def build_gem_line(name, args, group)
-        version_part = args.first.is_a?(String) ? %(, "#{args.first}") : ""
+        # Every String arg is a version requirement, so a range such as
+        # (">= 7.1", "< 9") is emitted in full.
+        version_part = args.grep(String).map { |req| %(, "#{req}") }.join
         gem_line     = %(gem "#{name}"#{version_part})
         # group may be a single symbol (:development) or several
         # (%i[development test] -> `group :development, :test do`).

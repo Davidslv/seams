@@ -80,7 +80,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       end
 
       group :test do
-        gem "rspec-rails",       "~> 7.1"
+        gem "rspec-rails",       ">= 7.1", "< 9"
         gem "factory_bot_rails", "~> 6.4"
         gem "webmock",           "~> 3.23"
       end

@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Dependencies: Ruby 4.0.7 (repo, CI, and the generated host's
+- Generated host pins: rspec-rails is injected as `">= 7.1", "< 9"` (was
+  `"~> 7.1"`) in the host Gemfile and each engine Gemfile, so Rails 7.2+
+  hosts get rspec-rails 8.x. The generated CI uses `actions/checkout@v7`
+  and a `postgres:18` service; the Kamal Postgres accessory comment moves
+  to `postgres:18` and its volume to `/var/lib/postgresql` (18's layout).
+- Dependencies: Ruby 4.0.6 (repo, CI, and the generated host's
   `.ruby-version` / Dockerfile default), Rails 8.1.4, RuboCop 1.91 (+
   rubocop-rails 2.38, rubocop-performance 1.27), SimpleCov 1.3, brakeman
   8.0.6, sqlite3 2.9.6, yard 0.9.45, and the docs-site on Astro 7.3 / Starlight 0.42. Patches the
@@ -81,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite on 3.3, 3.4, and 4.0. RuboCop targets 3.3 so 4.0-only syntax is
   caught. Ruby 3.2 is end-of-life and SimpleCov 1.x requires 3.3.
   Fixes #79.
+- `host_inject_gem` dropped every version requirement after the first, so
+  a range like `(">= 7.1", "< 9")` was written as `">= 7.1"` only.
 - Engine dummy apps now ship `spec/dummy/config/cable.yml` (test adapter).
   solid_cable 4.1 reads `config_for("cable")` at boot, so every generated
   engine spec suite failed to load in a host that bundles solid_cable.

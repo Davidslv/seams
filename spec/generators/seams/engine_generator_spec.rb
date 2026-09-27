@@ -214,7 +214,7 @@ RSpec.describe Seams::Generators::EngineGenerator do
         [
           'source "https://rubygems.org"',
           "gemspec",
-          'gem "rspec-rails"'
+          'gem "rspec-rails", ">= 7.1", "< 9"'
         ].each { |needle| expect(content).to include(needle) }
       end
     end
