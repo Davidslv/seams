@@ -41,9 +41,9 @@ module Seams
     # with a trailing `?`, but that's wrong for the run_* dispatchers
     # (they're imperative, not predicates). AbcSize / CyclomaticComplexity
     # likewise trigger on the run_* methods because CLI command
-    # branches are inherently branchy. The cops are disabled at file
-    # scope and the methods are kept linear and well-commented.
-    # rubocop:disable Naming/PredicateMethod, Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # branches are inherently branchy. The cops are disabled for the
+    # whole class and the methods are kept linear and well-commented.
+    # rubocop:disable-next Naming/PredicateMethod, Metrics/AbcSize, Metrics/CyclomaticComplexity
     class Resolve
       # Default directory that holds the generated engines.
       DEFAULT_ENGINES_ROOT = "engines"
@@ -276,6 +276,5 @@ module Seams
         false
       end
     end
-    # rubocop:enable Naming/PredicateMethod, Metrics/AbcSize, Metrics/CyclomaticComplexity
   end
 end

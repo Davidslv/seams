@@ -59,6 +59,7 @@ module Seams
         write(File.join(engine_path, "spec/dummy/config/application.rb"),  application_rb(engine_module))
         write(File.join(engine_path, "spec/dummy/config/environment.rb"),  environment_rb)
         write(File.join(engine_path, "spec/dummy/config/database.yml"),    database_yml(engine_path))
+        write(File.join(engine_path, "spec/dummy/config/cable.yml"),       cable_yml)
         write(File.join(engine_path, "spec/dummy/config/environments/test.rb"),       test_environment_rb)
         write(File.join(engine_path, "spec/dummy/config/initializers/secret_key.rb"), secret_key_rb)
         write(File.join(engine_path, "spec/dummy/config/routes.rb"), routes_rb(engine_module, mount_at))
@@ -160,6 +161,16 @@ module Seams
             password: <%= ENV.fetch("PGPASSWORD", "") %>
             pool: 5
             encoding: unicode
+        YML
+      end
+
+      # solid_cable >= 4.1 reads config/cable.yml eagerly at boot, so the
+      # dummy app must ship one even though engine specs never open a
+      # socket. The in-process test adapter needs no database or server.
+      def cable_yml
+        <<~YML
+          test:
+            adapter: test
         YML
       end
 

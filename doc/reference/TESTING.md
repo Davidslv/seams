@@ -98,7 +98,7 @@ in CI. Hosts can adopt the same pattern in their `spec/spec_helper.rb`:
 
 ```ruby
 SimpleCov.start "rails" do
-  add_filter "/spec/"
+  skip "/spec/" # SimpleCov 1.x; use add_filter on 0.22
   minimum_coverage 90 if ENV["CI"]
 end
 ```

@@ -8,7 +8,7 @@ require "seams/cli/test_changed"
 # `system` is the rspec shell-out boundary. Stubbing them on the SUT
 # is the correct test strategy here — see quality_spec.rb's matching
 # disable for the longer rationale.
-# rubocop:disable RSpec/SubjectStub
+# rubocop:disable-next RSpec/SubjectStub
 RSpec.describe Seams::CLI::TestChanged do
   subject(:cli) { described_class.new(base: "main", engines_root: engines_root, output: io) }
 
@@ -67,4 +67,3 @@ RSpec.describe Seams::CLI::TestChanged do
     end
   end
 end
-# rubocop:enable RSpec/SubjectStub

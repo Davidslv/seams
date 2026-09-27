@@ -34,6 +34,7 @@ RSpec.describe Seams::Generators::DummyAppWriter do
         spec/dummy/config/application.rb
         spec/dummy/config/environment.rb
         spec/dummy/config/database.yml
+        spec/dummy/config/cable.yml
         spec/dummy/config/environments/test.rb
         spec/dummy/config/initializers/secret_key.rb
         spec/dummy/config/routes.rb
@@ -71,6 +72,14 @@ RSpec.describe Seams::Generators::DummyAppWriter do
       # called outside a Rails context (e.g. seams gem unit specs).
       expect(content).to match(/ActiveRecord::Schema\[\d+\.\d+\]\.define/)
       expect(content).to include("create_table :examples")
+    end
+
+    # solid_cable >= 4.1 calls config_for("cable") at boot, so a dummy
+    # app without cable.yml fails to initialize when the host bundles it.
+    it "writes a cable.yml using the in-process test adapter" do
+      content = File.read(File.join(engine_path, "spec/dummy/config/cable.yml"))
+      expect(content).to include("test:")
+      expect(content).to include("adapter: test")
     end
 
     it "writes the supplied host User body" do

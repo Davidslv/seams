@@ -25,7 +25,7 @@ module Seams
     #     identity.signed_out.auth, session.expired.auth.
     #
     # Run with: bin/rails generate seams:auth
-    # rubocop:disable Metrics/ClassLength
+    # rubocop:disable-next Metrics/ClassLength
     class AuthGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
       include Seams::Generators::EjectAware
@@ -306,6 +306,5 @@ module Seams
         SCHEMA
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end

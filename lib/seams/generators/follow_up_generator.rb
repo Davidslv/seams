@@ -67,7 +67,7 @@ module Seams
       # assert_marker_exists!). Splitting them into separate blocks
       # would obscure the "these are the public follow-up generator
       # primitives" grouping. Disable BlockLength for this one block.
-      # rubocop:disable Metrics/BlockLength
+      # rubocop:disable-next Metrics/BlockLength
       no_tasks do
         # Resolve a path inside the host's engines/<this_engine>/.
         # Mirrors the canonical generators' +engine_path+ method but
@@ -130,7 +130,6 @@ module Seams
           MSG
         end
       end
-      # rubocop:enable Metrics/BlockLength
 
       # Subclass override-point. Subclasses define their own public
       # method named `report_summary` (or any other end-of-run name);

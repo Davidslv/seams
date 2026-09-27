@@ -218,7 +218,7 @@ module Seams
 
       public
 
-      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+      # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
       def post_install_message
         say ""
         say "  Seams is installed. Generate your first engine with:", :green
@@ -271,7 +271,6 @@ module Seams
         say "  See doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md to write your own follow-up generator.", :yellow
         say ""
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
     end
   end
 end

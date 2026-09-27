@@ -8,8 +8,8 @@ unless ENV["COVERAGE"] == "false"
   require "simplecov"
 
   SimpleCov.start do
-    add_filter "/spec/"
-    add_filter "/lib/generators/seams/" # generator templates have their own coverage strategy
+    skip "/spec/"
+    skip "/lib/generators/seams/" # generator templates have their own coverage strategy
     minimum_coverage 90 if ENV["CI"]
   end
 end

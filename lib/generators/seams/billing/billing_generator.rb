@@ -17,7 +17,7 @@ module Seams
     # the host's user model can include.
     #
     # Run with: bin/rails generate seams:billing
-    # rubocop:disable Metrics/ClassLength
+    # rubocop:disable-next Metrics/ClassLength
     class BillingGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
       include Seams::Generators::EjectAware
@@ -471,6 +471,5 @@ module Seams
         SCHEMA
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end

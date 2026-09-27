@@ -21,7 +21,7 @@ module Seams
     # reads from.
     #
     # Run with: bin/rails generate seams:notifications
-    # rubocop:disable Metrics/ClassLength
+    # rubocop:disable-next Metrics/ClassLength
     class NotificationsGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
       include Seams::Generators::EjectAware
@@ -392,6 +392,5 @@ module Seams
         RB
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end
