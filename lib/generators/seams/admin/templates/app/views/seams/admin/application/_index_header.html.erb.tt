@@ -1,0 +1,57 @@
+<%%#
+  Copy of Administrate 1.0's _index_header with one change: the "New"
+  link. Administrate builds it from the dashboard class name, which
+  gives new_admin_admin_<resource>_path for Admin::*Dashboard. The
+  link is built from this controller instead.
+%>
+<%% content_for(:title) do %>
+  <%%= display_resource_name(page.resource_name) %>
+<%% end %>
+
+<header class="main-content__header">
+  <h1 class="main-content__page-title" id="page-title">
+    <%%= content_for(:title) %>
+  </h1>
+
+  <%%= content_for(:header_middle) %>
+
+  <%% if show_search_bar %>
+    <%%= render(
+      "search",
+      search_term: search_term,
+      resource_name: display_resource_name(page.resource_name)
+    ) %>
+
+    <%% if filters.any? %>
+      <div data-controller="tooltip">
+        <button data-tooltip-target="tooltip" popovertarget="search-tooltip" class="button--tooltip search__tooltip">
+          <svg role="img">
+            <use xlink:href="#icon-question-mark" />
+          </svg>
+        </button>
+
+        <div data-tooltip-target="popover" popover id="search-tooltip" role="tooltip" class="search__tooltip-popover search__tooltip-popover-positioning">
+          <p><strong>Use filters to refine your search</strong></p>
+          <ul>
+            <%% filters.keys.each do |filter_key| %>
+            <li><%%= filter_key %>:<span class="search__tooltip-popover-value">&lt;value&gt;</span></li>
+            <%% end %>
+          </ul>
+        </div>
+      </div>
+    <%% end %>
+  <%% end %>
+
+  <div>
+    <%%= link_to(
+      t(
+        "administrate.actions.new_resource",
+        name: display_resource_name(page.resource_name, singular: true).downcase
+      ),
+      url_for(controller: "/admin/#{controller_name}", action: :new),
+      class: "button",
+    ) if accessible_action?(new_resource, :new) %>
+  </div>
+
+  <%%= content_for(:header_last) %>
+</header>
