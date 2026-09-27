@@ -11,6 +11,12 @@ require "administrate/base_dashboard"
 # secondary identifier and renders fine as Field::Number.
 module Admin
   class AccountDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (AccountDashboard -> Admin::Account), which does not exist.
+    def self.model
+      ::Accounts::Account
+    end
+
     ATTRIBUTE_TYPES = {
       # UUID PK — Field::String, not Field::Number.
       id:                  Field::String,
@@ -18,7 +24,9 @@ module Admin
       external_account_id: Field::Number,
       cancelled_at:        Field::DateTime,
       incinerated_at:      Field::DateTime,
-      memberships:         Field::HasMany,
+      memberships:         Admin::Fields::HasMany.with_options(
+        class_name: "Accounts::Membership", dashboard: "Admin::AccountsMembershipDashboard"
+      ),
       created_at:          Field::DateTime,
       updated_at:          Field::DateTime
     }.freeze

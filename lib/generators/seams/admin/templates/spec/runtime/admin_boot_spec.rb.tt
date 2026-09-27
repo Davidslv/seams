@@ -431,12 +431,14 @@ RSpec.describe "Seams::Admin engine boot", type: :integration do
     end
   end
 
-  describe "Admin::Tenant::ApplicationPolicy permitted?" do
+  # The base ApplicationPolicy names no ability and fails closed, so
+  # the role hierarchy is exercised through a concrete policy.
+  describe "Admin::Tenant::ApplicationPolicy permitted? (via AccountPolicy)" do
     let(:identity)   { Auth::Identity.create!(email: "tap-#{SecureRandom.hex(4)}@example.com", password: "verysecret", staff: false) }
     let(:account)    { Accounts::Account.create!(name: "Tenant", external_account_id: SecureRandom.random_number(2**31)) }
     let(:membership) { Accounts::Membership.new(account: account, identity_id: identity.id, name: "Member", role: role) }
     let(:ctx)        { Seams::Admin::Context.new(identity, membership) }
-    let(:policy)     { Admin::Tenant::ApplicationPolicy.new(ctx, account) }
+    let(:policy)     { Admin::Tenant::AccountPolicy.new(ctx, account) }
 
     context "with role=admin" do
       let(:role) { "admin" }

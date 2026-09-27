@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+module Admin
+  module Fields
+    # Administrate::Field::BelongsTo plus the `dashboard:` option (see
+    # Admin::Fields::DashboardOption). Renders with the stock
+    # fields/belongs_to partials.
+    class BelongsTo < ::Administrate::Field::BelongsTo
+      include DashboardOption
+    end
+  end
+end

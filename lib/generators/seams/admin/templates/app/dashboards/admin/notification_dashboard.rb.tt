@@ -12,6 +12,12 @@ require "administrate/base_dashboard"
 # collection view and only shown on the show page.
 module Admin
   class NotificationDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (NotificationDashboard -> Admin::Notification), which does not exist.
+    def self.model
+      ::Notifications::Notification
+    end
+
     ATTRIBUTE_TYPES = {
       id:               Field::Number,
       type:             Field::String,

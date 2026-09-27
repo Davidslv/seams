@@ -56,7 +56,9 @@ module Seams
         # Default authenticator: the current Identity must carry the
         # `staff` flag. Hosts that need a finer-grained gate (per-
         # account admin role, IP allow-list, etc.) override this.
-        @authenticator = ->(controller) { controller.current_identity&.staff? }
+        # `try` keeps the default safe on a controller without
+        # Auth::Authentication: no identity means the gate says no.
+        @authenticator = ->(controller) { controller.try(:current_identity)&.staff? }
 
         # :platform → admins see every Account's data. :tenant → admins
         # are scoped to the Account they're a member of. Phase 3 reads

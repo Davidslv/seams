@@ -41,7 +41,48 @@ module Seams
     # policy; a request that fails a policy never reaches the action;
     # the audit row only writes after a successful action.
     class ApplicationController < ::Administrate::ApplicationController
+      # Administrate's base controller does not inherit the host's
+      # ApplicationController, so it never picks up the auth engine's
+      # session lookup. Include it here, before the gate, so
+      # `current_identity` resolves and `Auth::Current.identity` is set
+      # for pundit_user and the audit actor.
+      include ::Auth::Authentication if defined?(::Auth::Authentication)
       include ::Seams::Admin::Authenticator
+
+      # The dashboard controllers are top-level `Admin::*`, outside the
+      # isolated Seams::Admin namespace, so Rails wires them to the host
+      # app's routes. Administrate's views call url_for against the
+      # current controller's routes, so give each subclass the engine's
+      # route set instead (the later include wins).
+      def self.inherited(subclass)
+        super
+        subclass.include(::Seams::Admin.railtie_routes_url_helpers)
+      end
+
+      # Accounts::Membership and Teams::Membership both have the route
+      # key `memberships` (isolated-engine model naming), so
+      # Administrate's polymorphic `[:admin, membership]` calls
+      # admin_membership(s)_path, which does not exist. These helpers
+      # route by the record's class, or by the current controller for a
+      # new record's form URL.
+      MEMBERSHIP_ROUTE_KEYS = {
+        "Accounts::Membership" => "accounts_membership",
+        "Teams::Membership"    => "teams_membership"
+      }.freeze
+
+      {
+        "admin_memberships"     => "admin_%ss",
+        "admin_membership"      => "admin_%s",
+        "new_admin_membership"  => "new_admin_%s",
+        "edit_admin_membership" => "edit_admin_%s"
+      }.each do |name, target|
+        %w[path url].each do |suffix|
+          define_method(:"#{name}_#{suffix}") do |*args, **opts|
+            public_send(:"#{format(target, membership_route_key(args.first))}_#{suffix}", *args, **opts)
+          end
+          helper_method :"#{name}_#{suffix}"
+        end
+      end
       # Administrate's canonical Pundit integration. Internally:
       #   - includes Pundit::Authorization
       #   - overrides `authorized_action?` to call
@@ -78,10 +119,12 @@ module Seams
       # `authorize` / `policy_scope`. Administrate's `Punditize`
       # already calls them on every standard action, so any future
       # custom action added to a subclass that forgets the call gets
-      # caught loudly in development. `:only` excludes `:index`
-      # (covered by `verify_policy_scoped` instead) and the rescue
-      # responders themselves (which never authorise — they 403).
-      after_action :verify_authorized,    except: %i[index respond_with_admin_unauthorised]
+      # caught loudly in development. `:except` skips `:index`, which
+      # is covered by `verify_policy_scoped` instead. The 403 rescue
+      # responder needs no exclusion: after_actions do not run when
+      # rescue_from handles the exception, and naming a non-action
+      # here raises ActionNotFound on Rails 7.1+.
+      after_action :verify_authorized,    except: :index
       after_action :verify_policy_scoped, only:   %i[index]
 
       # Helper exposed to dashboards so they can read the active
@@ -133,6 +176,41 @@ module Seams
       end
 
       private
+
+      # Pundit's array lookup cannot reach these policies on its own: it
+      # turns a Module namespace element into `Module`, and it keeps the
+      # record's namespace (`Admin::Platform::Auth::IdentityPolicy`).
+      # Each dashboard controller maps 1:1 to a policy instead
+      # (Admin::AccountsMembershipsController ->
+      # Admin::Platform::AccountsMembershipPolicy), so resolve the class
+      # explicitly and hand it to Pundit's own `policy_class:` options.
+      # That keeps verify_authorized / verify_policy_scoped working.
+      # Administrate's flash messages name the resource through a
+      # resolver that guesses the model from the controller path
+      # ("admin/plans" -> Plan). Use the dashboard's real model instead.
+      def translate_with_resource(key)
+        t("administrate.controller.#{key}", resource: resource_class.model_name.human)
+      end
+
+      def membership_route_key(record)
+        MEMBERSHIP_ROUTE_KEYS[record.class.name] || controller_name.singularize
+      end
+
+      def admin_policy_class
+        "#{policy_namespace.first}::#{controller_name.classify}Policy".constantize
+      end
+
+      def scoped_resource
+        policy_scope(resource_class.default_scoped, policy_scope_class: admin_policy_class::Scope)
+      end
+
+      def authorize_resource(resource)
+        authorize(resource, policy_class: admin_policy_class)
+      end
+
+      def authorized_action?(resource, action)
+        admin_policy_class.new(pundit_user, resource).public_send(:"#{action}?")
+      end
 
       # Resolve the current Accounts::Membership for tenant-mode
       # policy decisions. Delegates to

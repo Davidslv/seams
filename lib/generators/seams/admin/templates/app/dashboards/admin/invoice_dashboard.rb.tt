@@ -12,6 +12,12 @@ require "administrate/base_dashboard"
 # column on the same row.
 module Admin
   class InvoiceDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (InvoiceDashboard -> Admin::Invoice), which does not exist.
+    def self.model
+      ::Billing::Invoice
+    end
+
     ATTRIBUTE_TYPES = {
       id:               Field::Number,
       # UUID — Field::String, not Field::Number.

@@ -8,12 +8,22 @@ require "administrate/base_dashboard"
 # (Teams::Membership), not via Accounts::Membership.
 module Admin
   class TeamDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (TeamDashboard -> Admin::Team), which does not exist.
+    def self.model
+      ::Teams::Team
+    end
+
     ATTRIBUTE_TYPES = {
       id:          Field::Number,
       name:        Field::String,
       slug:        Field::String,
-      memberships: Field::HasMany.with_options(class_name: "Teams::Membership"),
-      invitations: Field::HasMany.with_options(class_name: "Teams::Invitation"),
+      memberships: Admin::Fields::HasMany.with_options(
+        class_name: "Teams::Membership", dashboard: "Admin::TeamsMembershipDashboard"
+      ),
+      invitations: Admin::Fields::HasMany.with_options(
+        class_name: "Teams::Invitation", dashboard: "Admin::InvitationDashboard"
+      ),
       created_at:  Field::DateTime,
       updated_at:  Field::DateTime
     }.freeze

@@ -1,0 +1,22 @@
+# frozen_string_literal: true
+
+module Admin
+  module Fields
+    # Administrate finds an association's dashboard by appending
+    # "Dashboard" to the associated class name (Teams::Team ->
+    # Teams::TeamDashboard). This engine's dashboards live under Admin::,
+    # and defining constants inside another engine's namespace would
+    # break the engine boundary. The `dashboard:` option names the
+    # dashboard explicitly:
+    #
+    #   team: Admin::Fields::BelongsTo.with_options(
+    #     class_name: "Teams::Team", dashboard: "Admin::TeamDashboard"
+    #   )
+    module DashboardOption
+      def associated_dashboard
+        name = options[:dashboard]
+        name ? name.constantize.new : super
+      end
+    end
+  end
+end

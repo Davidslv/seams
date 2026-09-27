@@ -267,6 +267,47 @@ RSpec.describe "rails new integration", type: :integration_full do
     RUBY
     expect(admin_mounted).to eq("true"), "Seams::Admin::Engine is not mounted in the host routes"
 
+    # Drive the admin surface over HTTP as a signed-out visitor, a
+    # signed-in non-staff identity, and a staff identity. Every step of
+    # this chain (route namespace, current_identity, policy lookup,
+    # dashboard model, route helpers, route names) was broken before.
+    # Records are created before the first request: `bin/rails runner`
+    # loses its execution context once an integration request runs.
+    admin_http = boot_probe_full(<<~'RUBY')
+      ActionController::Base.allow_forgery_protection = false
+      Auth::Identity.create!(email: "admin-plain@example.com", password: "verysecret1", staff: false)
+      Auth::Identity.create!(email: "admin-staff@example.com", password: "verysecret1", staff: true)
+      session_for = lambda do |email|
+        s = ActionDispatch::Integration::Session.new(Rails.application)
+        s.host = "localhost"
+        s.post("/auth/session", params: { email: email, password: "verysecret1" }) if email
+        s
+      end
+      anon = session_for.call(nil)
+      anon.get("/admin")
+      puts "ADMIN anon => #{anon.response.status} #{anon.response.location}"
+      plain = session_for.call("admin-plain@example.com")
+      plain.get("/admin")
+      puts "ADMIN nonstaff => #{plain.response.status}"
+      staff = session_for.call("admin-staff@example.com")
+      %w[identities accounts accounts_memberships teams teams_memberships invitations notifications
+         notification_preferences plans subscriptions invoices lifetime_passes].each do |resource|
+        ["/admin/#{resource}", "/admin/#{resource}/new"].each do |path|
+          staff.get(path)
+          puts "ADMIN staff #{path} => #{staff.response.status}"
+        end
+      end
+      staff.post("/admin/plans", params: { plan: { name: "Integration", gateway_ref: "price_integration",
+                                                   amount_cents: 500, currency: "usd", interval: "month" } })
+      puts "ADMIN staff create plan => #{staff.response.status}"
+    RUBY
+
+    expect(admin_http).to include("ADMIN anon => 302 http://localhost/auth/session/new"), admin_http
+    expect(admin_http).to include("ADMIN nonstaff => 403"), admin_http
+    staff_lines = admin_http.lines.grep(/^ADMIN staff /)
+    expect(staff_lines.size).to eq(25), admin_http
+    expect(staff_lines.grep_v(/=> (200|302)$/)).to be_empty, admin_http
+
     # Phase 2C — verify Auth + Notifications wiring end-to-end.
     # Publish the canonical identity.signed_up.auth event from a
     # runner process and assert the Notifications::AuthSubscriber

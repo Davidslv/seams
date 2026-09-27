@@ -95,6 +95,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   raised `NameError` on boot. `seams:engine` gains `--skip-host-wiring`
   for canonical generators that wire the host themselves. The admin engine
   now runs in the rails-new integration suite.
+- Admin engine: every dashboard request failed. Fixed the chain found by
+  driving a generated host over HTTP:
+  - routes point at `/admin/...` controllers (isolate_namespace resolved
+    `admin/identities` to `Seams::Admin::Admin::IdentitiesController`) and
+    sit in `scope as: :admin` so Administrate's `admin_*` helpers exist;
+  - the base controller includes `Auth::Authentication`, so
+    `current_identity` resolves; signed-out visitors are redirected to
+    sign-in, non-staff get 403;
+  - policies resolve as `Admin::<Platform|Tenant>::<Resource>Policy` via
+    Pundit's `policy_class:` (the array lookup produced
+    `Module::Auth::IdentityPolicy`);
+  - dashboards declare `self.model`; association fields take a
+    `dashboard:` option (`Admin::Fields::BelongsTo` / `HasMany`);
+  - the `Admin::*` controllers get the engine's route helpers, the
+    `accounts`/`teams` membership route-key clash is dispatched by record
+    class, flash messages use the real model name, and `verify_authorized`
+    no longer names a non-action (ActionNotFound on Rails 7.1+);
+  - the admin dummy app registers the abilities its tenant policies
+    check, and the tenant role specs use a concrete policy.
+  The integration suite signs in as anonymous, non-staff, and staff and
+  asserts every dashboard's index and new page plus a create.
 - Engine dummy apps now ship `spec/dummy/config/cable.yml` (test adapter).
   solid_cable 4.1 reads `config_for("cable")` at boot, so every generated
   engine spec suite failed to load in a host that bundles solid_cable.

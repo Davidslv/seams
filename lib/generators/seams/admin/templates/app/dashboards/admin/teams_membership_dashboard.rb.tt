@@ -14,9 +14,15 @@ require "administrate/base_dashboard"
 # treats it as a typed integer reference rather than a belongs_to.
 module Admin
   class TeamsMembershipDashboard < Administrate::BaseDashboard
+    # Administrate derives the model from the class name
+    # (TeamsMembershipDashboard -> Admin::TeamsMembership), which does not exist.
+    def self.model
+      ::Teams::Membership
+    end
+
     ATTRIBUTE_TYPES = {
       id:          Field::Number,
-      team:        Field::BelongsTo.with_options(class_name: "Teams::Team"),
+      team:        Admin::Fields::BelongsTo.with_options(class_name: "Teams::Team", dashboard: "Admin::TeamDashboard"),
       identity_id: Field::Number,
       role:        Field::Select.with_options(collection: %w[owner admin member]),
       created_at:  Field::DateTime,

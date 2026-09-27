@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+module Admin
+  module Fields
+    # Administrate::Field::HasMany plus the `dashboard:` option (see
+    # Admin::Fields::DashboardOption). Renders with the stock
+    # fields/has_many partials.
+    class HasMany < ::Administrate::Field::HasMany
+      include DashboardOption
+    end
+  end
+end

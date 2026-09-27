@@ -172,7 +172,7 @@ bin/rails generate administrate:dashboard MyHost::Project
 # Move app/dashboards/my_host/project_dashboard.rb to
 # engines/admin/app/dashboards/admin/project_dashboard.rb
 # Move the controller similarly under app/controllers/admin/.
-# Add `resources :projects, controller: "admin/projects"` to
+# Add `resources :projects, controller: "/admin/projects"` to
 # engines/admin/config/routes.rb (or splice via the
 # admin.routes.after_resources insertion point in a follow-up generator).
 ```
