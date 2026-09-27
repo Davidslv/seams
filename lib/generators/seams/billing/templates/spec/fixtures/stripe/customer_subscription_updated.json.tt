@@ -4,25 +4,46 @@
   "type": "customer.subscription.updated",
   "livemode": false,
   "created": 1730100000,
+  "api_version": "2026-08-26.dahlia",
   "data": {
     "object": {
       "id": "sub_test_123",
       "object": "subscription",
       "customer": "cus_test_123",
       "status": "active",
-      "current_period_end": 1735270400,
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_test_123",
+            "object": "subscription_item",
+            "current_period_start": 1732678400,
+            "current_period_end": 1735270400,
+            "price": {
+              "id": "price_test_pro_annual",
+              "object": "price",
+              "lookup_key": "pro_annual"
+            },
+            "quantity": 1,
+            "subscription": "sub_test_123"
+          }
+        ],
+        "has_more": false,
+        "url": "/v1/subscription_items?subscription=sub_test_123"
+      }
+    },
+    "previous_attributes": {
       "items": {
         "data": [
           {
             "id": "si_test_123",
-            "price": { "id": "price_test_pro_annual", "lookup_key": "pro_annual" },
-            "current_period_end": 1735270400
+            "price": {
+              "id": "price_test_pro",
+              "lookup_key": "pro"
+            }
           }
         ]
       }
-    },
-    "previous_attributes": {
-      "items": { "data": [{ "price": { "lookup_key": "pro" } }] }
     }
   }
 }

@@ -215,6 +215,32 @@ STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
+### Stripe gem and API version
+
+The generator pins `gem "stripe", "~> 19.0"`. stripe-ruby 19 sends API
+version `2026-08-26.dahlia` on every request (`Stripe.api_version`).
+Webhook payloads use the version set on the webhook endpoint, not the
+gem's. Create the endpoint on the same version so API responses and
+webhook payloads have the same shape.
+
+The handlers read the current (2025-03-31.basil and later) shapes and
+still accept the older ones:
+
+| Field                         | Current location                                  | Pre-basil fallback              |
+| ---                           | ---                                               | ---                             |
+| Invoice's subscription        | `invoice.parent.subscription_details.subscription` | `invoice.subscription`          |
+| Subscription period end       | `subscription.items.data[0].current_period_end`   | `subscription.current_period_end` |
+| Invoice paid time             | `invoice.status_transitions.paid_at`              | none                            |
+
+`Billing::Stripe::Payload` holds these readers. Use it from your own
+subscribers too: SDK objects (`::Stripe::StripeObject`) have no `#dig`.
+
+The endpoint accepts v1 snapshot events only. A v2 thin event is
+rejected with `400` (stripe-ruby 19 raises `ArgumentError` for it).
+
+Every `::Stripe::StripeError` from `Billing::Stripe::Client` is
+re-raised as `Billing::GatewayError`, with the original on `#cause`.
+
 In your Stripe dashboard, configure the webhook endpoint to send any
 of the events listed below. Each maps to a handler class in
 `app/services/billing/webhooks/handlers/`; missing handlers no-op

@@ -67,7 +67,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       gem "seams",    path: "#{seams_gem_path}"
       gem "bcrypt",   "~> 3.1"
       gem "faraday",  "~> 2.0"
-      gem "stripe",   "~> 13.0"
+      gem "stripe",   "~> 19.0"
       gem "ice_cube", ">= 0.16"
       gem "tailwindcss-rails", "~> 4.0"
       gem "administrate", "~> 1.0"

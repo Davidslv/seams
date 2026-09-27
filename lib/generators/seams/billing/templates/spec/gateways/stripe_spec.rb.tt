@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "rails_helper"
+require "webmock/rspec"
+require_relative "../../support/stripe_helpers"
 
 RSpec.describe Billing::Gateways::Stripe do
   let(:fake_client) { instance_double(Billing::Stripe::Client) }
@@ -15,13 +17,30 @@ RSpec.describe Billing::Gateways::Stripe do
       }
     end
 
-    it "delegates to the Faraday client with the documented param shape" do
+    it "delegates to the Stripe client with the documented param shape" do
       expect(fake_client).to receive(:create_subscription).with(
         customer: "cus_x", items: [{ price: "price_x" }]
       ).and_return(response)
 
       result = gateway.create_subscription(customer_ref: "cus_x", plan_ref: "price_x")
       expect(result).to include(id: "sub_x", status: "active", plan_ref: "price_x", current_period_end: 1_700_000_000)
+    end
+
+    # The real client returns ::Stripe::Subscription, which has no
+    # #dig. Build one from the stripe-ruby 19 (API 2026-08-26.dahlia)
+    # shape so the normaliser is exercised against the SDK type.
+    it "normalises a ::Stripe::Subscription from the SDK (period on the item)" do
+      sdk_sub = ::Stripe::Subscription.construct_from(
+        id: "sub_x", object: "subscription", status: "active",
+        items: { object: "list", data: [
+          { id: "si_x", object: "subscription_item", current_period_end: 1_700_000_000,
+            price: { id: "price_x", object: "price" } }
+        ] }
+      )
+      allow(fake_client).to receive(:create_subscription).and_return(sdk_sub)
+
+      result = gateway.create_subscription(customer_ref: "cus_x", plan_ref: "price_x")
+      expect(result).to eq(id: "sub_x", status: "active", current_period_end: 1_700_000_000, plan_ref: "price_x")
     end
 
     it "lets Billing::GatewayError raised by the client propagate" do
@@ -44,10 +63,37 @@ RSpec.describe Billing::Gateways::Stripe do
       expect(event[:object]).to eq("id" => "sub_x")
     end
 
+    it "raises Billing::WebhookError on a signed v2 thin event (stripe-ruby 19 ArgumentError)" do
+      thin    = %({"id":"evt_2","object":"v2.core.event","type":"v1.billing.meter.error_report_triggered"})
+      sig     = OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new("sha256"), secret, "#{timestamp}.#{thin}")
+      expect { gateway.verify_webhook(payload: thin, signature: "t=#{timestamp},v1=#{sig}", secret: secret) }
+        .to raise_error(Billing::WebhookError, /not a v1 event/)
+    end
+
     it "raises Billing::WebhookError on a bad signature" do
       bad_header = "t=#{timestamp},v1=deadbeef"
       expect { gateway.verify_webhook(payload: payload, signature: bad_header, secret: secret) }
         .to raise_error(Billing::WebhookError, /No signatures found matching/)
     end
+  end
+end
+
+RSpec.describe Billing::Stripe::Client do
+  include StripeHelpers
+
+  let(:client) { described_class.new(api_key: "sk_test_fake") }
+
+  it "re-raises a Stripe auth failure as Billing::GatewayError (code :gateway_auth)" do
+    stub_stripe_failure(:post, "/v1/customers", status: 401, error_message: "Invalid API Key provided")
+    expect { client.create_customer(email: "a@example.com") }
+      .to raise_error(Billing::GatewayError, /\AStripe authentication error: /) { |e|
+        expect(e.cause).to be_a(::Stripe::AuthenticationError)
+      }
+  end
+
+  it "re-raises any other Stripe API error as Billing::GatewayError" do
+    stub_stripe_failure(:get, "/v1/invoices/in_missing", status: 404, error_message: "No such invoice")
+    expect { client.retrieve_invoice("in_missing") }
+      .to raise_error(Billing::GatewayError, /\AStripe InvalidRequestError: No such invoice/)
   end
 end

@@ -116,7 +116,7 @@ bin/seams billing
 | | |
 | --- | --- |
 | Models | `Billing::Subscription`, `Billing::Invoice`, `Billing::WebhookEvent`, `Billing::Plan`, `Billing::Payment` |
-| Gateways | `Billing::Gateways::Abstract`, `Gateways::Stripe` (default — uses the official `stripe` gem) |
+| Gateways | `Billing::Gateways::Abstract`, `Gateways::Stripe` (default — uses the official `stripe` gem, pinned `~> 19.0`, API version `2026-08-26.dahlia`) |
 | Concern (exposed) | `Billing::Billable` — auto-included into `Billing.configuration.billable_class` (default `Accounts::Account`) at boot |
 | Jobs | `StartSubscriptionJob`, `CancelSubscriptionJob`, plus `Webhooks::*` handlers |
 | Controllers | `WebhooksController` (POST `/billing/webhooks/stripe` with signature verification + idempotent dedupe), `CheckoutController`, `PortalController`, `SubscriptionsController`, `InvoicesController` |
@@ -130,15 +130,23 @@ the binding at runtime in development without rebooting. The
 billable_class must respond to `stripe_customer_ref!(email:)`; the
 `Billing::Billable` concern provides the canonical implementation.
 
-The Stripe gateway uses these documented APIs (URLs cited inline in
-the source):
+The Stripe gateway calls the gem through `Billing::Stripe::Client`, a
+facade over `Stripe::StripeClient` (URLs cited inline in the source):
 
 | Stripe call | Docs |
 | --- | --- |
-| `Stripe::Subscription.create` | https://docs.stripe.com/api/subscriptions/create |
-| `Stripe::Subscription.cancel` | https://docs.stripe.com/api/subscriptions/cancel |
-| `Stripe::Subscription.retrieve` | https://docs.stripe.com/api/subscriptions/retrieve |
+| `client.v1.customers.create` / `.search` | https://docs.stripe.com/api/customers/create |
+| `client.v1.subscriptions.create` / `.update` / `.cancel` / `.retrieve` | https://docs.stripe.com/api/subscriptions/create |
+| `client.v1.invoices.retrieve` | https://docs.stripe.com/api/invoices/retrieve |
+| `client.v1.checkout.sessions.create` | https://docs.stripe.com/api/checkout/sessions/create |
+| `client.v1.billing_portal.sessions.create` | https://docs.stripe.com/api/customer_portal/sessions/create |
 | `Stripe::Webhook.construct_event` | https://docs.stripe.com/webhooks/signatures |
+
+Every `Stripe::StripeError` is re-raised as `Billing::GatewayError`.
+Webhook handlers read the post-2025-03-31.basil payload shapes
+(`invoice.parent.subscription_details.subscription`,
+`items.data[].current_period_end`) through `Billing::Stripe::Payload`
+and fall back to the older top-level fields.
 
 The webhook controller is idempotent: every Stripe event is recorded
 in `billing_webhook_events` with a unique index on

@@ -19,11 +19,14 @@ module Billing
         client.retrieve_invoice(@invoice_ref)
       end
 
+      # stripe_response is a ::Stripe::Invoice (no #dig). The
+      # subscription id moved to parent.subscription_details.subscription
+      # in API 2025-03-31.basil; Billing::Stripe::Payload reads both.
       def on_success(stripe_response)
         invoice = Billing::Invoice.find_or_initialize_by(gateway_ref: stripe_response[:id])
         invoice.assign_attributes(
-          customer_ref:     stripe_response[:customer],
-          subscription_ref: stripe_response[:subscription],
+          customer_ref:     Billing::Stripe::Payload.ref(stripe_response[:customer]),
+          subscription_ref: Billing::Stripe::Payload.invoice_subscription_ref(stripe_response),
           status:           stripe_response[:status],
           amount_cents:     stripe_response[:amount_paid] || stripe_response[:amount_due],
           currency:         stripe_response[:currency].to_s.upcase,
@@ -36,13 +39,11 @@ module Billing
 
       private
 
-      # Stripe moved the paid timestamp out of the top-level invoice
-      # object into status_transitions.paid_at — see
+      # The paid timestamp is status_transitions.paid_at — see
       # https://docs.stripe.com/api/invoices/object#invoice_object-status_transitions.
-      # We still tolerate a top-level :paid_at on older API versions.
+      # A top-level :paid_at is still tolerated for hand-built payloads.
       def paid_at_for(stripe_response)
-        unix = stripe_response.dig(:status_transitions, :paid_at) ||
-               stripe_response[:paid_at]
+        unix = Billing::Stripe::Payload.invoice_paid_at(stripe_response)
         unix && Time.at(unix)
       end
     end

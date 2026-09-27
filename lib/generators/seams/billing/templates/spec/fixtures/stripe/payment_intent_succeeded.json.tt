@@ -4,6 +4,7 @@
   "type": "payment_intent.succeeded",
   "livemode": false,
   "created": 1730900000,
+  "api_version": "2026-08-26.dahlia",
   "data": {
     "object": {
       "id": "pi_test_123",

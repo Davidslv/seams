@@ -233,10 +233,48 @@ RSpec.describe "Billing webhook handlers (runtime)", type: :integration do
 
       invoice = Billing::Invoice.find_by(gateway_ref: "in_test_123")
       expect(invoice.status).to eq("paid")
-      expect(invoice.paid_at).not_to be_nil
+      # status_transitions.paid_at from the payload, not "now".
+      expect(invoice.paid_at).to be_within(1.second).of(Time.at(1_730_500_000))
       expect(invoice.amount_cents).to eq(1299)
       expect(invoice.account_id).to eq(TEST_ACCOUNT_ID)
+      expect(invoice.subscription_ref).to eq("sub_test_123")
       expect(captured.size).to eq(1)
+    end
+  end
+
+  # Fixtures carry the stripe-ruby 19 / 2026-08-26.dahlia shapes. A
+  # webhook endpoint pinned to an API version before 2025-03-31.basil
+  # still sends the old fields; the handlers read those too.
+  describe "payloads from API versions before 2025-03-31.basil" do
+    it "reads invoice.subscription when invoice.parent is absent" do
+      seed_account_on("cus_test_123")
+      full   = stripe_event_fixture("invoice_created").deep_dup
+      object = full[:data][:object]
+      object.delete(:parent)
+      object[:subscription] = "sub_legacy_123"
+
+      Billing::Webhooks::Handlers::InvoiceCreatedHandler.new(
+        event: { id: full[:id], type: full[:type], livemode: false, object: object, raw: full.to_json },
+        gateway: gateway
+      ).call
+
+      expect(Billing::Invoice.find_by(gateway_ref: "in_test_123").subscription_ref).to eq("sub_legacy_123")
+    end
+
+    it "reads subscription.current_period_end when items carry no period" do
+      seed_account_on("cus_test_123")
+      full   = stripe_event_fixture("customer_subscription_created").deep_dup
+      object = full[:data][:object]
+      object[:items][:data][0].delete(:current_period_end)
+      object[:current_period_end] = 1_700_000_000
+
+      Billing::Webhooks::Handlers::SubscriptionCreatedHandler.new(
+        event: { id: full[:id], type: full[:type], livemode: false, object: object, raw: full.to_json },
+        gateway: gateway
+      ).call
+
+      subscription = Billing::Subscription.find_by(gateway_ref: "sub_test_123")
+      expect(subscription.current_period_end).to be_within(1.second).of(Time.at(1_700_000_000))
     end
   end
 

@@ -77,6 +77,8 @@ module Seams
                                 engine_path("lib/billing/stripe/client.rb")
         template_unless_ejected "lib/stripe/webhook_signature.rb.tt",
                                 engine_path("lib/billing/stripe/webhook_signature.rb")
+        template_unless_ejected "lib/stripe/payload.rb.tt",
+                                engine_path("lib/billing/stripe/payload.rb")
 
         return if gateway == "stripe"
 
@@ -316,7 +318,7 @@ module Seams
         # maintains the gem as a first-class deliverable; tracking
         # their API ourselves wasn't worth the centralisation
         # benefit. See feedback_external_apis.md.
-        host_inject_gem("stripe", "~> 13.0")
+        host_inject_gem("stripe", "~> 19.0")
         host_inject_gem("factory_bot_rails", "~> 6.4",  group: :test)
         host_inject_gem("webmock",           "~> 3.23", group: :test)
         host_inject_mount(engine_class: "Billing::Engine", at: "/billing")

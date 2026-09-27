@@ -1,0 +1,90 @@
+# frozen_string_literal: true
+
+module Billing
+  module Stripe
+    # Reads Stripe objects without caring where they came from.
+    #
+    # The engine sees the same Stripe resource in three shapes:
+    #
+    #   1. a `::Stripe::StripeObject` returned by the `stripe` gem
+    #      (Billing::Stripe::Client). It supports `obj[:key]` but has
+    #      NO `#dig` — calling `dig` on it raises NoMethodError.
+    #   2. the Hash built by Billing::Gateways::Stripe#verify_webhook
+    #      (string keys at the top level, symbol keys below it).
+    #   3. a JSON-parsed Hash (string keys, or symbol keys in specs).
+    #
+    # `dig` walks any mix of those. The field readers below also hide
+    # the Stripe API-version differences the engine cares about, so
+    # the rest of the engine reads one field instead of two.
+    #
+    # API-version notes (stripe-ruby 19 pins 2026-08-26.dahlia; the
+    # shape changes below arrived in 2025-03-31.basil):
+    #   https://docs.stripe.com/changelog/basil/2025-03-31/adds-new-parent-field-to-invoicing-objects
+    #   https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end
+    #   https://docs.stripe.com/changelog/basil/2025-03-31/add-support-for-multiple-partial-payments-on-invoices
+    module Payload
+      module_function
+
+      # Key-tolerant dig. Integer segments index into Arrays.
+      #
+      #   Payload.dig(invoice, :parent, :subscription_details, :subscription)
+      #   Payload.dig(subscription, :items, :data, 0, :current_period_end)
+      def dig(object, *path)
+        path.reduce(object) do |node, key|
+          return nil if node.nil?
+
+          fetch(node, key)
+        end
+      end
+
+      def fetch(node, key)
+        if key.is_a?(Integer)
+          node.is_a?(Array) ? node[key] : nil
+        elsif node.is_a?(Hash)
+          node.key?(key.to_s) ? node[key.to_s] : node[key.to_sym]
+        elsif node.respond_to?(:keys) && node.respond_to?(:[])
+          node[key.to_sym] # ::Stripe::StripeObject
+        end
+      end
+
+      # Stripe id for a field that is either an id String or an
+      # expanded object.
+      def ref(value)
+        value.is_a?(String) ? value : dig(value, :id)
+      end
+
+      # The subscription an invoice belongs to.
+      # Current API: invoice.parent.subscription_details.subscription.
+      # Before 2025-03-31.basil: invoice.subscription.
+      def invoice_subscription_ref(invoice)
+        ref(dig(invoice, :parent, :subscription_details, :subscription)) ||
+          ref(dig(invoice, :subscription))
+      end
+
+      # Unix time the invoice was paid, or nil. Stripe reports it on
+      # status_transitions.paid_at; a top-level paid_at is tolerated
+      # for hand-built payloads.
+      def invoice_paid_at(invoice)
+        dig(invoice, :status_transitions, :paid_at) || dig(invoice, :paid_at)
+      end
+
+      # First subscription item (items.data[0]) or nil.
+      def first_subscription_item(subscription)
+        dig(subscription, :items, :data, 0)
+      end
+
+      # Unix end of the current billing period.
+      # Current API: items.data[].current_period_end (one per item).
+      # Before 2025-03-31.basil: subscription.current_period_end.
+      def subscription_current_period_end(subscription)
+        dig(first_subscription_item(subscription), :current_period_end) ||
+          dig(subscription, :current_period_end)
+      end
+
+      # Price id of the first subscription item.
+      def subscription_price_ref(subscription)
+        ref(dig(first_subscription_item(subscription), :price))
+      end
+    end
+  end
+end

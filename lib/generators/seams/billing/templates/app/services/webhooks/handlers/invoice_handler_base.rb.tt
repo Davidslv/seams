@@ -12,6 +12,13 @@ module Billing
       # subscription_ref → Billing::Subscription#account_id, falling
       # back to a sibling Billing::Invoice on the same customer_ref
       # for one-off invoices that have no subscription.
+      #
+      # Payload shape (stripe-ruby 19 / API 2026-08-26.dahlia): the
+      # subscription id is at invoice.parent.subscription_details.subscription.
+      # The top-level invoice.subscription was removed in
+      # 2025-03-31.basil; Billing::Stripe::Payload still reads it so
+      # events from an endpoint pinned to an older API version work.
+      # https://docs.stripe.com/changelog/basil/2025-03-31/adds-new-parent-field-to-invoicing-objects
       class InvoiceHandlerBase < Billing::Webhooks::Handler
         DEFAULT_STATUS = "open"
 
@@ -36,7 +43,7 @@ module Billing
 
           invoice.account_id       = resolved_account_id
           invoice.customer_ref     = customer_ref
-          invoice.subscription_ref = object_hash[:subscription] || object_hash["subscription"]
+          invoice.subscription_ref = subscription_ref
           invoice.amount_cents     = object_hash[:amount_paid] || object_hash["amount_paid"] ||
                                      object_hash[:amount_due]  || object_hash["amount_due"]  || 0
           invoice.currency         = (object_hash[:currency] || object_hash["currency"] || "usd").to_s.upcase
@@ -53,7 +60,6 @@ module Billing
         # customer_ref (covers the case of a one-off invoice that
         # arrives before any sibling Invoice).
         def resolve_account_id_for_invoice
-          subscription_ref = object_hash[:subscription] || object_hash["subscription"]
           if subscription_ref
             id = Billing::Subscription.where(gateway_ref: subscription_ref).pick(:account_id)
             return id if id
@@ -67,12 +73,21 @@ module Billing
                                  .pick(:account_id)
         end
 
+        def subscription_ref
+          @subscription_ref ||= Billing::Stripe::Payload.invoice_subscription_ref(object_hash)
+        end
+
         def invoice_status
           self.class::INVOICE_STATUS || DEFAULT_STATUS
         end
 
+        # Stripe's own paid timestamp (status_transitions.paid_at) when
+        # the payload carries it; otherwise the time we saw the event.
         def paid_at_for_status
-          invoice_status == "paid" ? Time.current : nil
+          return nil unless invoice_status == "paid"
+
+          unix = Billing::Stripe::Payload.invoice_paid_at(object_hash)
+          unix ? Time.at(unix) : Time.current
         end
       end
     end

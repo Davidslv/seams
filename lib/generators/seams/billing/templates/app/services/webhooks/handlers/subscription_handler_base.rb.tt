@@ -60,31 +60,17 @@ module Billing
         end
 
         def plan_ref_from_object_hash
-          first = first_subscription_item
-          return nil unless first
-
-          price = first[:price] || first["price"]
-          price.is_a?(Hash) ? (price[:id] || price["id"]) : nil
+          Billing::Stripe::Payload.subscription_price_ref(object_hash)
         end
 
-        # Stripe moved current_period_end onto each subscription item
-        # in 2024; older API versions still set it at the root. Try
-        # root first, fall back to items.data[0].
-        # https://docs.stripe.com/api/subscriptions/object
+        # Since API 2025-03-31.basil the billing period lives on each
+        # subscription item (items.data[].current_period_end); the
+        # subscription-level field was removed. Read the first item,
+        # fall back to the root for payloads from older API versions.
+        # https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end
         def current_period_end_at
-          unix = object_hash[:current_period_end] ||
-                 object_hash["current_period_end"]
-          unix ||= (item = first_subscription_item) &&
-                   (item[:current_period_end] || item["current_period_end"])
+          unix = Billing::Stripe::Payload.subscription_current_period_end(object_hash)
           unix && Time.at(unix)
-        end
-
-        def first_subscription_item
-          items = object_hash[:items] || object_hash["items"]
-          return nil unless items.is_a?(Hash)
-
-          first = (items[:data] || items["data"] || []).first
-          first if first.is_a?(Hash)
         end
       end
     end
