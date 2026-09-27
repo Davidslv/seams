@@ -70,6 +70,8 @@ RSpec.describe "rails new integration", type: :integration_full do
       gem "stripe",   "~> 13.0"
       gem "ice_cube", ">= 0.16"
       gem "tailwindcss-rails", "~> 4.0"
+      gem "administrate", "~> 1.0"
+      gem "pundit",       "~> 2.4"
 
       group :development, :test do
         gem "strong_migrations"
@@ -213,7 +215,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     # User any more, and the Notifiable concern is wired onto
     # Auth::Identity below via an initializer (Pattern A from the
     # notifications engine README).
-    %w[install core auth accounts notifications billing teams].each { |g| generate(g) }
+    %w[install core auth accounts notifications billing teams admin].each { |g| generate(g) }
 
     # Wave 11 PII encryption requires keys at host boot. Real hosts
     # run `bin/rails db:encryption:init` once and store the keys in
@@ -227,7 +229,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     # ApplicationMailer in the dummy app, and bad require_relative
     # paths in 3-level-deep specs — three bug classes that previously
     # slipped past CI because we only exercised spec/runtime.
-    %w[core auth accounts notifications billing teams].each do |engine|
+    %w[core auth accounts notifications billing teams admin].each do |engine|
       spec_dir = File.join(host_path, "engines", engine, "spec")
       next if Dir.glob("#{spec_dir}/**/*_spec.rb").empty?
 
@@ -255,6 +257,15 @@ RSpec.describe "rails new integration", type: :integration_full do
     actual = tables.lines.last.to_s.strip.split(",")
     missing = expected - actual
     expect(missing).to be_empty, "host db is missing engine tables: #{missing.join(", ")} (got: #{actual.inspect})"
+
+    # The admin engine's constants live under Seams::Admin. The host must
+    # mount Seams::Admin::Engine; a stray `mount Admin::Engine` raised
+    # NameError on every boot.
+    admin_mounted = boot_probe(<<~RUBY)
+      Rails.application.reload_routes!
+      puts Rails.application.routes.routes.any? { |r| r.app.respond_to?(:app) && r.app.app == Seams::Admin::Engine }
+    RUBY
+    expect(admin_mounted).to eq("true"), "Seams::Admin::Engine is not mounted in the host routes"
 
     # Phase 2C — verify Auth + Notifications wiring end-to-end.
     # Publish the canonical identity.signed_up.auth event from a

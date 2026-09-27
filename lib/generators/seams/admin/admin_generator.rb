@@ -87,8 +87,11 @@ module Seams
         ["lifetime_pass",           "Billing::LifetimePass",                "billing"]
       ].freeze
 
+      # The base engine would mount `Admin::Engine` and write an
+      # `Admin.configure` initializer, but this engine's constants live
+      # under `Seams::Admin`. wire_into_host mounts the real class.
       def create_base_engine
-        EngineGenerator.start([ENGINE_NAME], destination_root: destination_root)
+        EngineGenerator.start([ENGINE_NAME, "--skip-host-wiring"], destination_root: destination_root)
       end
 
       def overwrite_engine_entry_point

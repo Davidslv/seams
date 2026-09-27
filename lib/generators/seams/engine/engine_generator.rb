@@ -23,6 +23,10 @@ module Seams
 
       NAME_PATTERN = /\A[a-z][a-z0-9_]*\z/
 
+      class_option :skip_host_wiring, type: :boolean, default: false,
+                                      desc: "Do not mount the engine or add a host initializer " \
+                                            "(for canonical generators that wire the host themselves)"
+
       def validate_name
         unless NAME_PATTERN.match?(name)
           raise Seams::GeneratorError,
@@ -107,6 +111,8 @@ module Seams
       end
 
       def wire_into_host
+        return if options[:skip_host_wiring]
+
         # Mount the engine into the host's routes (idempotent — skips
         # if the line already exists, so canonical generators that
         # call this and ALSO mount themselves are safe).

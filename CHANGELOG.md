@@ -89,6 +89,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Fixes #79.
 - `host_inject_gem` dropped every version requirement after the first, so
   a range like `(">= 7.1", "< 9")` was written as `">= 7.1"` only.
+- Admin generator: the host no longer gets `mount Admin::Engine` and an
+  `Admin.configure` initializer stub from the base engine step. The engine
+  lives at `Seams::Admin::Engine`, so every host that ran `seams:admin`
+  raised `NameError` on boot. `seams:engine` gains `--skip-host-wiring`
+  for canonical generators that wire the host themselves. The admin engine
+  now runs in the rails-new integration suite.
 - Engine dummy apps now ship `spec/dummy/config/cable.yml` (test adapter).
   solid_cable 4.1 reads `config_for("cable")` at boot, so every generated
   engine spec suite failed to load in a host that bundles solid_cable.
