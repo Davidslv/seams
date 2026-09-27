@@ -763,6 +763,33 @@ RSpec.describe "rails new integration", type: :integration_full do
                           "the --shell layout must link the compiled tailwind build.\n#{shell_http}"
   end
 
+  # #42 class (issue #48 part 3): a gem that ships only some native
+  # platforms (herb was arm64-darwin-only) resolves on the developer's
+  # machine but breaks `bundle` on a Rails 8 multi-platform lockfile.
+  # CI runs on one Linux platform, so add the platforms Rails 8's
+  # `rails new` locks for and assert a DEFAULT seams:install host still
+  # resolves. Only seams itself is pre-added, so every other gem in the
+  # lock is exactly what the generator injected.
+  it "resolves a default seams:install host on a multi-platform lockfile" do
+    run_rails_new
+    File.write(File.join(host_path, "Gemfile"), %(\ngem "seams", path: "#{seams_gem_path}"\n), mode: "a")
+    bundle_install
+    generate("install")
+    bundle_install
+
+    platforms = %w[x86_64-linux aarch64-linux arm64-darwin x86_64-darwin]
+    shell(["bundle", "lock", *platforms.flat_map { |platform| ["--add-platform", platform] }])
+
+    lockfile = File.read(File.join(host_path, "Gemfile.lock"))
+    locked   = lockfile[/^PLATFORMS\n((?:  .+\n)+)/, 1].to_s.split.map(&:strip)
+    # Bundler may record a more specific variant (arm64-darwin-25).
+    platforms.each do |platform|
+      expect(locked).to(be_any { |entry| entry.start_with?(platform) }, "#{platform} missing from #{locked}")
+    end
+    expect(File.read(File.join(host_path, "Gemfile"))).not_to match(/^\s*gem ["']herb["']/),
+                                                              "herb must stay opt-in (--herb)"
+  end
+
   # Phase 1.9 round-trip: the generic engine generator + the remove
   # generator must each leave the host bootable. Tests them together so
   # we don't need a second `rails new`.
