@@ -266,6 +266,15 @@ RSpec.describe Seams::Generators::InstallGenerator do
       gemfile = File.read(File.join(destination_root, "Gemfile"))
       expect(gemfile.scan(/gem ["']seams["']/).size).to eq(1)
     end
+
+    it "injects rspec-rails with a range that allows 8.x on Rails 7.2+ and 7.1.x on Rails 7.1" do
+      File.write(File.join(destination_root, "Gemfile"), "source \"https://rubygems.org\"\n")
+
+      run_generator
+
+      gemfile = File.read(File.join(destination_root, "Gemfile"))
+      expect(gemfile).to include(%(group :test do\n  gem "rspec-rails", ">= 7.1", "< 9"\nend))
+    end
   end
 
   describe "Phase 1.8 — CLI rake tasks (test:changed + quality:all)" do
@@ -345,6 +354,13 @@ RSpec.describe Seams::Generators::InstallGenerator do
       expect(raw).to include("ruby/setup-ruby@v")
       expect(raw).not_to include("@latest")
       expect(raw).not_to include("@main")
+    end
+
+    it "uses current majors of checkout and the Postgres service image" do
+      raw = File.read(File.join(destination_root, ".github/workflows/ci.yml"))
+      expect(raw).to include("actions/checkout@v7")
+      expect(raw).not_to match(%r{actions/checkout@v[1-6]\b})
+      expect(raw).to include("image: postgres:18")
     end
   end
 

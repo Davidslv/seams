@@ -45,7 +45,7 @@ env:
 # Otherwise delete this block and provide DATABASE_URL via env.secret.
 # accessories:
 #   postgres:
-#     image: postgres:16
+#     image: postgres:18
 #     host: TODO.web.example.com
 #     port: "127.0.0.1:5432:5432"
 #     env:
@@ -55,7 +55,9 @@ env:
 #       secret:
 #         - POSTGRES_PASSWORD
 #     volumes:
-#       - /var/lib/postgresql/data:/var/lib/postgresql/data
+#       # postgres:18+ keeps data under /var/lib/postgresql/<major>/docker,
+#       # so mount the parent directory (not .../data as in 17 and older).
+#       - /var/lib/postgresql:/var/lib/postgresql
 
 asset_path: /rails/public/assets
 

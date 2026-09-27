@@ -201,8 +201,9 @@ module Seams
         host_inject_gem("seams", "~> #{Seams::VERSION}")
         # Every Seams host needs rspec-rails so the per-engine
         # spec/dummy specs can actually run. Idempotent — skipped if
-        # the host already has these gems.
-        host_inject_gem("rspec-rails", "~> 7.1", group: :test)
+        # the host already has these gems. The range lets bundler pick
+        # rspec-rails 8.x on Rails 7.2+ and fall back to 7.1.x on Rails 7.1.
+        host_inject_gem("rspec-rails", ">= 7.1", "< 9", group: :test)
       end
 
       private

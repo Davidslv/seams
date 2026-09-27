@@ -49,6 +49,11 @@ RSpec.describe Seams::Generators::HostInjector do
       expect(File.read(File.join(destination_root, "Gemfile"))).to include('gem "stripe", "~> 12.0"')
     end
 
+    it "supports a multi-part version range" do
+      generator.host_inject_gem("rspec-rails", ">= 7.1", "< 9")
+      expect(File.read(File.join(destination_root, "Gemfile"))).to include('gem "rspec-rails", ">= 7.1", "< 9"')
+    end
+
     it "supports a group" do
       generator.host_inject_gem("rspec-rails", group: :test)
       content = File.read(File.join(destination_root, "Gemfile"))

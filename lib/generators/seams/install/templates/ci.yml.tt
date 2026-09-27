@@ -19,7 +19,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ".ruby-version"
@@ -34,7 +34,7 @@ jobs:
     name: Security (brakeman + bundle-audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ".ruby-version"
@@ -52,7 +52,7 @@ jobs:
     outputs:
       engines: ${{ steps.set.outputs.engines }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: set
         run: |
           if [ -d engines ]; then
@@ -75,7 +75,7 @@ jobs:
         engine: ${{ fromJson(needs.discover.outputs.engines) }}
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -91,7 +91,7 @@ jobs:
       PGUSER:     "postgres"
       PGPASSWORD: "postgres"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ".ruby-version"
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -119,7 +119,7 @@ jobs:
       PGUSER:     "postgres"
       PGPASSWORD: "postgres"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ".ruby-version"
