@@ -10,6 +10,9 @@ module RuboCop
       # through public events (Seams::Events::Publisher) and
       # explicitly-exposed concerns — not by requiring private files.
       class NoCrossEngineDependency < Base
+        # Path segments that climb (or stay in) the directory tree.
+        CLIMB_SEGMENTS = [".", ".."].freeze
+
         MSG = "Engine `%<own>s` must not require `%<path>s` from another engine. " \
               "Communicate via events or via `%<other>s`'s exposed concerns."
 
@@ -72,7 +75,7 @@ module RuboCop
         # file's own directory.
         def first_segment_after_climb(path)
           segments = path.split("/")
-          climbed  = segments.take_while { |segment| [".", ".."].include?(segment) }
+          climbed  = segments.take_while { |segment| CLIMB_SEGMENTS.include?(segment) }
           return nil unless climbed.include?("..")
 
           segments.drop(climbed.size).first

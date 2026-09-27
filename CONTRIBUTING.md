@@ -27,7 +27,7 @@ green:
 
 - `Lint`
 - `Security`
-- `RSpec (Ruby 4.0.7)`
+- `RSpec (Ruby 4.0.7)` (the 3.3 and 3.4 matrix legs also run; they are not required)
 - `Integration (rails new + boot)`
 
 The `Docs` workflow also runs (link check + API-doc coverage ratchet);
@@ -73,7 +73,7 @@ The four critical-review aspects, used in waves 1–6 of the audit cleanup:
    ERB escaping (`<%%=` for passthrough), cross-file references resolve,
    engine.rb wiring order, concerns are well-formed, migrations match
    models, no obvious security holes.
-2. **End-to-end** — actually run the change against Postgres + Ruby 4.
+2. **End-to-end** — actually run the change against Postgres + Ruby 3.3+.
    Clone seams-example, run `db:migrate`, boot the server, hit the
    relevant flow.
 3. **Cross-engine / event-bus** — every `Publisher.publish` payload
