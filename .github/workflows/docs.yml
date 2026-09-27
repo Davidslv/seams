@@ -40,19 +40,34 @@ jobs:
             --cache
             --max-cache-age 1d
             --no-progress
+            --max-retries 5
+            --retry-wait-time 10
             './**/*.md'
           # On scheduled runs we don't want a flaky external link to fail
           # the workflow — we file an issue instead (see below).
           fail: ${{ github.event_name != 'schedule' }}
           output: ./lychee/out.md
 
-      - name: File an issue when nightly link check fails
+      # Reuse the open broken-link issue if there is one, so a flaky host
+      # updates a single issue instead of opening a new one every night.
+      - name: Find the open broken-link issue
+        id: existing
+        if: ${{ github.event_name == 'schedule' && steps.lychee.outputs.exit_code != 0 }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label broken-link --limit 1 --json number --jq '.[0].number // empty')
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: File or update an issue when nightly link check fails
         if: ${{ github.event_name == 'schedule' && steps.lychee.outputs.exit_code != 0 }}
         uses: peter-evans/create-issue-from-file@v6
         with:
           title: "Broken links detected by the nightly docs check"
           content-filepath: ./lychee/out.md
           labels: docs, broken-link
+          issue-number: ${{ steps.existing.outputs.number }}
 
   api-coverage:
     name: API doc coverage
