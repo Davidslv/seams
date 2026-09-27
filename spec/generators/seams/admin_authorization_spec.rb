@@ -17,9 +17,8 @@ POLICY_TEMPLATE_ROOT = File.expand_path(
 
 def load_admin_policy_template(relative_path)
   path = File.join(POLICY_TEMPLATE_ROOT, relative_path)
-  # rubocop:disable Security/Eval
+  # rubocop:disable-next Security/Eval
   eval(File.read(path), TOPLEVEL_BINDING, path)
-  # rubocop:enable Security/Eval
 end
 
 # Base classes first (concrete policies inherit from them), then the

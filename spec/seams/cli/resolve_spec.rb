@@ -12,7 +12,7 @@ require "seams/cli/resolve"
 # the stdout line are facets of the same observable behaviour. The
 # resolve_spec.rb file exempts these two cops at file scope rather
 # than per-example.
-# rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe Seams::CLI::Resolve do
   let(:tmpdir)        { Dir.mktmpdir("seams-resolve-spec-") }
   let(:engines_root)  { File.join(tmpdir, "engines") }
@@ -278,4 +278,3 @@ RSpec.describe Seams::CLI::Resolve do
     end
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations

@@ -94,7 +94,7 @@ module Seams
                    engine_path("spec/lib/auth/oauth/#{snake_name}_spec.rb")
         end
 
-        # rubocop:disable Metrics/AbcSize
+        # rubocop:disable-next Metrics/AbcSize
         def report_summary
           say ""
           say "  Auth OAuth provider `#{snake_name}` added.", :green
@@ -122,7 +122,6 @@ module Seams
           say "    bin/seams resolve --eject auth/lib/auth/oauth/#{snake_name}.rb"
           say ""
         end
-        # rubocop:enable Metrics/AbcSize
 
         private
 

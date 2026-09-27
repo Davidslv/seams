@@ -38,7 +38,7 @@ module Seams
     # Like the admin generator, this is a long-but-flat orchestration class: each
     # public method is one small, single-purpose generate step, so the length is
     # inherent to the number of files the engine ships, not tangled logic.
-    # rubocop:disable Metrics/ClassLength
+    # rubocop:disable-next Metrics/ClassLength
     class DesignGenerator < Rails::Generators::Base
       include Seams::Generators::HostInjector
       include Seams::Generators::EjectAware
@@ -643,6 +643,5 @@ module Seams
         TXT
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end

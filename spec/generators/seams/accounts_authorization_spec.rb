@@ -38,9 +38,8 @@ AUTHORIZATION_CONCERN_TEMPLATE = File.expand_path(
   __dir__
 )
 
-# rubocop:disable Security/Eval
+# rubocop:disable-next Security/Eval
 eval(File.read(AUTHORIZATION_CONCERN_TEMPLATE), binding, AUTHORIZATION_CONCERN_TEMPLATE)
-# rubocop:enable Security/Eval
 
 RSpec.describe Accounts::Authorization do
   let(:controller_class) do

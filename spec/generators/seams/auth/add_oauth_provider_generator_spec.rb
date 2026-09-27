@@ -27,7 +27,7 @@ RSpec.describe Seams::Generators::Auth::AddOauthProviderGenerator do
   # because it stitches together a multi-file fixture with embedded
   # heredoc bodies — splitting it up would obscure the "this is what
   # the post-Phase-2A auth engine looks like" intent.
-  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
   def install_auth_engine_fixture
     FileUtils.mkdir_p(File.join(engine_dir, "lib/auth/oauth"))
     FileUtils.mkdir_p(File.join(engine_dir, "config"))
@@ -72,7 +72,6 @@ RSpec.describe Seams::Generators::Auth::AddOauthProviderGenerator do
       end
     RUBY
   end
-  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   def configuration_contents
     File.read(File.join(engine_dir, "lib/auth/configuration.rb"))

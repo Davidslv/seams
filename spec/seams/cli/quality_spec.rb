@@ -9,7 +9,7 @@ require "seams/cli/quality"
 # on the SUT IS the correct test strategy here. The alternative
 # (injecting runners + gem-checkers as constructor args) clutters
 # the production API for a code-style preference.
-# rubocop:disable RSpec/SubjectStub
+# rubocop:disable-next RSpec/SubjectStub
 RSpec.describe Seams::CLI::Quality do
   subject(:cli) { described_class.new(output: io) }
 
@@ -152,4 +152,3 @@ RSpec.describe Seams::CLI::Quality do
     end
   end
 end
-# rubocop:enable RSpec/SubjectStub
