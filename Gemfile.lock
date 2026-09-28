@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    seams (0.2.0)
+    seams (0.2.1)
       rails (>= 7.1, < 9.0)
       thor (>= 1.0)
 

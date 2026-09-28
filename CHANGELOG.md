@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-28
+
 ### Added
 
 - Docs: [Setting up the admin area](doc/how-to/SETTING_UP_ADMIN.md), a
