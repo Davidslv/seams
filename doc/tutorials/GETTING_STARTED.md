@@ -7,18 +7,21 @@ generating your first canonical engine.
 
 - Ruby 3.3+
 - Rails 7.1+ (8.x recommended)
+- PostgreSQL. The engines use `jsonb` columns, so SQLite and MySQL are
+  not supported. For a new app: `rails new myapp --database=postgresql`.
 - A new or existing Rails application
 
 ## 1. Install
 
 ```ruby
 # Gemfile
-gem "seams"
+gem "seams", "~> 0.2"
 ```
 
 ```bash
 bundle install
 bin/rails generate seams:install
+bundle install   # install adds gems (rspec-rails, rubocop, brakeman, ...)
 ```
 
 The install generator scaffolds:
@@ -32,56 +35,57 @@ The install generator scaffolds:
 - `script/run_affected_tests.sh`, `script/collate_coverage.rb` — host-local helpers
 - `doc/ARCHITECTURE.md` — per-host architecture template
 
-## 2. Generate your first engine
+## 2. Generate your first engines
+
+`core` comes first. Every other engine builds on it.
 
 ```bash
+bin/seams core
 bin/seams auth
 ```
 
-Look at what it created:
+Look at what `auth` created:
 
 ```bash
-$ tree engines/auth -L 2
-engines/auth
-├── LICENSE
-├── README.md
-├── auth.gemspec
-├── app/
-│   ├── controllers/
-│   ├── models/
-│   └── views/
-├── config/
-│   └── routes.rb
-├── db/
-│   └── migrate/
-├── lib/
-└── spec/
+$ ls engines/auth
+app  auth.gemspec  config  db  Gemfile  lib  LICENSE  Rakefile  README.md  spec
+$ ls engines/auth/app
+controllers  jobs  mailers  models  services  views
 ```
 
-## 3. Wire it up
+## 3. What the generators wire up, and what you do
 
-Add the engine's mount line to your host routes:
+The generators edit your app for you:
 
-```ruby
-# config/routes.rb
-Rails.application.routes.draw do
-  mount Auth::Engine, at: "/auth"
-end
-```
+- a `mount` line per engine in `config/routes.rb` (`/auth`, `/core`, ...)
+- `include Auth::Authentication` in your `ApplicationController`
+- `config/initializers/<engine>.rb` for each engine
+- any gems the engine needs, in your Gemfile
 
-Add the authentication concern to your ApplicationController:
+You do three things:
 
-```ruby
-class ApplicationController < ActionController::Base
-  include Auth::Authentication
-end
-```
+1. **Install the gems they added:**
 
-Run migrations:
+   ```bash
+   bundle install
+   ```
 
-```bash
-bin/rails db:migrate
-```
+2. **Create encryption keys.** The auth engine encrypts personal data
+   at rest with Active Record encryption. Without keys, sign-up fails
+   with `Missing Active Record encryption credential`.
+
+   ```bash
+   bin/rails db:encryption:init   # prints an active_record_encryption: block
+   bin/rails credentials:edit     # paste the block in and save
+   ```
+
+3. **Run the migrations:**
+
+   ```bash
+   bin/rails db:migrate
+   ```
+
+Sign-up is at `/auth/registration/new` and sign-in at `/auth/session/new`.
 
 ## 4. Generate more engines
 
@@ -102,11 +106,17 @@ Every time you generate a new engine the existing engines'
 `.rubocop.yml` files are auto-updated so the boundary cops cover
 the new engine without manual edits.
 
+Run `bundle install` and `bin/rails db:migrate` after generating. Several
+engines add gems: billing adds `stripe`, admin adds `administrate` and
+`pundit`, design adds `tailwindcss-rails`. After `bin/seams design`, also
+run `bin/rails tailwindcss:build`, because the layout loads the compiled CSS.
+
 The recommended order is `core → auth → accounts → notifications →
 billing → teams`. Some engines depend on each other (accounts on
 auth, billing on accounts) — see each engine's README for the
 "Requires:" line. `permissions`, `admin`, and `design` are opt-in and
-can be added at any time. Run `bin/seams design --shell` to also get a
+can be added at any time. Only staff can open the admin area: set
+`staff: true` on an `Auth::Identity` to let someone in. Run `bin/seams design --shell` to also get a
 ready-to-boot application layout and signed-in dashboard, which makes
 the other engines visible in a real, styled UI.
 

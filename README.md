@@ -2,7 +2,7 @@
 
 [![Gem Version](https://img.shields.io/gem/v/seams.svg)](https://rubygems.org/gems/seams)
 [![CI](https://github.com/Davidslv/seams/actions/workflows/ci.yml/badge.svg)](https://github.com/Davidslv/seams/actions/workflows/ci.yml)
-[![Docs site](https://img.shields.io/badge/docs-davidslv.github.io%2Fseams-blue.svg)](https://davidslv.github.io/seams/)
+[![Docs site](https://img.shields.io/badge/docs-davidslv.uk%2Fseams-blue.svg)](https://davidslv.uk/seams/)
 [![API docs](https://img.shields.io/badge/api-rubydoc.info-blue.svg)](https://rubydoc.info/gems/seams)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -13,7 +13,7 @@ You ship one Rails app. Inside it, each feature (auth, accounts, billing, teams,
 Every generated file is plain Rails code in your repo. You can read it, change it, or delete it. Nothing is hidden behind the gem.
 
 > [!NOTE]
-> Seams is the executable companion to the book **[Modular Rails: Architecture for the Long Game](https://davidslv.uk/modular-rails/)**. The full guides live on the **[documentation site](https://davidslv.github.io/seams/)**. [seams-example](https://github.com/Davidslv/seams-example) is a reference host with every engine wired up.
+> Seams is the executable companion to the book **[Modular Rails: Architecture for the Long Game](https://davidslv.uk/modular-rails/)**. The full guides live on the **[documentation site](https://davidslv.uk/seams/)**. [seams-example](https://github.com/Davidslv/seams-example) is a reference host with every engine wired up.
 
 ## Requirements
 
@@ -43,27 +43,39 @@ Then install the framework:
 ```bash
 bundle install
 bin/rails generate seams:install
+bundle install
 ```
 
-`seams:install` adds the framework files, a CI workflow, and a `bin/seams` command. Every step after this uses `bin/seams`.
+`seams:install` adds the framework files, a CI workflow, a `bin/seams` command, and a few development gems (hence the second `bundle install`). Every step after this uses `bin/seams`.
 
 ## Quick start
 
-Generate the engines you need. The order matters, because later engines build on earlier ones:
+Generate the engines you need. The order matters, because later engines build on earlier ones. Each generator can add gems to your Gemfile, so run `bundle install` after each one, before the next:
 
 ```bash
-bin/seams core            # shared building blocks (always first)
-bin/seams auth            # sign-in, sessions, OAuth, API tokens
-bin/seams accounts        # the tenant (Account) and its members
-bin/seams notifications   # in-app, email, and SMS notifications
-bin/seams billing         # Stripe subscriptions
-bin/seams teams           # optional teams inside an account
-bin/seams design --shell  # UI components and an app layout
-
-bundle install
-bin/rails db:migrate
-bin/seams list            # show engines, their events, and subscribers
+bin/seams core && bundle install            # shared building blocks (always first)
+bin/seams auth && bundle install            # sign-in, sessions, OAuth, API tokens
+bin/seams accounts && bundle install        # the tenant (Account) and its members
+bin/seams notifications && bundle install   # in-app, email, and SMS notifications
+bin/seams billing && bundle install         # Stripe subscriptions
+bin/seams teams && bundle install           # optional teams inside an account
+bin/seams design --shell && bundle install  # UI components and an app layout
 ```
+
+Then finish the setup:
+
+```bash
+bin/rails tailwindcss:build     # the design layout loads the compiled CSS
+bin/rails db:encryption:init    # auth encrypts personal data; paste the printed
+bin/rails credentials:edit      #   active_record_encryption block into credentials
+bin/rails db:migrate
+bin/seams list                  # show engines, their events, and subscribers
+```
+
+> [!IMPORTANT]
+> Skip the encryption keys and sign-up fails with `Missing Active Record encryption credential`. Skip the Tailwind build and every page using the design layout fails with `The asset 'tailwind.css' was not found`.
+
+Start the app with `bin/rails server`. Sign up at `/auth/registration/new` and sign in at `/auth/session/new`.
 
 > [!TIP]
 > New to Seams? Follow **[Getting Started](doc/tutorials/GETTING_STARTED.md)**. It goes step by step from `bundle install` to a running app.
@@ -168,7 +180,7 @@ Seams writes code into your app. So updating the gem does not change engines you
 
 ## Documentation
 
-The **[documentation site](https://davidslv.github.io/seams/)** has every guide below, with search. The API reference is on **[rubydoc.info](https://rubydoc.info/gems/seams)**.
+The **[documentation site](https://davidslv.uk/seams/)** has every guide below, with search. The API reference is on **[rubydoc.info](https://rubydoc.info/gems/seams)**.
 
 <details>
 <summary><strong>Start here</strong></summary>
