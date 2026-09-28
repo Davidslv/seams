@@ -21,7 +21,7 @@ body:
     attributes:
       label: Seams version / commit
       description: "Output of `bundle show seams` or the commit SHA."
-      placeholder: "0.2.0"
+      placeholder: "0.2.1"
     validations:
       required: true
   - type: textarea
