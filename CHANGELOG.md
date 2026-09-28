@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Docs: the onboarding path now works when followed literally. Both
+  tutorials and the README quick start were re-run in fresh apps from
+  the published gem. The 10-minute tutorial claimed SQLite works (the
+  migrations use `jsonb` and fail), sent readers to a nonexistent
+  `/auth/sign_up`, and had them add mount lines the generators already
+  write. All onboarding docs now cover PostgreSQL, `bundle install`
+  after each generator, `bin/rails db:encryption:init` (without it,
+  sign-up raises `Missing Active Record encryption credential`), and
+  `bin/rails tailwindcss:build` after `design --shell`. The Engine
+  Catalogue's wiring example now matches what the generators write.
+  Docs links point at davidslv.uk/seams.
+
 ## [0.2.0] — 2026-09-27
 
 > [!WARNING]

@@ -248,27 +248,38 @@ the example `_quire.css` theme. See
 
 ## Pulling them together
 
-A real B2B SaaS using all six:
+A B2B SaaS using the canonical engines. The generators write the
+routes for you. After `core`, `auth`, `accounts`, `notifications`,
+`billing`, `teams` and `admin`, `config/routes.rb` contains:
 
 ```ruby
-# config/routes.rb
-mount Core::Engine,           at: "/"            # no public routes — mount for completeness
-mount Auth::Engine,           at: "/auth"
-mount Accounts::Engine,       at: "/accounts"
-mount Notifications::Engine,  at: "/notifications"
-mount Billing::Engine,        at: "/billing"
+# config/routes.rb (written by the generators)
+mount Seams::Admin::Engine,   at: "/admin"
 mount Teams::Engine,          at: "/teams"
+mount Billing::Engine,        at: "/billing"
+mount Notifications::Engine,  at: "/notifications"
+mount Accounts::Engine,       at: "/accounts"
+mount Auth::Engine,           at: "/auth"
+mount Core::Engine,           at: "/core"
 ```
+
+The auth generator also adds `include Auth::Authentication` to your
+`ApplicationController`. Add the other two concerns yourself, so the
+per-request `Current` attributes cascade into core and accounts:
 
 ```ruby
 # app/controllers/application_controller.rb
 class ApplicationController < ActionController::Base
-  include Auth::Authentication               # 1. sets Auth::Current.identity
-  include Core::HasCurrentAttributes         # 2. reads Auth::Current.identity (depends on 1)
-  include Accounts::Authorization            # 3. reads Auth::Current.identity (depends on 1)
-  before_action :authenticate_identity!
+  include Auth::Authentication               # 1. added by `bin/seams auth`; sets Auth::Current.identity
+  include Core::HasCurrentAttributes         # 2. add this; reads Auth::Current.identity (depends on 1)
+  include Accounts::Authorization            # 3. add this; reads Auth::Current.identity (depends on 1)
+  before_action :authenticate_identity!      # optional: require sign-in app-wide
 end
 ```
+
+With the app-wide `before_action`, host pages that must stay public
+need `skip_before_action :authenticate_identity!`. The auth engine's
+own sign-in, sign-up and password-reset actions already skip it.
 
 Order matters: `Auth::Authentication` must be included BEFORE
 `Core::HasCurrentAttributes` and `Accounts::Authorization` so
@@ -290,5 +301,5 @@ class User < ApplicationRecord
 end
 ```
 
-That's a Bullet-Train-class app surface in six `bin/seams`
+That's a Bullet-Train-class app surface in a handful of `bin/seams`
 commands. The code is yours; nothing is hidden behind a gem.
