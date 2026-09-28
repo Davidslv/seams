@@ -186,6 +186,7 @@ RSpec.describe Seams::Generators::InstallGenerator do
       assert_file "config/deploy.yml" do |content|
         expect(content).to include("service:")
         expect(content).to include("STRIPE_SECRET_KEY")
+        expect(content).to include("CACHE_DATABASE_URL")
       end
     end
 

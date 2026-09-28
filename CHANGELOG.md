@@ -7,8 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Docs: [Setting up the admin area](doc/how-to/SETTING_UP_ADMIN.md), a
+  step-by-step guide covering installation, the staff flag, tenant mode,
+  `before_admin_action`, ejecting, and adding your own dashboards. Every
+  step was checked in a generated app.
+- Docs: the Deploying guide covers Rails 8's four production databases
+  (`CACHE_/QUEUE_/CABLE_DATABASE_URL`) and the Active Record encryption
+  keys the auth engine needs. The generated Kamal `deploy.yml` lists the
+  three extra database URLs.
+
 ### Fixed
 
+- Admin engine: an app without every canonical engine (for example only
+  `core` and `auth`) got a 500 on every admin page, because the
+  navigation loaded dashboards whose models don't exist. Those
+  dashboards are now hidden and their URLs return 404.
+- Design generator: the next-steps message now marks
+  `bin/rails tailwindcss:build` as required and names the error you get
+  without it.
+- Admin README: the "add your own dashboard" recipe now includes
+  `self.model`, the policies, the leading-slash route, and deleting
+  Administrate's generated host controller. It no longer claims
+  `theme_css_path` restyles the admin, since that setting is not
+  applied yet.
 - Docs: the onboarding path now works when followed literally. Both
   tutorials and the README quick start were re-run in fresh apps from
   the published gem. The 10-minute tutorial claimed SQLite works (the

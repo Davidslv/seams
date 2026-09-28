@@ -136,9 +136,8 @@ Seams::Admin.configure do |c|
   # at request time. See "Two-mode operation" above.
   c.tenancy_scope = :platform
 
-  # 3. theme_css_path — Optional path to a host-supplied CSS file loaded
-  # on top of Administrate's stock styling. nil = use Administrate's
-  # defaults.
+  # 3. theme_css_path — Reserved for a host-supplied CSS file on top of
+  # Administrate's stock styling. Accepted but not applied yet.
   c.theme_css_path = nil
 
   # 4. before_admin_action — Optional callable that runs before every
@@ -192,18 +191,51 @@ bin/seams resolve --eject admin/app/dashboards/admin/identity_dashboard.rb
 # Now edit engines/admin/app/dashboards/admin/identity_dashboard.rb freely.
 ```
 
-For new dashboards covering host-specific models, generate via
-Administrate, then move the result under the `Admin::*` namespace:
+To add a dashboard for one of your own models, e.g. `Project`:
 
-```bash
-bin/rails generate administrate:dashboard MyHost::Project
-# Move app/dashboards/my_host/project_dashboard.rb to
-# engines/admin/app/dashboards/admin/project_dashboard.rb
-# Move the controller similarly under app/controllers/admin/.
-# Add `resources :projects, controller: "/admin/projects"` to
-# engines/admin/config/routes.rb (or splice via the
-# admin.routes.after_resources insertion point in a follow-up generator).
-```
+1. **Dashboard:** `engines/admin/app/dashboards/admin/project_dashboard.rb`.
+   Generate a starting point with `bin/rails generate administrate:dashboard Project`,
+   then move it here, rename it to `Admin::ProjectDashboard`, and declare
+   its model. Administrate would otherwise guess `Admin::Project`:
+
+   ```ruby
+   module Admin
+     class ProjectDashboard < Administrate::BaseDashboard
+       def self.model
+         ::Project
+       end
+       # ATTRIBUTE_TYPES, COLLECTION_ATTRIBUTES, ... as generated
+     end
+   end
+   ```
+
+2. **Controller:** `engines/admin/app/controllers/admin/projects_controller.rb`,
+   subclassing the gated base controller. Delete the controller
+   Administrate generated in your app's `app/controllers/admin/`, because
+   it bypasses the gate:
+
+   ```ruby
+   module Admin
+     class ProjectsController < ::Seams::Admin::ApplicationController
+       def resource_class = ::Project
+       def dashboard = (@dashboard ||= ProjectDashboard.new)
+     end
+   end
+   ```
+
+3. **Policies:** `Admin::Platform::ProjectPolicy` and `Admin::Tenant::ProjectPolicy`
+   under `engines/admin/app/policies/admin/{platform,tenant}/`. Subclass the
+   namespace's `ApplicationPolicy`. The controller name picks the policy, and
+   an action with no policy is denied.
+
+4. **Route:** add this to `engines/admin/config/routes.rb`, inside the
+   `scope as: :admin do` block:
+
+   ```ruby
+   resources :projects, controller: "/admin/projects"
+   ```
+
+   The leading slash is required. The sidebar picks the dashboard up automatically.
 
 Administrate's full dashboard / field / controller surface is documented
 at <https://administrate-demo.herokuapp.com/>.
@@ -222,8 +254,9 @@ at <https://administrate-demo.herokuapp.com/>.
 
 - **2FA / IP allow-list for `/admin`.** Not shipped. Wire your own via
   `Seams::Admin.config.before_admin_action`.
-- **Branded UI.** Stock Administrate CSS only in v1. Override via
-  `theme_css_path`.
+- **Branded UI.** Stock Administrate CSS only. `theme_css_path` is
+  accepted but not applied yet. To restyle, override Administrate's
+  views (see Administrate's documentation).
 - **Search beyond Administrate's stock.** Administrate ships a basic
   Ransack-backed search; rich filtering / faceted search is your job.
 - **Batch actions.** Not in Administrate's surface; not shipped here.

@@ -570,6 +570,14 @@ RSpec.describe Seams::Generators::AdminGenerator do
       end
     end
 
+    it "hides dashboards whose engine is not installed and answers 404 for them" do
+      assert_file controller_path do |content|
+        expect(content).to include("def self.admin_model_for(key)")
+        expect(content).to include("rescue NameError")
+        expect(content).to include("before_action :ensure_admin_model_installed")
+      end
+    end
+
     it "keeps the created record for the create audit row" do
       assert_file controller_path do |content|
         expect(content).to include("super { |resource| @created_resource = resource }")

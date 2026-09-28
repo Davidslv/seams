@@ -37,6 +37,12 @@ env:
   secret:
     - RAILS_MASTER_KEY
     - DATABASE_URL
+    # Rails 8 has separate cache/queue/cable databases; DATABASE_URL only
+    # covers the primary. Point these at the same server with different
+    # database names, or configure them in config/database.yml and drop them.
+    - CACHE_DATABASE_URL
+    - QUEUE_DATABASE_URL
+    - CABLE_DATABASE_URL
     - REDIS_URL
     - STRIPE_SECRET_KEY
     - STRIPE_WEBHOOK_SECRET

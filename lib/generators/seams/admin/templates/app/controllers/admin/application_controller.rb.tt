@@ -73,9 +73,19 @@ module Seams
       # declared model so follow-up dashboards are picked up too.
       def self.admin_route_keys_by_model
         admin_routes.map(&:first).uniq.each_with_object({}) do |key, map|
-          dashboard = "Admin::#{key.classify}Dashboard".safe_constantize
-          map[dashboard.model.name] = key if dashboard.respond_to?(:model)
+          model = admin_model_for(key)
+          map[model.name] = key if model
         end
+      end
+
+      # The model behind a dashboard route key, or nil when its engine is
+      # not installed (a host with auth but no billing has no
+      # Billing::Plan). Those dashboards are hidden and answer 404.
+      def self.admin_model_for(key)
+        dashboard = "Admin::#{key.classify}Dashboard".safe_constantize
+        dashboard.model if dashboard.respond_to?(:model)
+      rescue NameError
+        nil
       end
 
       # Accounts::Membership and Teams::Membership both have the route
@@ -153,6 +163,10 @@ module Seams
       helper_method :seams_admin_tenancy_scope
       helper_method :seams_admin_navigation
 
+      # Runs after the authentication gate, so signed-out visitors are
+      # still redirected to sign-in rather than told what exists.
+      before_action :ensure_admin_model_installed
+
       def seams_admin_tenancy_scope
         ::Seams::Admin.config.tenancy_scope
       end
@@ -219,6 +233,12 @@ module Seams
         t("administrate.controller.#{key}", resource: resource_class.model_name.human)
       end
 
+      def ensure_admin_model_installed
+        return if self.class.admin_model_for(controller_name)
+
+        raise ActionController::RoutingError, "#{controller_name} is not installed in this app"
+      end
+
       def membership_route_key(record)
         MEMBERSHIP_ROUTE_KEYS[record.class.name] || controller_name.singularize
       end
@@ -270,11 +290,11 @@ module Seams
       # an index route that the current user may list.
       def seams_admin_navigation
         self.class.admin_routes.select { |_key, action| action == "index" }.map(&:first).uniq.filter_map do |key|
-          dashboard = "Admin::#{key.classify}Dashboard".safe_constantize
-          next unless dashboard.respond_to?(:model) && authorized_action?(dashboard.model, :index)
+          model = self.class.admin_model_for(key)
+          next unless model && authorized_action?(model, :index)
 
           { key: key,
-            label: dashboard.model.model_name.human(count: 2),
+            label: model.model_name.human(count: 2),
             path: url_for(controller: "/admin/#{key}", action: :index),
             active: key == controller_name }
         end

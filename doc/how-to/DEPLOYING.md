@@ -34,10 +34,63 @@ When the install generator runs again (e.g. after `bin/seams billing`),
 it doesn't rewrite the Dockerfile — but `bundle install` inside the
 container picks up the new engine gemspec on the next image build.
 
+## Databases in production (Rails 8)
+
+A Rails 8 app has **four** production databases in `config/database.yml`:
+`primary`, plus `cache`, `queue` and `cable` for Solid Cache, Solid Queue
+and Solid Cable. `DATABASE_URL` only configures `primary`. Unless you
+configure the other three, `db:prepare` creates the primary database and
+then fails, because it tries a local socket for the rest:
+
+```text
+connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed
+```
+
+Give each of them a URL. Rails reads `<NAME>_DATABASE_URL` for a named
+database. They can live on the same Postgres server as long as the
+database names differ:
+
+```bash
+DATABASE_URL=postgres://app:secret@db.example.com/app_production
+CACHE_DATABASE_URL=postgres://app:secret@db.example.com/app_production_cache
+QUEUE_DATABASE_URL=postgres://app:secret@db.example.com/app_production_queue
+CABLE_DATABASE_URL=postgres://app:secret@db.example.com/app_production_cable
+```
+
+Alternatively, edit the `production:` block of `config/database.yml` to
+point all four at your server.
+
+> Verified with a generated app running every engine against
+> `postgres:18` in Docker. With all four URLs set, the container ran
+> `db:prepare` and served requests.
+
+## Encryption keys
+
+The auth engine encrypts personal data (such as email addresses) with
+Active Record encryption. Production needs the same three keys as
+development:
+
+```bash
+bin/rails db:encryption:init     # prints an active_record_encryption: block
+bin/rails credentials:edit       # paste it in (or credentials:edit --environment production)
+```
+
+Ship the key that decrypts those credentials as `RAILS_MASTER_KEY`, or
+`config/credentials/production.key` if you use per-environment
+credentials. Without the encryption keys, the app boots, but the first
+sign-up or sign-in raises
+`Missing Active Record encryption credential: active_record_encryption.deterministic_key`.
+
+> [!WARNING]
+> Keep these keys stable. Rotating or losing them makes existing
+> encrypted rows unreadable. Follow the Rails
+> [key rotation guide](https://guides.rubyonrails.org/active_record_encryption.html#rotating-keys)
+> before changing them.
+
 ## Migrations
 
-`bin/docker-entrypoint` runs `bundle exec rails db:prepare` on every
-boot. That's idempotent — Rails skips already-applied migrations —
+`bin/docker-entrypoint` runs `bundle exec rails db:prepare` when the
+container starts the web server. Workers skip it. That's idempotent — Rails skips already-applied migrations —
 but if you'd rather control migrations from a one-off task (Kamal's
 `pre-deploy` hook, GitHub Actions step, etc.) comment that line out.
 
@@ -59,6 +112,9 @@ env:
   secret:
     - RAILS_MASTER_KEY
     - DATABASE_URL
+    - CACHE_DATABASE_URL
+    - QUEUE_DATABASE_URL
+    - CABLE_DATABASE_URL
     - REDIS_URL
     - STRIPE_SECRET_KEY
     - STRIPE_WEBHOOK_SECRET
@@ -84,8 +140,9 @@ worker: bundle exec sidekiq -c 5 -q default -q billing -q notifications
 
 | Variable                  | Set when                             |
 | ---                       | ---                                  |
-| `RAILS_MASTER_KEY`        | Always.                              |
+| `RAILS_MASTER_KEY`        | Always. Decrypts the credentials that hold the Active Record encryption keys. |
 | `DATABASE_URL`            | Always (host-supplied).              |
+| `CACHE_DATABASE_URL`, `QUEUE_DATABASE_URL`, `CABLE_DATABASE_URL` | Rails 8 apps, unless `config/database.yml` points these databases elsewhere. See [Databases in production](#databases-in-production-rails-8). |
 | `REDIS_URL`               | If using Sidekiq / ActionCable Redis. |
 | `STRIPE_SECRET_KEY`       | If the Billing engine is installed.   |
 | `STRIPE_WEBHOOK_SECRET`   | Same.                                 |

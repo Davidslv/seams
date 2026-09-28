@@ -90,6 +90,14 @@ RSpec.describe Seams::Generators::DesignGenerator do
     run_generator
   end
 
+  describe "next-steps summary" do
+    it "marks the Tailwind build as required and names the error you get without it" do
+      text = described_class.new([], {}, destination_root: destination_root).send(:report_summary_text)
+      expect(text).to include("bin/rails tailwindcss:build   (required)")
+      expect(text).to include("The asset 'tailwind.css' was")
+    end
+  end
+
   describe "engine entry point" do
     it "places the engine under the bare Design namespace, NON-isolated" do
       assert_file "engines/design/lib/design/engine.rb" do |content|

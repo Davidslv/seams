@@ -620,8 +620,12 @@ module Seams
             1. bundle install
                (picks up tailwindcss-rails, injected into the host Gemfile)
 
-            2. bin/rails tailwindcss:install   (if Tailwind isn't set up yet)
-               then build it:  bin/rails tailwindcss:build
+            2. bin/rails tailwindcss:build   (required)
+               Pages using the layout fail with "The asset 'tailwind.css' was
+               not found" until the CSS is built. Rebuild after style changes,
+               or keep `bin/rails tailwindcss:watch` running.
+               Without --shell, if your layout doesn't load Tailwind yet, run
+               `bin/rails tailwindcss:install` first.
 
             3. Use the components anywhere in the host or another engine's views:
                  <%= ui_button(variant: :primary) { "Save" } %>
