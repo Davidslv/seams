@@ -162,7 +162,7 @@ With these set:
 - Requests for another account's records return 404.
 - A `member` gets a 403.
 
-The generated `engines/admin/README.md` has the full reference.
+Step-by-step guide: [Setting up the admin area](doc/how-to/SETTING_UP_ADMIN.md). The generated `engines/admin/README.md` has the full reference.
 
 </details>
 
@@ -198,6 +198,7 @@ The **[documentation site](https://davidslv.uk/seams/)** has every guide below, 
 - [Removing an engine](doc/how-to/REMOVING_AN_ENGINE.md)
 - [Writing an adapter](doc/how-to/WRITING_AN_ADAPTER.md): swap in Mailgun, Twilio, Paddle, and others
 - [Writing follow-up generators](doc/how-to/WRITING_FOLLOW_UP_GENERATORS.md)
+- [Setting up the admin area](doc/how-to/SETTING_UP_ADMIN.md)
 - [Insertion points](doc/reference/INSERTION_POINTS.md) and the [catalogue of markers](doc/reference/INSERTION_POINTS_CATALOGUE.md)
 - [Deploying](doc/how-to/DEPLOYING.md)
 

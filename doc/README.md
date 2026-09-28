@@ -23,6 +23,7 @@ You know what you want; here's how.
 - [REMOVING_AN_ENGINE.md](how-to/REMOVING_AN_ENGINE.md) — remove an engine cleanly.
 - [WRITING_AN_ADAPTER.md](how-to/WRITING_AN_ADAPTER.md) — swap in Mailgun, Twilio, Paddle, etc.
 - [WRITING_FOLLOW_UP_GENERATORS.md](how-to/WRITING_FOLLOW_UP_GENERATORS.md) — extend an installed engine.
+- [SETTING_UP_ADMIN.md](how-to/SETTING_UP_ADMIN.md) — add the admin area, let yourself in, tenant mode, your own dashboards.
 - [DEPLOYING.md](how-to/DEPLOYING.md) — ship a host to production.
 - [UPGRADING_FROM_WAVE_8.md](how-to/UPGRADING_FROM_WAVE_8.md) — migrate a pre-Wave-9 host.
 

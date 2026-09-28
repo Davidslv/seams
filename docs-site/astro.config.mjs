@@ -123,6 +123,7 @@ export default defineConfig({
             { label: "Remove an engine", slug: "removing_an_engine" },
             { label: "Write an adapter", slug: "writing_an_adapter" },
             { label: "Write a follow-up generator", slug: "writing_follow_up_generators" },
+            { label: "Set up the admin area", slug: "setting_up_admin" },
             { label: "Deploy", slug: "deploying" },
             { label: "Upgrade from Wave 8", slug: "upgrading_from_wave_8" },
           ],

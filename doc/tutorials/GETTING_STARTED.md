@@ -153,7 +153,8 @@ of them in parallel (one job per engine).
 - [ENGINE_CATALOGUE.md](../reference/ENGINE_CATALOGUE.md) — The canonical engines in detail.
 - [PERMISSIONS.md](../reference/PERMISSIONS.md) — Role → ability grant map and `authorize_permission!`.
 - [DESIGN_SYSTEM.md](../design-system/DESIGN_SYSTEM.md) — The design engine: components, tokens, theming.
-- [ARCHITECTURE_WAVE_11.md](../explanation/ARCHITECTURE_WAVE_11.md) — The admin engine.
+- [SETTING_UP_ADMIN.md](../how-to/SETTING_UP_ADMIN.md) — Set up the admin area.
+- [ARCHITECTURE_WAVE_11.md](../explanation/ARCHITECTURE_WAVE_11.md) — Why the admin engine is built this way.
 - [CURRENT_ATTRIBUTES.md](../reference/CURRENT_ATTRIBUTES.md) — Per-request namespaces (Auth::Current, Accounts::Current, Teams::Current).
 - [ARCHITECTURE.md](../explanation/ARCHITECTURE.md) — Why Seams is built this way.
 - [UPGRADING_FROM_WAVE_8.md](../how-to/UPGRADING_FROM_WAVE_8.md) — If you adopted seams pre-Wave-9.
