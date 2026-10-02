@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Bookings::HoldSweepJob do
+  let(:occurrence) { create(:bookings_occurrence, capacity: 10) }
+  let(:received)   { [] }
+  let(:handle)     { Seams::Events::Publisher.subscribe("booking.hold_expiring.bookings") { |p| received << p } }
+
+  before { handle }
+
+  after { Seams::Events::Publisher.unsubscribe(handle) }
+
+  it "publishes booking.hold_expiring.bookings for held rows past expires_at and leaves them held" do
+    expired = Bookings::HoldService.call(occurrence: occurrence, identity_id: 1).value
+    expired.update_columns(expires_at: 1.minute.ago)
+    live = Bookings::HoldService.call(occurrence: occurrence, identity_id: 2).value
+
+    described_class.perform_now
+
+    expect(received.map { |p| p[:booking_id] }).to eq([expired.id])
+    expect(received.first).to include(payable_ref: expired.first_instalment.payable_ref,
+                                      occurrence_id: occurrence.id, identity_id: 1)
+    expect(expired.reload).to be_held
+    expect(live.reload).to be_held
+  end
+
+  it "ignores rows that are no longer held" do
+    booking = create(:booking, occurrence: occurrence, status: "confirmed", expires_at: 1.minute.ago)
+
+    described_class.perform_now
+
+    expect(received).to be_empty
+    expect(booking.reload).to be_confirmed
+  end
+end

@@ -1,0 +1,65 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Bookings::Instalments::MarkPaidService do
+  let(:received) { [] }
+  let(:handle)   { Seams::Events::Publisher.subscribe("booking.confirmed.bookings") { |p| received << p } }
+
+  before { handle }
+
+  after { Seams::Events::Publisher.unsubscribe(handle) }
+
+  def held_booking(offering)
+    occurrence = create(:bookings_occurrence, offering: offering)
+    Bookings::HoldService.call(occurrence: occurrence, identity_id: 1).value
+  end
+
+  it "confirms a held booking on an automatic offering and publishes booking.confirmed.bookings" do
+    booking = held_booking(create(:bookings_offering))
+    result  = described_class.call(instalment: booking.first_instalment)
+
+    expect(result.code).to eq(:confirmed)
+    expect(booking.reload).to be_confirmed
+    expect(booking.first_instalment).to be_paid
+    expect(received.first).to include(booking_id: booking.id, reference: booking.reference)
+  end
+
+  it "moves a held booking on a manual offering to pending_review without a confirmed event" do
+    booking = held_booking(create(:bookings_manual_offering))
+    result  = described_class.call(instalment: booking.first_instalment)
+
+    expect(result.code).to eq(:pending_review)
+    expect(booking.reload).to be_pending_review
+    expect(received).to be_empty
+  end
+
+  it "is a no-op the second time" do
+    booking = held_booking(create(:bookings_offering))
+    described_class.call(instalment: booking.first_instalment)
+    result = described_class.call(instalment: booking.first_instalment)
+
+    expect(result.code).to eq(:already_paid)
+    expect(received.size).to eq(1)
+  end
+
+  it "marks a balance paid without touching the booking status" do
+    booking = held_booking(create(:bookings_offering))
+    balance = create(:booking_instalment, booking: booking, kind: "balance", amount_cents: 7_500)
+    result  = described_class.call(instalment: balance)
+
+    expect(result.code).to eq(:paid)
+    expect(balance.reload).to be_paid
+    expect(booking.reload).to be_held
+  end
+
+  it "records the payment but leaves a booking that is no longer held alone" do
+    booking = held_booking(create(:bookings_offering))
+    booking.update!(status: "cancelled")
+    result = described_class.call(instalment: booking.first_instalment)
+
+    expect(result.code).to eq(:paid)
+    expect(booking.reload.status).to eq("cancelled")
+    expect(received).to be_empty
+  end
+end

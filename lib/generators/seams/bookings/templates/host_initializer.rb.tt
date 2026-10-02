@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+# Configuration for the Bookings engine. Written by `bin/seams bookings`
+# on first run only; later runs leave this file alone.
+Bookings.configure do |config|
+  # How long a hold keeps its places before Bookings::HoldSweepJob
+  # reports it as expiring. Seconds or a duration. Default 30 minutes;
+  # the engine refuses anything above 24 hours.
+  # config.hold_ttl = 30.minutes
+end

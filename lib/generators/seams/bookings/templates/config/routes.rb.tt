@@ -1,0 +1,6 @@
+# frozen_string_literal: true
+
+Bookings::Engine.routes.draw do
+  # The guest-facing hold, the operator desk, and the read API arrive in later releases.
+  # seams:insertion-point bookings.routes
+end

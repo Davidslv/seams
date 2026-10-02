@@ -1,0 +1,61 @@
+# frozen_string_literal: true
+
+module Bookings
+  module Instalments
+    # Records a payment an operator took by hand (a bank transfer, cash
+    # at the desk) against one instalment.
+    #
+    # Runs under the occurrence lock, the same lock a hold takes, so a
+    # confirmation never interleaves with a hold or with the path that
+    # frees an expired hold. Paying the first instalment (deposit or
+    # full) confirms the booking when the offering confirms
+    # automatically, or moves it to `pending_review` when the operator
+    # reviews by hand. Either move happens only while the booking is
+    # still `held`. A balance payment marks the instalment paid and
+    # leaves the status alone. An instalment already paid is a no-op.
+    #
+    #   Bookings::Instalments::MarkPaidService.call(instalment: instalment)
+    module MarkPaidService
+      class << self
+        def call(instalment:)
+          outcome = Bookings::Booking.transaction do
+            occurrence = Bookings::Occurrence.find(instalment.booking.occurrence_id)
+            occurrence.with_lock { settle(instalment.reload) }
+          end
+          publish_confirmed(outcome.value.booking) if outcome.code == :confirmed
+          outcome
+        end
+
+        private
+
+        def settle(instalment)
+          return ok(instalment) if instalment.paid?
+
+          instalment.update!(state: "paid", paid_at: Time.current)
+          return ok(instalment, :paid) unless instalment.first_payment?
+
+          booking = instalment.booking.reload
+          return ok(instalment, :paid) unless booking.held?
+
+          booking.update!(status: booking.occurrence.offering.manual? ? "pending_review" : "confirmed")
+          ok(instalment, booking.confirmed? ? :confirmed : :pending_review)
+        end
+
+        def ok(instalment, code = :already_paid)
+          Bookings::ServiceResult.ok(value: instalment, code: code)
+        end
+
+        def publish_confirmed(booking)
+          Seams::Events::Publisher.publish(
+            "booking.confirmed.bookings",
+            booking_id: booking.id,
+            reference: booking.reference,
+            occurrence_id: booking.occurrence_id,
+            identity_id: booking.identity_id,
+            quantity: booking.quantity
+          )
+        end
+      end
+    end
+  end
+end

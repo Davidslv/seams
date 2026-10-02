@@ -1,0 +1,29 @@
+# frozen_string_literal: true
+
+# What: creates booking_occurrences, one dated run of an offering with a
+#       fixed number of identical places. Carries the dates, capacity,
+#       price, optional deposit (null means pay in full), currency, a
+#       jsonb details bag, and a draft/published/cancelled status.
+# Why:  the occurrence row is the lock. Every hold takes `FOR UPDATE` on
+#       it, sums the counted bookings, and inserts inside that lock, so
+#       two concurrent holds cannot exceed capacity. Capacity edits take
+#       the same lock.
+# Risk: new table, no data migration. Foreign key to booking_offerings.
+class CreateBookingOccurrences < ActiveRecord::Migration[7.1]
+  def change
+    create_table :booking_occurrences do |t|
+      t.references :offering,      null: false, foreign_key: { to_table: :booking_offerings }, index: true
+      t.datetime   :starts_at,     null: false
+      t.datetime   :ends_at,       null: false
+      t.integer    :capacity,      null: false
+      t.integer    :price_cents,   null: false
+      t.integer    :deposit_cents                       # null means pay in full
+      t.string     :currency,      null: false, default: "gbp"
+      t.jsonb      :details,       null: false, default: {}
+      t.string     :status,        null: false, default: "draft"
+      t.timestamps
+    end
+
+    add_index :booking_occurrences, %i[status starts_at]
+  end
+end

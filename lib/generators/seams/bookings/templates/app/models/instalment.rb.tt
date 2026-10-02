@@ -1,0 +1,53 @@
+# frozen_string_literal: true
+
+module Bookings
+  # One payment a booking owes: the deposit, the balance, or the full
+  # price. `payable_ref` is the public key a payment engine uses to
+  # name the charge; it is unique so a charge can never match two
+  # instalments. `checkout_url` is written by a later release once a
+  # hosted payment session is open for the instalment.
+  class Instalment < ApplicationRecord
+    self.table_name = "booking_instalments"
+
+    KINDS  = %w[deposit balance full].freeze
+    STATES = %w[due requested paid refunded].freeze
+
+    belongs_to :booking, class_name: "Bookings::Booking"
+
+    validates :kind, inclusion: { in: KINDS }
+    validates :state, inclusion: { in: STATES }
+    validates :amount_cents, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+    validates :due_on, presence: true
+    validates :payable_ref, presence: true, uniqueness: true
+
+    before_validation :assign_payable_ref, on: :create
+
+    def paid?
+      state == "paid"
+    end
+
+    def deposit?
+      kind == "deposit"
+    end
+
+    def balance?
+      kind == "balance"
+    end
+
+    def full?
+      kind == "full"
+    end
+
+    # The first payment on a booking, whichever shape it takes. Paying
+    # it is what moves a held booking on.
+    def first_payment?
+      deposit? || full?
+    end
+
+    private
+
+    def assign_payable_ref
+      self.payable_ref ||= "pay_#{SecureRandom.alphanumeric(20).downcase}"
+    end
+  end
+end

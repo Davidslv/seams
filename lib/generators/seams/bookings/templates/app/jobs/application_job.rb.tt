@@ -1,0 +1,6 @@
+# frozen_string_literal: true
+
+module Bookings
+  class ApplicationJob < ::ApplicationJob
+  end
+end

@@ -1,0 +1,41 @@
+# frozen_string_literal: true
+
+require_relative "../rails_helper"
+
+RSpec.describe "Bookings engine boot", type: :integration do
+  it "loads the engine" do
+    expect(defined?(Bookings::Engine)).to eq("constant")
+  end
+
+  it "registers the seven bookings events" do
+    %w[
+      occurrence.published.bookings
+      booking.held.bookings
+      booking.hold_expiring.bookings
+      booking.balance_due.bookings
+      booking.confirmed.bookings
+      booking.rejected.bookings
+      booking.cancelled.bookings
+    ].each do |event|
+      expect(Seams::EventRegistry.registered?(event)).to be(true), "#{event} not registered"
+    end
+  end
+
+  it "creates the bookings tables from the dummy schema" do
+    %i[booking_offerings booking_occurrences bookings booking_instalments auth_identities].each do |t|
+      expect(ActiveRecord::Base.connection.table_exists?(t)).to be(true), "missing #{t}"
+    end
+  end
+
+  it "defaults hold_ttl to 30 minutes and refuses more than 24 hours" do
+    config = Bookings::Configuration.new
+    expect(config.hold_ttl).to eq(30 * 60)
+    config.hold_ttl = 2.hours
+    expect(config.hold_ttl).to eq(7_200)
+    expect { config.hold_ttl = 25.hours }.to raise_error(Bookings::ConfigurationError)
+  end
+
+  it "finds the Auth::Identity the boot assertion depends on" do
+    expect(defined?(Auth::Identity)).to eq("constant")
+  end
+end

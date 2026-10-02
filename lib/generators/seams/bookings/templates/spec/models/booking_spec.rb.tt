@@ -1,0 +1,61 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Bookings::Booking do
+  let(:occurrence) { create(:bookings_occurrence, capacity: 2) }
+
+  it "assigns a public reference" do
+    booking = create(:booking, occurrence: occurrence)
+    expect(booking.reference).to match(/\ABK[A-HJ-NP-Z2-9]{8}\z/)
+  end
+
+  it "sets expires_at from hold_ttl on a held booking" do
+    booking = create(:booking, occurrence: occurrence, status: "held")
+    expect(booking.expires_at).to be_within(5.seconds).of(Time.current + Bookings.configuration.hold_ttl)
+  end
+
+  it "leaves expires_at empty on a booking created as confirmed" do
+    booking = create(:booking, occurrence: occurrence, status: "confirmed")
+    expect(booking.expires_at).to be_nil
+  end
+
+  it "requires a signed-in guest" do
+    booking = build(:booking, occurrence: occurrence, identity_id: nil)
+    expect(booking).not_to be_valid
+    expect(booking.errors[:identity_id]).to be_present
+  end
+
+  it "refuses a quantity above the places remaining" do
+    create(:booking, occurrence: occurrence, status: "confirmed", quantity: 1)
+    booking = build(:booking, occurrence: occurrence, quantity: 2)
+    expect(booking).not_to be_valid
+    expect(booking.errors[:quantity].first).to eq("exceeds the 1 places remaining")
+  end
+
+  it "lets a walk-in created directly as confirmed take the last place, then refuses the next" do
+    create(:booking, occurrence: occurrence, status: "held", quantity: 1)
+    walk_in = described_class.create!(occurrence: occurrence, identity_id: 99, quantity: 1, status: "confirmed")
+    expect(walk_in).to be_persisted
+    expect(build(:booking, occurrence: occurrence)).not_to be_valid
+  end
+
+  it "refuses to move a cancelled booking back into a counted status when full" do
+    cancelled = create(:booking, occurrence: occurrence, status: "cancelled", quantity: 2)
+    create(:booking, occurrence: occurrence, status: "confirmed", quantity: 2)
+    expect(cancelled.update(status: "held", expires_at: 1.hour.from_now)).to be(false)
+  end
+
+  it "lets a held booking move to confirmed without re-checking capacity" do
+    booking = create(:booking, occurrence: occurrence, status: "held", quantity: 2)
+    expect(booking.update(status: "confirmed")).to be(true)
+  end
+
+  it "finds the first instalment" do
+    booking = create(:booking, occurrence: occurrence)
+    balance = create(:booking_instalment, booking: booking, kind: "balance")
+    deposit = create(:booking_instalment, booking: booking, kind: "deposit")
+    expect(booking.first_instalment).to eq(deposit)
+    expect(booking.first_instalment).not_to eq(balance)
+  end
+end

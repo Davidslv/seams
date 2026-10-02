@@ -1,0 +1,34 @@
+# frozen_string_literal: true
+
+# What: creates bookings, a guest's claim on `quantity` places of one
+#       occurrence. Status is one of held, pending_review, confirmed,
+#       rejected, cancelled, expired. `expires_at` is the hold deadline,
+#       `reference` the public code, `reason` an optional operator note,
+#       `customer_ref` an opaque payment-side customer id written by a
+#       later release.
+# Why:  `identity_id` is the signed-in guest's Auth::Identity id, stored
+#       as a bare bigint with no database foreign key: the auth engine
+#       owns that table and Bookings never joins to it. The
+#       (occurrence_id, status) index serves the capacity sum under the
+#       lock; (status, expires_at) serves the hold sweep.
+# Risk: new table, no data migration. Unique reference index.
+class CreateBookings < ActiveRecord::Migration[7.1]
+  def change
+    create_table :bookings do |t|
+      t.bigint     :identity_id,   null: false
+      t.references :occurrence,    null: false, foreign_key: { to_table: :booking_occurrences }, index: false
+      t.integer    :quantity,      null: false, default: 1
+      t.string     :status,        null: false, default: "held"
+      t.datetime   :expires_at
+      t.string     :reference,     null: false
+      t.text       :reason
+      t.string     :customer_ref
+      t.timestamps
+    end
+
+    add_index :bookings, :reference, unique: true
+    add_index :bookings, :identity_id
+    add_index :bookings, %i[occurrence_id status]
+    add_index :bookings, %i[status expires_at]
+  end
+end

@@ -1,0 +1,101 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Bookings::HoldService do
+  let(:occurrence) { create(:bookings_occurrence, capacity: 2, price_cents: 10_000, deposit_cents: 2_500) }
+  let(:received)   { [] }
+  let(:handle)     { Seams::Events::Publisher.subscribe("booking.held.bookings") { |p| received << p } }
+
+  before { handle }
+
+  after { Seams::Events::Publisher.unsubscribe(handle) }
+
+  it "holds the places, writes the deposit instalment, and publishes booking.held.bookings" do
+    result = described_class.call(occurrence: occurrence, identity_id: 1, quantity: 2)
+
+    expect(result).to be_ok
+    booking = result.value
+    expect(booking).to be_held
+    expect(booking.expires_at).to be_within(5.seconds).of(Time.current + Bookings.configuration.hold_ttl)
+    instalment = booking.first_instalment
+    expect(instalment).to have_attributes(kind: "deposit", amount_cents: 2_500, state: "due")
+    expect(received.first).to include(booking_id: booking.id, payable_ref: instalment.payable_ref,
+                                      amount_cents: 2_500, currency: "gbp", quantity: 2)
+  end
+
+  it "writes a full instalment when the occurrence takes no deposit" do
+    occurrence.update!(deposit_cents: nil)
+    booking = described_class.call(occurrence: occurrence, identity_id: 1).value
+    expect(booking.first_instalment).to have_attributes(kind: "full", amount_cents: 10_000)
+  end
+
+  it "refuses a hold without a signed-in guest" do
+    result = described_class.call(occurrence: occurrence, identity_id: nil)
+    expect(result).to be_failure
+    expect(result.code).to eq(:unauthenticated)
+    expect(Bookings::Booking.count).to eq(0)
+  end
+
+  it "refuses a hold on an occurrence that is not published" do
+    occurrence.update!(status: "draft")
+    result = described_class.call(occurrence: occurrence, identity_id: 1)
+    expect(result.code).to eq(:not_published)
+    expect(received).to be_empty
+  end
+
+  it "counts a pending_review booking toward capacity" do
+    create(:booking, occurrence: occurrence, status: "pending_review", quantity: 2)
+    result = described_class.call(occurrence: occurrence, identity_id: 1)
+    expect(result).to be_failure
+    expect(result.error).to include("exceeds the 0 places remaining")
+    expect(Bookings::Instalment.count).to eq(0)
+  end
+
+  it "does not count a cancelled booking toward capacity" do
+    create(:booking, occurrence: occurrence, status: "cancelled", quantity: 2)
+    expect(described_class.call(occurrence: occurrence, identity_id: 1, quantity: 2)).to be_ok
+  end
+
+  it "refuses when the quantity exceeds the places remaining, leaving the sum untouched" do
+    create(:booking, occurrence: occurrence, status: "held", quantity: 1)
+    result = described_class.call(occurrence: occurrence, identity_id: 1, quantity: 2)
+    expect(result.code).to eq(:refused)
+    expect(occurrence.reload.places_remaining).to eq(1)
+  end
+end
+
+# Two real connections, no fixture transaction: the row lock is the
+# only thing that keeps the second hold out.
+RSpec.describe Bookings::HoldService, "two threads for the last place" do
+  self.use_transactional_tests = false
+
+  after do
+    Bookings::Instalment.delete_all
+    Bookings::Booking.delete_all
+    Bookings::Occurrence.delete_all
+    Bookings::Offering.delete_all
+  end
+
+  it "lets exactly one hold through and never goes negative" do
+    occurrence = create(:bookings_occurrence, capacity: 1)
+    gate    = Queue.new
+    results = Array.new(2)
+
+    threads = Array.new(2) do |i|
+      Thread.new do
+        Rails.application.executor.wrap do
+          gate.pop
+          results[i] = described_class.call(occurrence: occurrence, identity_id: i + 1, quantity: 1)
+        end
+      end
+    end
+    2.times { gate << :go }
+    threads.each(&:join)
+
+    expect(results.count(&:ok?)).to eq(1)
+    expect(results.count(&:failure?)).to eq(1)
+    expect(Bookings::Booking.held.count).to eq(1)
+    expect(occurrence.reload.places_remaining).to eq(0)
+  end
+end

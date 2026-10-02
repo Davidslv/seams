@@ -1,0 +1,130 @@
+# Bookings
+
+> Dated occurrences with a fixed number of identical places, a hold
+> that cannot oversell, and the money schedule for each booking.
+
+**Requires:** the `core` and `auth` engines. The guest is an
+`Auth::Identity` and must be signed in before holding; `bookings.identity_id`
+stores that id as a bare bigint with no association and no database
+foreign key. Bookings never joins to `auth_identities`.
+
+**Does not require:** billing. Nothing in this engine names a Billing
+constant. Card payment arrives as a later release that listens to the
+events below.
+
+## Model
+
+| Model | Table | Owns |
+| --- | --- | --- |
+| `Bookings::Offering` | `booking_offerings` | name, slug, host-defined `kind`, `confirmation` (`automatic` or `manual`), `status` (`draft`, `published`) |
+| `Bookings::Occurrence` | `booking_occurrences` | `starts_at`, `ends_at`, `capacity`, `price_cents`, `deposit_cents` (null means pay in full), `currency`, `details` jsonb, `status` (`draft`, `published`, `cancelled`) |
+| `Bookings::Booking` | `bookings` | `identity_id`, `quantity`, `status`, `expires_at`, public `reference`, optional `reason`, opaque `customer_ref` |
+| `Bookings::Instalment` | `booking_instalments` | `kind` (`deposit`, `balance`, `full`), `amount_cents`, `due_on`, `state` (`due`, `requested`, `paid`, `refunded`), unique `payable_ref`, `checkout_url` |
+
+One generated app is one operator. The sellable unit is one occurrence
+with N identical places. Price and currency live on the occurrence.
+
+## The lock
+
+The occurrence row is the lock. `Bookings::HoldService` takes it with
+`with_lock`, sums `quantity` over bookings that are `held`,
+`pending_review`, or `confirmed`, inserts the booking as `held` and its
+first instalment (the deposit, or the full price), and commits.
+`rejected`, `cancelled`, and `expired` do not count.
+
+The capacity check lives on `Bookings::Booking` itself, so a walk-in
+created from the console and an Administrate form take the same lock.
+Lowering `capacity` on an occurrence takes it too; a cut below the
+places already taken is refused.
+
+Booking statuses: `held`, `pending_review`, `confirmed`, `rejected`,
+`cancelled`, `expired`.
+
+```ruby
+result = Bookings::HoldService.call(occurrence: occurrence, identity_id: current_identity.id, quantity: 2)
+result.ok?     # => true when the places were taken
+result.value   # => the held Bookings::Booking
+result.error   # => "Quantity exceeds the 1 places remaining" when refused
+```
+
+## Configuration
+
+```ruby
+# config/initializers/bookings.rb
+Bookings.configure do |c|
+  c.hold_ttl = 30.minutes   # default; the engine refuses anything above 24 hours
+end
+```
+
+## The sweep
+
+`Bookings::HoldSweepJob` finds every `held` booking past `expires_at`
+and publishes `booking.hold_expiring.bookings`. It does not change the
+row. The place is freed only when the payment side reports the session
+dead, in a later release. Schedule it every minute. With Solid Queue:
+
+```yaml
+# config/recurring.yml
+production:
+  bookings_hold_sweep:
+    class: Bookings::HoldSweepJob
+    schedule: every minute
+```
+
+## Marking an instalment paid by hand
+
+An operator who took a bank transfer or cash records it with
+`Bookings::Instalments::MarkPaidService`. It takes the occurrence lock,
+marks the instalment `paid`, and, when the instalment is the first
+payment and the booking is still `held`, confirms the booking for an
+`automatic` offering or moves it to `pending_review` for a `manual`
+one. A balance payment marks the instalment paid and leaves the status
+alone. Calling it twice is a no-op.
+
+```ruby
+Bookings::Instalments::MarkPaidService.call(instalment: booking.first_instalment)
+```
+
+## Events emitted
+
+| Event name | Payload | Emitted when |
+| --- | --- | --- |
+| `occurrence.published.bookings` | `{ occurrence_id:, offering_id:, starts_at:, capacity: }` | `Occurrence#publish!` |
+| `booking.held.bookings` | `{ booking_id:, reference:, occurrence_id:, offering_id:, identity_id:, quantity:, expires_at:, payable_ref:, amount_cents:, currency:, description: }` | `HoldService` commits a hold |
+| `booking.hold_expiring.bookings` | `{ booking_id:, reference:, occurrence_id:, identity_id:, expires_at:, payable_ref: }` | `HoldSweepJob` finds a `held` row past `expires_at` |
+| `booking.confirmed.bookings` | `{ booking_id:, reference:, occurrence_id:, identity_id:, quantity: }` | the first payment confirms an `automatic` booking |
+| `booking.balance_due.bookings` | registered; emitted by the balance release | |
+| `booking.rejected.bookings` | registered; emitted by the review release | |
+| `booking.cancelled.bookings` | registered; emitted by the cancel release | |
+
+All events are published after the database transaction commits.
+
+## Events consumed
+
+| Event name | Subscriber | What it does |
+| --- | --- | --- |
+| _none yet_ | | The payment listeners arrive with the billing release. |
+
+## Exposed concerns
+
+| Concern | Purpose |
+| --- | --- |
+| _none_ | |
+
+## Mounting
+
+```ruby
+# config/routes.rb (host application)
+Rails.application.routes.draw do
+  mount Bookings::Engine, at: "/bookings"
+end
+```
+
+## Running the specs
+
+```bash
+bin/rails seams:test[bookings]
+```
+
+The hold service spec races two threads for the last place against a
+real Postgres database, so it runs outside the transactional fixture.

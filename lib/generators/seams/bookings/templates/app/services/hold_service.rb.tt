@@ -1,0 +1,77 @@
+# frozen_string_literal: true
+
+module Bookings
+  # Takes `quantity` places on an occurrence for a signed-in guest.
+  #
+  # The whole hold is one database transaction: lock the occurrence
+  # row with `with_lock`, let the booking's own validation sum the
+  # counted rows under that lock, insert the booking as `held`, insert
+  # the first instalment (the deposit, or the full price), commit.
+  # Nothing outside the database runs inside the transaction.
+  # `booking.held.bookings` is published after the commit, so a
+  # subscriber that opens a payment session sees a committed row.
+  #
+  #   result = Bookings::HoldService.call(
+  #     occurrence:  occurrence,
+  #     identity_id: current_identity.id,
+  #     quantity:    2
+  #   )
+  #   result.ok? ? result.value : result.error
+  module HoldService
+    class << self
+      def call(occurrence:, identity_id:, quantity: 1)
+        if identity_id.blank?
+          return Bookings::ServiceResult.failure(error: "Sign in to hold places", code: :unauthenticated)
+        end
+
+        result = Bookings::Booking.transaction do
+          locked = Bookings::Occurrence.find(occurrence.id)
+          locked.with_lock { attempt(locked, identity_id, quantity) }
+        end
+        publish_held(result.value) if result.ok?
+        result
+      end
+
+      private
+
+      def attempt(occurrence, identity_id, quantity)
+        unless occurrence.published?
+          return Bookings::ServiceResult.failure(error: "This occurrence is not open for booking",
+                                                 code: :not_published)
+        end
+
+        booking = occurrence.bookings.new(identity_id: identity_id, quantity: quantity, status: "held")
+        unless booking.save
+          return Bookings::ServiceResult.failure(error: booking.errors.full_messages.to_sentence,
+                                                 code: :refused)
+        end
+
+        booking.instalments.create!(
+          kind: occurrence.deposit? ? "deposit" : "full",
+          amount_cents: occurrence.first_payment_cents,
+          due_on: Date.current
+        )
+        Bookings::ServiceResult.ok(value: booking, code: :held)
+      end
+
+      def publish_held(booking)
+        instalment = booking.first_instalment
+        occurrence = booking.occurrence
+        Seams::Events::Publisher.publish(
+          "booking.held.bookings",
+          booking_id: booking.id,
+          reference: booking.reference,
+          occurrence_id: occurrence.id,
+          offering_id: occurrence.offering_id,
+          identity_id: booking.identity_id,
+          quantity: booking.quantity,
+          expires_at: booking.expires_at,
+          payable_ref: instalment.payable_ref,
+          amount_cents: instalment.amount_cents,
+          currency: occurrence.currency,
+          description: occurrence.offering.name
+        )
+      end
+    end
+  end
+end

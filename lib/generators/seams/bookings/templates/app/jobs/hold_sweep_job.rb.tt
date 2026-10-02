@@ -1,0 +1,34 @@
+# frozen_string_literal: true
+
+module Bookings
+  # Recurring sweep. Finds every `held` booking whose hold has run past
+  # `expires_at` and publishes `booking.hold_expiring.bookings` for it.
+  # It does not touch the row: the place is freed only when the payment
+  # side reports the session dead, in a later release, so a guest who
+  # is mid-payment never loses the place under them.
+  #
+  # Wire into your queue's recurring scheduler. With Rails 8's Solid
+  # Queue, add to config/recurring.yml:
+  #
+  #   production:
+  #     bookings_hold_sweep:
+  #       class: Bookings::HoldSweepJob
+  #       schedule: every minute
+  class HoldSweepJob < ApplicationJob
+    queue_as :bookings
+
+    def perform
+      Bookings::Booking.hold_expired.find_each do |booking|
+        Seams::Events::Publisher.publish(
+          "booking.hold_expiring.bookings",
+          booking_id: booking.id,
+          reference: booking.reference,
+          occurrence_id: booking.occurrence_id,
+          identity_id: booking.identity_id,
+          expires_at: booking.expires_at,
+          payable_ref: booking.first_instalment&.payable_ref
+        )
+      end
+    end
+  end
+end

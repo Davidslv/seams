@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+module Bookings
+  # Uniform return shape for every Bookings service. Services return
+  # `Bookings::ServiceResult.ok(value: ...)` or
+  # `Bookings::ServiceResult.failure(error: ..., code: ...)` so callers
+  # branch on `result.ok?` without each service inventing its own
+  # contract.
+  #
+  #   result = Bookings::HoldService.call(occurrence: occurrence, identity_id: id)
+  #   if result.ok?
+  #     redirect_to booking_path(result.value)
+  #   else
+  #     flash[:alert] = result.error
+  #   end
+  #
+  # `code:` is a machine-readable tag (`:unauthenticated`, `:refused`,
+  # `:confirmed`, ...) a caller can branch on without parsing `error:`.
+  ServiceResult = Struct.new(:ok, :value, :error, :code, keyword_init: true) do
+    def self.ok(value: nil, code: nil)
+      new(ok: true, value: value, code: code)
+    end
+
+    def self.failure(error:, code: nil)
+      new(ok: false, error: error, code: code)
+    end
+
+    def ok?
+      ok == true
+    end
+
+    def failure?
+      !ok?
+    end
+  end
+end
