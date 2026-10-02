@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+# What: creates booking_instalments, one payment a booking owes: kind
+#       deposit, balance, or full; amount; due date; state due,
+#       requested, paid, or refunded; a unique payable_ref; a nullable
+#       checkout URL and paid_at.
+# Why:  the money schedule is separate from the booking so a deposit
+#       and a balance can be collected, and refunded, independently.
+#       `payable_ref` is the key a payment engine names the charge by;
+#       unique so a charge can never match two instalments.
+# Risk: new table, no data migration. Foreign key to bookings.
+class CreateBookingInstalments < ActiveRecord::Migration[7.1]
+  def change
+    create_table :booking_instalments do |t|
+      t.references :booking,       null: false, foreign_key: { to_table: :bookings }, index: true
+      t.string     :kind,          null: false
+      t.integer    :amount_cents,  null: false
+      t.date       :due_on,        null: false
+      t.string     :state,         null: false, default: "due"
+      t.string     :payable_ref,   null: false
+      t.string     :checkout_url
+      t.datetime   :paid_at
+      t.timestamps
+    end
+
+    add_index :booking_instalments, :payable_ref, unique: true
+  end
+end

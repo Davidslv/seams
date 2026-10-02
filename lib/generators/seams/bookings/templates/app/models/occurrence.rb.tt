@@ -1,0 +1,98 @@
+# frozen_string_literal: true
+
+module Bookings
+  # One dated run of an offering with a fixed number of identical
+  # places. The occurrence row is the lock: every path that takes a
+  # place, and every edit to `capacity`, serialises on it with
+  # `with_lock`.
+  class Occurrence < ApplicationRecord
+    self.table_name = "booking_occurrences"
+
+    STATUSES = %w[draft published cancelled].freeze
+
+    belongs_to :offering, class_name: "Bookings::Offering"
+    has_many :bookings, class_name: "Bookings::Booking", dependent: :restrict_with_error
+
+    validates :starts_at, :ends_at, presence: true
+    validates :capacity, numericality: { only_integer: true, greater_than: 0 }
+    validates :price_cents, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+    validates :deposit_cents, numericality: { only_integer: true, greater_than: 0, less_than: :price_cents },
+                              allow_nil: true
+    validates :currency, presence: true, format: { with: /\A[a-z]{3}\z/ }
+    validates :status, inclusion: { in: STATUSES }
+    validate  :ends_after_start
+    validate  :capacity_covers_places_taken, on: :update, if: :will_save_change_to_capacity?
+
+    normalizes :currency, with: ->(value) { value.to_s.strip.downcase }
+
+    scope :published, -> { where(status: "published") }
+
+    def published?
+      status == "published"
+    end
+
+    def cancelled?
+      status == "cancelled"
+    end
+
+    # True when the guest pays a deposit first and the balance later.
+    # A null deposit means the first payment is the full price.
+    def deposit?
+      deposit_cents.present?
+    end
+
+    def first_payment_cents
+      deposit_cents || price_cents
+    end
+
+    # Places taken by the bookings that count: held, pending_review,
+    # and confirmed. Pass `except:` to leave one booking out, so a row
+    # re-checking its own capacity does not count itself twice.
+    def places_taken(except: nil)
+      scope = bookings.counted
+      scope = scope.where.not(id: except.id) if except&.persisted?
+      scope.sum(:quantity)
+    end
+
+    def places_remaining
+      capacity - places_taken
+    end
+
+    # Opens the occurrence for holds and tells the bus. Re-publishing a
+    # published occurrence is a no-op.
+    def publish!
+      return self if published?
+
+      update!(status: "published")
+      Seams::Events::Publisher.publish(
+        "occurrence.published.bookings",
+        occurrence_id: id,
+        offering_id: offering_id,
+        starts_at: starts_at,
+        capacity: capacity
+      )
+      self
+    end
+
+    private
+
+    def ends_after_start
+      return if starts_at.blank? || ends_at.blank? || ends_at > starts_at
+
+      errors.add(:ends_at, "must be after starts_at")
+    end
+
+    # An operator lowering capacity (console, a form, Administrate)
+    # takes the same row lock as a hold, so the cut and the sum are
+    # read together. A cut below the places already taken is refused.
+    # The lock is taken on a fresh instance: `with_lock` reloads, and
+    # reloading this instance would discard the pending change.
+    def capacity_covers_places_taken
+      locked = self.class.find(id)
+      locked.with_lock do
+        taken = locked.places_taken
+        errors.add(:capacity, "cannot be cut below the #{taken} places already taken") if capacity < taken
+      end
+    end
+  end
+end

@@ -95,6 +95,7 @@ Start the app with `bin/rails server`. Sign up at `/auth/registration/new` and s
 | `bin/seams admin` | An admin area built on Administrate and Pundit. Optional. See [Admin engine](#admin-engine) below. |
 | `bin/seams design` | A design system: 33 `ui_*` components, Tailwind v4 theme tokens, a form builder, and a `/design/guide` gallery. `--shell` also adds an app layout and a starter dashboard. |
 | `bin/seams permissions` | An editable map of which roles can do what, in `config/initializers/seams_permissions.rb`. See [Permissions](doc/reference/PERMISSIONS.md). |
+| `bin/seams bookings` | Dated occurrences with a fixed number of places, a hold that cannot oversell, and a deposit or full instalment per booking. Optional. Needs `core` and `auth`. See [Bookings](doc/reference/ENGINE_CATALOGUE.md#bookings). |
 
 ### Framework and tools
 

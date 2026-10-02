@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Bookings engine (`bin/seams bookings`), phase 1 of the bookings epic
+  (#151, #152): `Bookings::Offering`, `Bookings::Occurrence`,
+  `Bookings::Booking`, and `Bookings::Instalment`, with the occurrence
+  row as the lock. `Bookings::HoldService` takes the row with
+  `with_lock`, sums the `held`, `pending_review`, and `confirmed`
+  bookings, and inserts the booking and its first instalment in that
+  transaction, so two concurrent holds cannot exceed capacity. The
+  capacity check lives on the model, so a console walk-in and an
+  Administrate edit take the same lock, and a capacity cut below the
+  places taken is refused. `hold_ttl` defaults to 30 minutes and
+  refuses more than 24 hours. `Bookings::HoldSweepJob` publishes
+  `booking.hold_expiring.bookings` for expired holds without changing
+  the row. `Bookings::Instalments::MarkPaidService` records a payment
+  taken by hand and confirms, or moves to `pending_review` for a
+  `manual` offering. Requires core and auth; references the guest by
+  `identity_id` only and names no Billing constant. Card payment,
+  freeing an expired hold, refunds, and the read API are later phases.
+
 ## [0.2.1] — 2026-09-28
 
 ### Added

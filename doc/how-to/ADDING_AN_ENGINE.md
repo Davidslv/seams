@@ -13,6 +13,7 @@ build your own on top of `seams:engine`.
 | `bin/seams notifications`  | Notifications | DeliverEmailJob/DeliverSmsJob, ActionMailer + NullSms adapters, optional Notifiable concern |
 | `bin/seams billing`        | Billing       | Subscription + Invoice + LifetimePass, Stripe gateway, webhook controller with dedupe, Billable concern auto-included on `Accounts::Account` |
 | `bin/seams teams`          | Teams         | Team + Membership + Invitation, AccountScoped + Authorization concerns |
+| `bin/seams bookings`       | Bookings      | Offering + Occurrence + Booking + Instalment, the occurrence lock, `HoldService`, `HoldSweepJob`, `Instalments::MarkPaidService`. Requires core + auth |
 
 Run any of them. The generator:
 

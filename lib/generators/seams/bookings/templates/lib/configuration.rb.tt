@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+module Bookings
+  # Engine-scoped configuration. Override in
+  # config/initializers/bookings.rb of the host application:
+  #
+  #   Bookings.configure do |c|
+  #     c.hold_ttl = 20.minutes   # default 30 minutes, maximum 24 hours
+  #   end
+  class Configuration
+    DEFAULT_HOLD_TTL = 30 * 60
+    MAX_HOLD_TTL     = 24 * 60 * 60
+
+    attr_reader :hold_ttl
+
+    # Follow-up generators that add knobs (balance_due_days, reference_prefix) declare them here.
+    # seams:insertion-point bookings.configuration.attributes
+
+    def initialize
+      @hold_ttl = DEFAULT_HOLD_TTL
+    end
+
+    # How long a `held` booking keeps its places before the sweep
+    # reports it as expiring, in seconds. Accepts an Integer or a
+    # duration (`20.minutes`). The 24 hour ceiling matches the longest
+    # a hosted payment session can stay open, so a hold never outlives
+    # the payment step a later release attaches to it.
+    def hold_ttl=(value)
+      seconds = value.to_i
+      if seconds <= 0 || seconds > MAX_HOLD_TTL
+        raise Bookings::ConfigurationError,
+              "Bookings.configuration.hold_ttl must be between 1 second and 24 hours " \
+              "(got #{value.inspect})."
+      end
+
+      @hold_ttl = seconds
+    end
+  end
+end

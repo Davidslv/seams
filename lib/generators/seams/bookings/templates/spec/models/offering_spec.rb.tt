@@ -1,0 +1,31 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Bookings::Offering do
+  it "assigns a slug from the name" do
+    offering = described_class.create!(name: "Sunday Pottery Class", kind: "class")
+    expect(offering.slug).to eq("sunday-pottery-class")
+  end
+
+  it "refuses an unknown confirmation" do
+    offering = build(:bookings_offering, confirmation: "later")
+    expect(offering).not_to be_valid
+    expect(offering.errors[:confirmation]).to be_present
+  end
+
+  it "refuses an unknown status" do
+    expect(build(:bookings_offering, status: "archived")).not_to be_valid
+  end
+
+  it "knows whether the operator reviews by hand" do
+    expect(build(:bookings_manual_offering)).to be_manual
+    expect(build(:bookings_offering)).to be_automatic
+  end
+
+  it "keeps an offering that still has occurrences" do
+    offering = create(:bookings_offering)
+    create(:bookings_occurrence, offering: offering)
+    expect(offering.destroy).to be(false)
+  end
+end

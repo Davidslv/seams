@@ -1,0 +1,113 @@
+# frozen_string_literal: true
+
+module Bookings
+  # A guest's claim on `quantity` places of one occurrence.
+  #
+  # `identity_id` is the signed-in guest's Auth::Identity id, kept as a
+  # bare bigint with no association and no database foreign key: the
+  # auth engine owns that table and Bookings never joins to it.
+  #
+  # Statuses:
+  #   held            places taken, first payment pending, `expires_at` set
+  #   pending_review  first payment in, operator confirms by hand
+  #   confirmed       the guest has the places
+  #   rejected        operator refused (the refund path is a later release)
+  #   cancelled       guest or operator withdrew
+  #   expired         the hold ran out and the payment session is dead (a later release)
+  #
+  # Only held, pending_review, and confirmed count toward capacity.
+  class Booking < ApplicationRecord
+    self.table_name = "bookings"
+
+    STATUSES         = %w[held pending_review confirmed rejected cancelled expired].freeze
+    COUNTED_STATUSES = %w[held pending_review confirmed].freeze
+    # No 0/O/1/I so a reference read over the phone is unambiguous.
+    REFERENCE_ALPHABET = %w[A B C D E F G H J K L M N P Q R S T U V W X Y Z 2 3 4 5 6 7 8 9].freeze
+
+    belongs_to :occurrence, class_name: "Bookings::Occurrence"
+    has_many :instalments, class_name: "Bookings::Instalment", dependent: :destroy
+
+    validates :identity_id, presence: true
+    validates :quantity, numericality: { only_integer: true, greater_than: 0 }
+    validates :status, inclusion: { in: STATUSES }
+    validates :reference, presence: true, uniqueness: true
+    validates :expires_at, presence: true, if: :held?
+    validate  :occurrence_has_capacity, if: :needs_capacity_check?
+
+    before_validation :assign_reference, on: :create
+    before_validation :assign_expiry, on: :create
+
+    scope :counted,      -> { where(status: COUNTED_STATUSES) }
+    scope :held,         -> { where(status: "held") }
+    scope :hold_expired, -> { held.where(expires_at: ..Time.current) }
+
+    def held?
+      status == "held"
+    end
+
+    def pending_review?
+      status == "pending_review"
+    end
+
+    def confirmed?
+      status == "confirmed"
+    end
+
+    def counted?
+      COUNTED_STATUSES.include?(status)
+    end
+
+    # The instalment the guest pays first: the deposit, or the full
+    # price when the occurrence takes no deposit.
+    def first_instalment
+      instalments.where(kind: %w[deposit full]).order(:id).first
+    end
+
+    private
+
+    def assign_reference
+      return if reference.present?
+
+      loop do
+        candidate = "BK#{Array.new(8) { REFERENCE_ALPHABET[SecureRandom.random_number(REFERENCE_ALPHABET.size)] }.join}"
+        next if self.class.exists?(reference: candidate)
+
+        self.reference = candidate
+        break
+      end
+    end
+
+    def assign_expiry
+      return unless held?
+
+      self.expires_at ||= Time.current + Bookings.configuration.hold_ttl
+    end
+
+    # A new counted row, a quantity change, a move onto another
+    # occurrence, or a return from a status that does not count all
+    # take places and need the lock. A move out of the counted set
+    # only frees places.
+    def needs_capacity_check?
+      return false unless counted?
+
+      new_record? ||
+        will_save_change_to_quantity? ||
+        will_save_change_to_occurrence_id? ||
+        !COUNTED_STATUSES.include?(status_in_database)
+    end
+
+    # The lock is on the model so every writer takes it: the hold
+    # service, a walk-in from the console, and an Administrate form.
+    # The sum is read under the lock, after any concurrent insert has
+    # committed, which is correct at READ COMMITTED.
+    def occurrence_has_capacity
+      locked = Bookings::Occurrence.find_by(id: occurrence_id)
+      return unless locked # belongs_to reports the missing occurrence
+
+      locked.with_lock do
+        remaining = locked.capacity - locked.places_taken(except: self)
+        errors.add(:quantity, "exceeds the #{remaining} places remaining") if quantity.to_i > remaining
+      end
+    end
+  end
+end

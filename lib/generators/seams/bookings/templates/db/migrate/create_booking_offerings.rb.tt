@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+# What: creates booking_offerings, the thing an operator sells: a class,
+#       a workshop, a tour. Name, slug, a host-defined kind, how a paid
+#       first instalment confirms a booking (automatic or manual), and
+#       a draft/published status.
+# Why:  the dates, the price, and the capacity live on each occurrence;
+#       the offering is the stable name guests book under and the
+#       operator's choice of review step.
+# Risk: new table, no data migration. Unique slug index.
+class CreateBookingOfferings < ActiveRecord::Migration[7.1]
+  def change
+    create_table :booking_offerings do |t|
+      t.string :name,         null: false
+      t.string :slug,         null: false
+      t.string :kind,         null: false
+      t.string :confirmation, null: false, default: "automatic"
+      t.string :status,       null: false, default: "draft"
+      t.timestamps
+    end
+
+    add_index :booking_offerings, :slug, unique: true
+    add_index :booking_offerings, :status
+  end
+end

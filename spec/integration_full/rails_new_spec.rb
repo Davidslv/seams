@@ -215,7 +215,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     # User any more, and the Notifiable concern is wired onto
     # Auth::Identity below via an initializer (Pattern A from the
     # notifications engine README).
-    %w[install core auth accounts notifications billing teams admin].each { |g| generate(g) }
+    %w[install core auth accounts notifications billing teams admin bookings].each { |g| generate(g) }
 
     # Wave 11 PII encryption requires keys at host boot. Real hosts
     # run `bin/rails db:encryption:init` once and store the keys in
@@ -229,7 +229,7 @@ RSpec.describe "rails new integration", type: :integration_full do
     # ApplicationMailer in the dummy app, and bad require_relative
     # paths in 3-level-deep specs — three bug classes that previously
     # slipped past CI because we only exercised spec/runtime.
-    %w[core auth accounts notifications billing teams admin].each do |engine|
+    %w[core auth accounts notifications billing teams admin bookings].each do |engine|
       spec_dir = File.join(host_path, "engines", engine, "spec")
       next if Dir.glob("#{spec_dir}/**/*_spec.rb").empty?
 
@@ -252,6 +252,7 @@ RSpec.describe "rails new integration", type: :integration_full do
       billing_subscriptions billing_invoices billing_plans billing_lifetime_passes billing_webhook_events
       teams team_memberships team_invitations
       notifications notification_deliveries notification_preferences
+      booking_offerings booking_occurrences bookings booking_instalments
     ]
     tables = shell_capture(["bin/rails", "runner", "puts ActiveRecord::Base.connection.tables.sort.join(',')"])
     actual = tables.lines.last.to_s.strip.split(",")

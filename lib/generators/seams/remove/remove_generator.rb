@@ -82,6 +82,13 @@ module Seams
         "admin" => {
           mount: "Seams::Admin::Engine",
           user_includes: %w[]
+        },
+        # Bookings mounts itself and writes config/initializers/bookings.rb;
+        # the initializer is left for the host to delete, like every other
+        # engine's. Unmount is the only reverse-edit.
+        "bookings" => {
+          mount: "Bookings::Engine",
+          user_includes: %w[]
         }
       }.freeze
 

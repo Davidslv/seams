@@ -1,0 +1,84 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Bookings::Occurrence do
+  describe "places_taken" do
+    let(:occurrence) { create(:bookings_occurrence, capacity: 10) }
+
+    it "counts held, pending_review, and confirmed bookings" do
+      create(:booking, occurrence: occurrence, status: "held",           quantity: 1)
+      create(:booking, occurrence: occurrence, status: "pending_review", quantity: 2)
+      create(:booking, occurrence: occurrence, status: "confirmed",      quantity: 3)
+      expect(occurrence.places_taken).to eq(6)
+      expect(occurrence.places_remaining).to eq(4)
+    end
+
+    it "does not count rejected, cancelled, or expired bookings" do
+      create(:booking, occurrence: occurrence, status: "rejected",  quantity: 2)
+      create(:booking, occurrence: occurrence, status: "cancelled", quantity: 2)
+      create(:booking, occurrence: occurrence, status: "expired",   quantity: 2)
+      expect(occurrence.places_taken).to eq(0)
+    end
+  end
+
+  describe "capacity cut" do
+    let(:occurrence) { create(:bookings_occurrence, capacity: 3) }
+
+    before { create(:booking, occurrence: occurrence, status: "confirmed", quantity: 2) }
+
+    it "refuses a cut below the places already taken" do
+      expect(occurrence.update(capacity: 1)).to be(false)
+      expect(occurrence.errors[:capacity].first).to include("cannot be cut below the 2 places already taken")
+      expect(occurrence.reload.capacity).to eq(3)
+    end
+
+    it "allows a cut down to exactly the places taken" do
+      expect(occurrence.update(capacity: 2)).to be(true)
+    end
+
+    it "allows raising capacity" do
+      expect(occurrence.update(capacity: 20)).to be(true)
+    end
+  end
+
+  describe "validation" do
+    it "requires ends_at after starts_at" do
+      occurrence = build(:bookings_occurrence, starts_at: Time.current, ends_at: 1.hour.ago)
+      expect(occurrence).not_to be_valid
+      expect(occurrence.errors[:ends_at]).to be_present
+    end
+
+    it "requires a positive capacity" do
+      expect(build(:bookings_occurrence, capacity: 0)).not_to be_valid
+    end
+
+    it "requires the deposit to be below the price, or null for pay in full" do
+      expect(build(:bookings_occurrence, price_cents: 1_000, deposit_cents: 1_000)).not_to be_valid
+      expect(build(:bookings_occurrence, price_cents: 1_000, deposit_cents: nil)).to be_valid
+    end
+
+    it "normalises the currency to lowercase ISO code" do
+      occurrence = create(:bookings_occurrence, currency: " GBP ")
+      expect(occurrence.currency).to eq("gbp")
+    end
+  end
+
+  describe "#publish!" do
+    let(:received) { [] }
+    let(:handle)   { Seams::Events::Publisher.subscribe("occurrence.published.bookings") { |p| received << p } }
+
+    before { handle }
+
+    after { Seams::Events::Publisher.unsubscribe(handle) }
+
+    it "moves a draft to published and publishes once" do
+      occurrence = create(:bookings_occurrence, status: "draft")
+      occurrence.publish!
+      occurrence.publish!
+      expect(occurrence.reload).to be_published
+      expect(received.size).to eq(1)
+      expect(received.first).to include(occurrence_id: occurrence.id, capacity: occurrence.capacity)
+    end
+  end
+end

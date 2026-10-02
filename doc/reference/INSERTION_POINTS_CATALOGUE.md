@@ -22,9 +22,11 @@ Marker count summary:
 | notifications | 7 | engine.rb, configuration.rb, notifiable.rb, type registry |
 | billing | 7 | engine.rb, routes.rb, configuration.rb, webhook router |
 | admin | 5 | engine.rb, routes.rb, configuration.rb |
+| bookings | 5 | engine.rb, routes.rb, configuration.rb |
 
 Post-Wave-11A: 37 markers shipping in templates; 1 deferred
-(`core.configuration.attributes`) pending Wave 12. Phase 2A
+(`core.configuration.attributes`) pending Wave 12. The bookings engine
+adds 5 more (42 shipping). Phase 2A
 (Wave 10) shipped 32 markers across the canonical six engines;
 Wave 11A added 5 more on the new admin engine.
 
@@ -485,3 +487,49 @@ showcase follow-up generator that targets ONE of these markers
 end-to-end. Phase 2B's eject CLI uses the marker list as its diagnostic
 source: `bin/seams resolve --list-markers <engine>` reads this catalogue
 to verify the engine is on a current Wave 10 retrofit.
+
+---
+
+## bookings engine
+
+### bookings.engine.events
+
+- **File:** `engines/bookings/lib/bookings/engine.rb`
+- **Inside:** the `initializer "bookings.register_events"` block, after
+  the `booking.cancelled.bookings` registration.
+- **Purpose:** follow-up generators that emit new bookings events
+  (`booking.transferred.bookings`, `occurrence.cancelled.bookings`)
+  register them here.
+
+### bookings.engine.abilities
+
+- **File:** `engines/bookings/lib/bookings/engine.rb`
+- **Inside:** the `initializer "bookings.register_abilities"` block,
+  after the `booking.manage.bookings` registration.
+- **Purpose:** follow-up generators that ship new bookings ability codes
+  (`resource.action.bookings`) register them here.
+
+### bookings.engine.initializers
+
+- **File:** `engines/bookings/lib/bookings/engine.rb`
+- **Inside:** the engine class body, after the `append_migrations`
+  initializer, before the `config.after_initialize` dependency check.
+- **Purpose:** follow-up generators that need their own
+  `initializer "..." do ... end` block (a subscriber attach, a payment
+  listener) declare it here.
+
+### bookings.routes
+
+- **File:** `engines/bookings/config/routes.rb`
+- **Inside:** the `Bookings::Engine.routes.draw` block, which ships
+  with no routes in this release.
+- **Purpose:** the guest-facing hold, the operator desk, and the read
+  API splice their routes here in later releases.
+
+### bookings.configuration.attributes
+
+- **File:** `engines/bookings/lib/bookings/configuration.rb`
+- **Inside:** the `Configuration` class body, after the `attr_reader
+  :hold_ttl` line.
+- **Purpose:** follow-up generators add knobs (`balance_due_days`,
+  `reference_prefix`) here.

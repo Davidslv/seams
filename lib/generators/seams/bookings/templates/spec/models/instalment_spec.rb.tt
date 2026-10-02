@@ -1,0 +1,23 @@
+# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.describe Bookings::Instalment do
+  it "assigns a unique payable_ref" do
+    first  = create(:booking_instalment)
+    second = create(:booking_instalment)
+    expect(first.payable_ref).to start_with("pay_")
+    expect(first.payable_ref).not_to eq(second.payable_ref)
+  end
+
+  it "refuses an unknown kind or state" do
+    expect(build(:booking_instalment, kind: "tip")).not_to be_valid
+    expect(build(:booking_instalment, state: "lost")).not_to be_valid
+  end
+
+  it "knows which instalment is the first payment" do
+    expect(build(:booking_instalment, kind: "deposit")).to be_first_payment
+    expect(build(:booking_instalment, kind: "full")).to be_first_payment
+    expect(build(:booking_instalment, kind: "balance")).not_to be_first_payment
+  end
+end

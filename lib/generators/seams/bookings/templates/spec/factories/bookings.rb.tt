@@ -1,0 +1,50 @@
+# frozen_string_literal: true
+
+# Factories for Bookings engine specs. Sequences keep slugs and
+# identity ids unique across the run so uniqueness validations and the
+# capacity sum stay honest.
+#
+# `identity_id` is a bare bigint: Bookings stores the guest's
+# Auth::Identity id and never joins to auth_identities, so the factory
+# hands out a fresh integer rather than creating a cross-engine row.
+# Specs that want a real guest create one through the dummy's
+# Auth::Identity stub and pass `identity_id:` explicitly.
+FactoryBot.define do
+  factory :bookings_offering, class: "Bookings::Offering" do
+    sequence(:name) { |n| "Offering #{n}" }
+    sequence(:slug) { |n| "offering-#{n}" }
+    kind            { "class" }
+    confirmation    { "automatic" }
+    status          { "published" }
+
+    factory :bookings_manual_offering do
+      confirmation { "manual" }
+    end
+  end
+
+  factory :bookings_occurrence, class: "Bookings::Occurrence" do
+    association :offering, factory: :bookings_offering
+    starts_at     { 7.days.from_now }
+    ends_at       { 7.days.from_now + 2.hours }
+    capacity      { 10 }
+    price_cents   { 10_000 }
+    deposit_cents { 2_500 }
+    currency      { "gbp" }
+    status        { "published" }
+  end
+
+  factory :booking, class: "Bookings::Booking" do
+    association :occurrence, factory: :bookings_occurrence
+    sequence(:identity_id) { |n| n }
+    quantity { 1 }
+    status   { "held" }
+  end
+
+  factory :booking_instalment, class: "Bookings::Instalment" do
+    association :booking
+    kind         { "deposit" }
+    amount_cents { 2_500 }
+    due_on       { Date.current }
+    state        { "due" }
+  end
+end

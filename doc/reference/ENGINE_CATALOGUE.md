@@ -6,12 +6,13 @@ edit it, and never has to wait for an upstream release to fix a bug.
 
 The **six core engines** (Core, Auth, Accounts, Notifications,
 Billing, Teams) form the canonical SaaS spine and are documented in
-full below. Three further engines are **opt-in** and ship later in the
+full below. Four further engines are **opt-in** and ship later in the
 build order:
 
 - **[Permissions](#permissions)** — the role → ability grant map.
 - **[Admin](#admin)** — Administrate dashboards with a platform/tenant policy split.
 - **[Design](#design)** — the themeable design system + optional app shell.
+- **[Bookings](#bookings)** — dated occurrences, counted places, a hold that cannot oversell.
 
 Wave 9 reworked the identity / account / team boundaries: the old
 `Auth::User` (which conflated credential state and tenant
@@ -245,6 +246,36 @@ the example `_quire.css` theme. See
 [forms](../design-system/DESIGN_SYSTEM_FORMS.md),
 [theming](../design-system/DESIGN_SYSTEM_THEMING.md),
 [accessibility](../design-system/DESIGN_SYSTEM_ACCESSIBILITY.md)).
+
+## Bookings
+
+```bash
+bin/seams bookings
+```
+
+| | |
+| --- | --- |
+| Models | `Bookings::Offering` (name, slug, host-defined `kind`, `confirmation` automatic/manual, status draft/published), `Bookings::Occurrence` (dates, `capacity`, `price_cents`, nullable `deposit_cents`, `currency`, `details` jsonb, status draft/published/cancelled), `Bookings::Booking` (`identity_id`, `quantity`, six statuses, `expires_at`, public `reference`), `Bookings::Instalment` (deposit/balance/full, `amount_cents`, `due_on`, due/requested/paid/refunded, unique `payable_ref`) |
+| Services | `Bookings::HoldService` (the hold, under the occurrence lock), `Bookings::Instalments::MarkPaidService` (an operator records a payment taken by hand) |
+| Jobs | `Bookings::HoldSweepJob` (publishes `booking.hold_expiring.bookings` for `held` rows past `expires_at`; does not change the row) |
+| Migrations | `booking_offerings`, `booking_occurrences`, `bookings`, `booking_instalments` |
+| Events emitted | `occurrence.published.bookings`, `booking.held.bookings`, `booking.hold_expiring.bookings`, `booking.confirmed.bookings`; registered for later phases: `booking.balance_due.bookings`, `booking.rejected.bookings`, `booking.cancelled.bookings` |
+| Configuration | `hold_ttl` (default 30 minutes, maximum 24 hours) |
+
+Bookings is **opt-in** and requires `core` and `auth`. One generated app
+is one operator; the sellable unit is one occurrence with N identical
+places. The occurrence row is the lock: a hold takes it with
+`with_lock`, sums the bookings that count (`held`, `pending_review`,
+`confirmed`), and inserts the booking and its first instalment in that
+transaction. The check is on `Bookings::Booking` itself, so a walk-in
+from the console and an Administrate form take the same lock, and a
+capacity cut below the places taken is refused.
+
+The guest is an `Auth::Identity` referenced by `identity_id` only, with
+no association and no database foreign key. Do not point Billing's
+`billable_class` at the guest. Nothing in the engine names a Billing
+constant: card payment, freeing an expired hold, refunds, and the
+public read API arrive in later phases that listen to the events above.
 
 ## Pulling them together
 

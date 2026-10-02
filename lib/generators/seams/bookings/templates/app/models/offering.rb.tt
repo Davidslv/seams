@@ -1,0 +1,47 @@
+# frozen_string_literal: true
+
+module Bookings
+  # What an operator sells: a class, a workshop, a tour. The dates,
+  # the price, and the capacity live on each occurrence. The offering
+  # carries the name, the host-defined kind, and whether a paid first
+  # instalment confirms a booking on its own (`automatic`) or leaves it
+  # in `pending_review` for the operator (`manual`).
+  class Offering < ApplicationRecord
+    self.table_name = "booking_offerings"
+
+    CONFIRMATIONS = %w[automatic manual].freeze
+    STATUSES      = %w[draft published].freeze
+
+    has_many :occurrences, class_name: "Bookings::Occurrence", dependent: :restrict_with_error
+
+    validates :name, presence: true, length: { maximum: 200 }
+    validates :kind, presence: true, length: { maximum: 100 }
+    validates :slug, presence: true, uniqueness: true,
+                     format: { with: /\A[a-z0-9-]+\z/,
+                               message: "may only contain lowercase letters, digits and dashes" }
+    validates :confirmation, inclusion: { in: CONFIRMATIONS }
+    validates :status, inclusion: { in: STATUSES }
+
+    before_validation :assign_slug, on: :create
+
+    scope :published, -> { where(status: "published") }
+
+    def manual?
+      confirmation == "manual"
+    end
+
+    def automatic?
+      confirmation == "automatic"
+    end
+
+    def published?
+      status == "published"
+    end
+
+    private
+
+    def assign_slug
+      self.slug ||= name.to_s.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/(^-|-$)/, "")
+    end
+  end
+end

@@ -1,0 +1,67 @@
+# frozen_string_literal: true
+
+module Bookings
+  class Engine < ::Rails::Engine
+    isolate_namespace Bookings
+
+    config.generators do |g|
+      g.test_framework :rspec
+    end
+
+    initializer "bookings.register_events" do
+      # Emitted by this release.
+      Seams::EventRegistry.register("occurrence.published.bookings",  emitted_by: "Bookings")
+      Seams::EventRegistry.register("booking.held.bookings",          emitted_by: "Bookings")
+      Seams::EventRegistry.register("booking.hold_expiring.bookings", emitted_by: "Bookings")
+      Seams::EventRegistry.register("booking.confirmed.bookings",     emitted_by: "Bookings")
+      # Registered now so subscribers can attach; emitted by the
+      # review, cancel, and balance paths that ship in later releases.
+      Seams::EventRegistry.register("booking.balance_due.bookings",   emitted_by: "Bookings")
+      Seams::EventRegistry.register("booking.rejected.bookings",      emitted_by: "Bookings")
+      Seams::EventRegistry.register("booking.cancelled.bookings",     emitted_by: "Bookings")
+      # Follow-up generators that emit new bookings events register them here.
+      # seams:insertion-point bookings.engine.events
+    end
+
+    initializer "bookings.register_abilities" do
+      # Ability codes this engine owns, registered exactly like events
+      # (resource.action.engine). Host grant maps reference these codes;
+      # see Seams::Permissions::DEFAULT_GRANTS.
+      Seams::PermissionRegistry.register("offering.manage.bookings",   owned_by: "Bookings")
+      Seams::PermissionRegistry.register("occurrence.manage.bookings", owned_by: "Bookings")
+      Seams::PermissionRegistry.register("booking.read.bookings",      owned_by: "Bookings")
+      Seams::PermissionRegistry.register("booking.manage.bookings",    owned_by: "Bookings")
+      # Follow-up generators that ship new bookings abilities register them here.
+      # seams:insertion-point bookings.engine.abilities
+    end
+
+    initializer "bookings.append_migrations" do |app|
+      unless app.root == root
+        config.paths["db/migrate"].expanded.each do |expanded_path|
+          app.config.paths["db/migrate"] << expanded_path
+        end
+      end
+    end
+
+    # Follow-up generators that need their own initializer block declare it here.
+    # seams:insertion-point bookings.engine.initializers
+
+    config.after_initialize do
+      # Boot-time dependency assertion. Bookings::Booking.identity_id
+      # is the signed-in guest's Auth::Identity id; without auth there
+      # is no one to hold a place. Fail at boot with a clear message
+      # rather than at the first hold.
+      unless defined?(::Auth::Identity)
+        raise <<~MSG
+          [seams bookings] missing required cross-engine dependency:
+              Auth::Identity (run: bin/rails generate seams:auth)
+
+          The bookings engine stores the guest's identity_id from
+          auth_identities; it cannot run without auth. Generate the
+          auth engine, or remove bookings with
+          `bin/rails generate seams:remove bookings --force`.
+        MSG
+      end
+    end
+  end
+end
