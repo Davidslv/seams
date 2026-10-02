@@ -46,6 +46,27 @@ RSpec.describe Bookings::Booking do
     expect(cancelled.update(status: "held", expires_at: 1.hour.from_now)).to be(false)
   end
 
+  it "refuses to move a booking onto an occurrence that has no room" do
+    source = create(:bookings_occurrence, capacity: 3)
+    destination = create(:bookings_occurrence, capacity: 1)
+    create(:booking, occurrence: destination, status: "confirmed", quantity: 1)
+    booking = create(:booking, occurrence: source, status: "confirmed", quantity: 3)
+
+    expect(booking.update(occurrence: destination)).to be(false)
+    expect(booking.errors[:quantity].first).to eq("exceeds the 0 places remaining")
+    expect(booking.reload.occurrence_id).to eq(source.id)
+    expect(destination.reload.places_remaining).to eq(0)
+  end
+
+  it "moves a booking onto an occurrence that has room" do
+    destination = create(:bookings_occurrence, capacity: 3)
+    booking = create(:booking, occurrence: occurrence, status: "confirmed", quantity: 2)
+
+    expect(booking.update(occurrence: destination)).to be(true)
+    expect(destination.reload.places_taken).to eq(2)
+    expect(occurrence.reload.places_taken).to eq(0)
+  end
+
   it "lets a held booking move to confirmed without re-checking capacity" do
     booking = create(:booking, occurrence: occurrence, status: "held", quantity: 2)
     expect(booking.update(status: "confirmed")).to be(true)

@@ -83,13 +83,17 @@ module Bookings
       self.expires_at ||= Time.current + Bookings.configuration.hold_ttl
     end
 
-    # A new counted row, a quantity change, or a move from a status that
-    # does not count back into one that does all take places and need
-    # the lock. A move out of the counted set only frees places.
+    # A new counted row, a quantity change, a move onto another
+    # occurrence, or a return from a status that does not count all
+    # take places and need the lock. A move out of the counted set
+    # only frees places.
     def needs_capacity_check?
       return false unless counted?
 
-      new_record? || will_save_change_to_quantity? || !COUNTED_STATUSES.include?(status_in_database)
+      new_record? ||
+        will_save_change_to_quantity? ||
+        will_save_change_to_occurrence_id? ||
+        !COUNTED_STATUSES.include?(status_in_database)
     end
 
     # The lock is on the model so every writer takes it: the hold

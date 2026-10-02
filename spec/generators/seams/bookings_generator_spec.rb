@@ -185,6 +185,7 @@ RSpec.describe Seams::Generators::BookingsGenerator do
       it "Bookings::Booking takes the occurrence lock before it takes a place" do
         assert_file "engines/bookings/app/models/bookings/booking.rb" do |content|
           expect(content).to match(/validate\s+:occurrence_has_capacity/)
+          expect(content).to include("will_save_change_to_occurrence_id?")
           expect(content).to include(".with_lock")
           expect(content).to include("Bookings.configuration.hold_ttl")
         end
