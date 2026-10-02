@@ -251,6 +251,9 @@ module Seams
         say "    bin/seams design        - Design engine (ui_* component partials,"
         say "                              Tailwind v4 tokens, Design::FormBuilder)."
         say "                              Non-isolated: ui_* helpers resolve host-wide."
+        say "    bin/seams bookings      - Bookings engine (dated occurrences, counted"
+        say "                              places, a hold that cannot oversell)."
+        say "                              Requires core + auth."
         say ""
         say "  Follow-up generators (extend an already-installed engine):", :yellow
         say "    bin/rails generate seams:auth:add_oauth_provider <name>"
