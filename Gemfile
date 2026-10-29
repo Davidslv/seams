@@ -7,7 +7,7 @@ gemspec
 group :development, :test do
   gem "brakeman", "~> 8.0", ">= 8.0.6", require: false
   gem "bundler-audit", "~> 0.9", require: false
-  gem "pry", "~> 0.14"
+  gem "pry", "~> 0.16"
   gem "pry-byebug", "~> 3.10"
   gem "rspec", "~> 3.13"
   gem "rspec-rails", "~> 8.0"
