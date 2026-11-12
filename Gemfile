@@ -10,7 +10,7 @@ group :development, :test do
   gem "pry", "~> 0.14"
   gem "pry-byebug", "~> 3.10"
   gem "rspec", "~> 3.13"
-  gem "rspec-rails", "~> 8.0"
+  gem "rspec-rails", "~> 8.1"
   gem "rubocop", "~> 1.91", require: false
   gem "rubocop-performance", "~> 1.27", require: false
   gem "rubocop-rails", "~> 2.38", require: false
