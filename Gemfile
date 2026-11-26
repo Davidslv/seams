@@ -5,7 +5,7 @@ source "https://rubygems.org"
 gemspec
 
 group :development, :test do
-  gem "brakeman", "~> 8.0", ">= 8.0.6", require: false
+  gem "brakeman", "~> 8.1", require: false
   gem "bundler-audit", "~> 0.9", require: false
   gem "pry", "~> 0.14"
   gem "pry-byebug", "~> 3.10"
